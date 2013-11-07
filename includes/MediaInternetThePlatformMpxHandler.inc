@@ -11,10 +11,8 @@ class MediaInternetThePlatformMpxHandler extends MediaInternetBaseHandler {
    */
   public function parse($embed_code) {
     // Valid format: mpx://[anything here].
-    preg_match('/^(mpx://)/i', $embed_code, $matches);
-    $host = $matches[1];
-
-    if ($host) {
+    preg_match('/mpx:\/\//i', $embed_code, $matches);
+    if(isset($matches[0])) {
       return file_stream_wrapper_uri_normalize($embed_code);
     }
     else {
