@@ -16,7 +16,8 @@
  */
 function media_theplatform_mpx_get_changed_ids($since) {
   $url = 'http://data.media.theplatform.com/media/notify?token=' . media_theplatform_mpx_variable_get('token') . '&account=' . media_theplatform_mpx_variable_get('import_account') . '&block=false&filter=Media&clientId=drupal_media_theplatform_mpx_' . media_theplatform_mpx_variable_get('account_pid') . '&since=' . $since;
-  $result = drupal_http_request($url);
+  $options = array('timeout' => media_theplatform_mpx_variable_get('cron_get_changed_ids_timeout', 120) );
+  $result = drupal_http_request($url, $options);
   if (isset($result->data)) {
     $result_data = drupal_json_decode($result->data);
     if (isset($result_data) && count($result_data) > 0) {
