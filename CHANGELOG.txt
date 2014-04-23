@@ -1,12 +1,3 @@
-Media: thePlatform mpx 7.x-2.3
-------------------------------------------
-- Fixed bugs
-- Added JS and iFrame embed methods
-- Added alter hooks for developers
-- Separate mimetypes for players and videos
-- Code cleanup
-
-
 Media: thePlatform mpx 7.x-2.2
 ------------------------------------------
 - Added hooks for Ctools custom content and embedding nodes in Panels.

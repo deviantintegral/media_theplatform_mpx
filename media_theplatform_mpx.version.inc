@@ -53,34 +53,3 @@ function media_theplatform_mpx_form_alter(&$form, &$form_state, $form_id) {
     }
   }
 }
-
-/**
- * Implements hook_ctools_render_alter().
- */
-function media_theplatform_mpx_ctools_render_alter(&$info, &$page, &$context) {
-  // Checks for any Media fids in $context array.
-  $context_array_values = print_r($context, TRUE);
-  $fids = media_theplatform_mpx_extract_fids($context_array_values);
-
-  // Checks for Media fids in Ctools Custom Content which have been saved for re-use.
-  // These fids do not appear in the $context array, so we must query ctools_custom_content datatable.
-  foreach ($context['handler']->conf['display']->content as $ctools_item) {
-    if ($ctools_item->type == 'custom' && $ctools_item->subtype != 'custom') {
-      // Query ctools_custom_content to get its saved content.
-      $ctools_item_data = db_select('ctools_custom_content', 'cc')
-        ->fields('cc')
-        ->condition('name', $ctools_item->subtype, '=')
-        ->execute()
-        ->fetchAssoc();
-      // If ctools_custom_content record exists, check its content for any Media files.
-      if ($ctools_item_data) {
-        $ctools_item_fids = media_theplatform_mpx_extract_fids($ctools_item_data['settings']);
-        // If Media Files exist, add them to $fids array.
-        if ($ctools_item_fids) {
-          $fids = array_merge($fids, $ctools_item_fids);
-        }
-      }
-    }
-  }
-  media_theplatform_mpx_add_player_head($fids);
-}

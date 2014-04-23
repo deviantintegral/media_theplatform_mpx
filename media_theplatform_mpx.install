@@ -8,6 +8,7 @@
  * Implements hook_schema().
  */
 function media_theplatform_mpx_schema() {
+
   $schema['mpx_player'] = array(
     'description' => 'Stores imported mpxPlayers.',
     'fields' => array(
@@ -20,16 +21,15 @@ function media_theplatform_mpx_schema() {
       'title' => array(
         'description' => 'Title in thePlatform',
         'type' => 'varchar',
-        'length' => 255,
+        'length' => 2048,
         'not null' => TRUE,
         'default' => '',
       ),
       'description' => array(
         'description' => 'Description in thePlatform',
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => FALSE,
-        'default' => '',
+        'type' => 'text',
+        'size' => 'medium',
+        'not null' => TRUE,
       ),
       'id' => array(
         'description' => 'Id in thePlatform',
@@ -45,11 +45,11 @@ function media_theplatform_mpx_schema() {
         'default' => '',
       ),
       'guid' => array(
-        'description' => 'Title of the mpxPlayer',
+        'description' => 'Guid in thePlatform',
         'type' => 'varchar',
-        'length' => 255,
+        'length' => 512,
         'not null' => TRUE,
-        'default' => '',
+        'default' => 0,
       ),
       'fid' => array(
         'description' => 'Fid in file_managed',
@@ -57,8 +57,15 @@ function media_theplatform_mpx_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+      'parent_account' => array(
+        'description' => 'Top-Level Account in thePlatform',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
       'account' => array(
-        'description' => 'Account in thePlatform',
+        'description' => 'Sub-Account in thePlatform',
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
@@ -71,14 +78,6 @@ function media_theplatform_mpx_schema() {
       'body_html' => array(
         'type' => 'blob',
         'description' => 'HTML in the <head> tag',
-      ),
-      'height' => array(
-        'description' => 'height of the player',
-        'type' => 'int',
-      ),
-      'width' => array(
-        'description' => 'width of the player',
-        'type' => 'int',
       ),
       'player_data' => array(
         'type' => 'blob',
@@ -104,7 +103,11 @@ function media_theplatform_mpx_schema() {
       ),
     ),
     'primary key' => array('player_id'),
+    'indexes' => array(
+      'fid' => array('fid'),
+    ),
   );
+
   $schema['mpx_video'] = array(
     'description' => 'Stores imported mpx Videos.',
     'fields' => array(
@@ -117,28 +120,27 @@ function media_theplatform_mpx_schema() {
       'title' => array(
         'description' => 'Title in thePlatform',
         'type' => 'varchar',
-        'length' => 255,
+        'length' => 2048,
         'not null' => TRUE,
         'default' => '',
       ),
       'description' => array(
         'description' => 'Description in thePlatform',
-        'type' => 'varchar',
-        'length' => 255,
+        'type' => 'text',
+        'size' => 'medium',
         'not null' => TRUE,
-        'default' => '',
       ),
       'id' => array(
+        'description' => 'Id in thePlatform',
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
         'default' => '',
-        'description' => 'Id in thePlatform',
       ),
       'guid' => array(
         'description' => 'Guid in thePlatform',
         'type' => 'varchar',
-        'length' => 255,
+        'length' => 512,
         'not null' => TRUE,
         'default' => 0,
       ),
@@ -153,25 +155,26 @@ function media_theplatform_mpx_schema() {
         'type' => 'int',
         'not null' => FALSE,
       ),
-      'release_id' => array(
-        'description' => 'Release ID (used for JS and iFrame embeds)',
+      'parent_account' => array(
+        'description' => 'Top-Level Account in thePlatform',
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
         'default' => '',
       ),
       'account' => array(
-        'description' => 'Account in thePlatform',
+        'description' => 'Sub-Account in thePlatform',
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
         'default' => '',
       ),
       'thumbnail_url' => array(
-        'type' => 'varchar',
-        'length' => '255',
-        'not null' => TRUE,
         'description' => 'thumbnail URL',
+        'type' => 'varchar',
+        'length' => '2048',
+        'not null' => TRUE,
+        'default' => '',
       ),
       'created' => array(
         'description' => 'timestamp of created',
@@ -191,65 +194,265 @@ function media_theplatform_mpx_schema() {
         'not null' => TRUE,
         'default' => 1,
       ),
+      // Additional default mpx fields.
+      'released_file_pids' => array(
+        'description' => 'Released File Public IDs',
+        'type' => 'blob',
+        'size' => 'normal',
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'default_released_file_pid' => array(
+        'description' => 'Default Video Public ID',
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'categories' => array(
+        'description' => 'Video Categories',
+        'type' => 'blob',
+        'size' => 'big',
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'author' => array(
+        'description' => 'Video Author',
+        'type' => 'varchar',
+        'length' => 512,
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'airdate' => array(
+        'description' => 'Video Air Date',
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'available_date' => array(
+        'description' => 'Video Available Date',
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'expiration_date' => array(
+        'description' => 'Video Expiration Date',
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'keywords' => array(
+        'description' => 'Video Keywords',
+        'type' => 'text',
+        'size' => 'medium',
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'copyright' => array(
+        'description' => 'Video Copyright',
+        'type' => 'varchar',
+        'length' => 512,
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'related_link' => array(
+        'description' => 'Video Related Link',
+        'type' => 'varchar',
+        'length' => 2048,
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'fab_rating' => array(
+        'description' => 'Video Film Advisory Board Rating',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'fab_sub_ratings' => array(
+        'description' => 'Video Film Advisory Board Sub-Ratings',
+        'type' => 'blob',
+        'size' => 'normal',
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'mpaa_rating' => array(
+        'description' => 'Video MPAA Rating',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'mpaa_sub_ratings' => array(
+        'description' => 'Video MPAA Sub-Ratings',
+        'type' => 'blob',
+        'size' => 'normal',
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'vchip_rating' => array(
+        'description' => 'Video V-Chip Rating',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'vchip_sub_ratings' => array(
+        'description' => 'Video V-Chip Sub-Ratings',
+        'type' => 'blob',
+        'size' => 'normal',
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'exclude_countries' => array(
+        'description' => 'Exclude the countries in the "countries" field.',
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
+      'countries' => array(
+        'description' => 'Video Countries',
+        'type' => 'blob',
+        'size' => 'normal',
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
     ),
     'primary key' => array('video_id'),
+    'indexes' => array(
+      'fid' => array('fid'),
+    ),
   );
-  $schema['mpx_log'] = array(
-    'description' => 'Stores mpx log data.',
+
+  $schema['mpx_accounts'] = array(
+    'description' => 'Stores mpx account data.',
     'fields' => array(
-      'log_id' => array(
-        'description' => 'Counter ID field',
+      'id' => array(
+        'description' => 'Internal Account ID',
         'type' => 'serial',
         'unsigned' => TRUE,
         'not null' => TRUE,
       ),
-      'uid' => array(
-        'description' => 'User uid',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'type' => array(
-        'description' => 'Log type',
+      'username' => array(
+        'description' => 'thePlatform Account Username',
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
         'default' => '',
       ),
-      'type_id' => array(
-        'description' => 'Type id',
-        'type' => 'varchar',
-        'length' => 255,
-        'default' => NULL,
-      ),
-      'action' => array(
-        'description' => 'Action desc',
+      'password' => array(
+        'description' => 'thePlatform Account Password',
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
         'default' => '',
       ),
-      'details' => array(
+      'token' => array(
+        'description' => 'thePlatform Authentication Token',
         'type' => 'varchar',
         'length' => 255,
-        'description' => 'Action details',
+        'not null' => FALSE,
       ),
-      'timestamp' => array(
-        'description' => 'timestamp of created',
+      'idle_timeout' => array(
+        'description' => 'Token Expiry Timestamp',
         'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
+        'not null' => FALSE,
+      ),
+      'import_account' => array(
+        'description' => 'thePlatform Import Sub-Account',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => FALSE,
+      ),
+      'account_id' => array(
+        'description' => 'thePlatform Account ID',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => FALSE,
+      ),
+      'account_pid' => array(
+        'description' => 'thePlatform Public Account ID',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => FALSE,
+      ),
+      'default_player' => array(
+        'description' => 'ID From mpx_player Table.',
+        'type' => 'int',
+        'not null' => FALSE,
+      ),
+      'last_notification' => array(
+        'description' => 'Last Notification Request Indicator',
+        'type' => 'int',
+        'not null' => FALSE,
+      ),
+      'proprocessing_batch_url' => array(
+        'description' => 'Feed Request Batch URL',
+        'type' => 'varchar',
+        'length' => 1024,
+        'not null' => FALSE,
+      ),
+      'proprocessing_batch_item_count' => array(
+        'description' => 'Feed Request Batch Item Count.',
+        'type' => 'int',
+        'not null' => FALSE,
+      ),
+      'proprocessing_batch_current_item' => array(
+        'description' => 'Current Feed Request Batch Item.',
+        'type' => 'int',
+        'not null' => FALSE,
       ),
     ),
-    'primary key' => array('log_id'),
+    'primary key' => array('id'),
   );
+
   return $schema;
+}
+
+/**
+ * Implements hook_requirements().
+ */
+function media_theplatform_mpx_requirements($phase) {
+
+  $requirements = array();
+  $t = get_t();
+
+  if ($phase == 'install' || $phase == 'update') {
+    $mcrypt_requirement_level = function_exists('mcrypt_encrypt') ? REQUIREMENT_OK : REQUIREMENT_ERROR;
+    $mcrypt_requirement_description = function_exists('mcrypt_encrypt') ? '' :
+      $t('mcrypt PHP extension must be installed for secure data storage.');
+    $requirements['media_theplatform_mpx_mcrypt_extension'] = array(
+      'title' => $t('mcrypt PHP Extension'),
+      'value' => $mcrypt_requirement_level,
+      'description' => $mcrypt_requirement_description,
+      'severity' => $mcrypt_requirement_description,
+    );
+  }
+  else if ($phase == 'runtime') {
+    $zend_crypt_library = libraries_load('zend_crypt');
+    $zend_crypt_requirement_level = $zend_crypt_library['loaded'] ? REQUIREMENT_OK : REQUIREMENT_ERROR;
+    $zend_crypt_requirement_description = $zend_crypt_library['loaded'] ? '' :
+      $t('Zend Crypt library must be installed for secure data storage.  Refer to library info for retrieving this library.');
+    $requirements['media_theplatform_mpx_zend_crypt_library'] = array(
+      'title' => $t('Zend Crypt Library'),
+      'value' => $t('enabled'),
+      'description' => $zend_crypt_requirement_description,
+      'severity' => $zend_crypt_requirement_level,
+    );
+  }
+
+  return $requirements;
 }
 
 /**
  * Implements hook_install().
  */
 function media_theplatform_mpx_install() {
+
   return array();
 }
 
@@ -258,8 +461,9 @@ function media_theplatform_mpx_install() {
  */
 function media_theplatform_mpx_uninstall() {
   drupal_load('module', 'media_theplatform_mpx');
-  // Expire signIn token.
-  media_theplatform_mpx_expire_token();
+  foreach (_media_theplatform_mpx_get_account_data() as $account) {
+    _media_theplatform_mpx_delete_account($account->id);
+  }
   foreach (media_theplatform_mpx_variable_default() as $variable => $value) {
     media_theplatform_mpx_variable_del($variable);
   }
@@ -267,16 +471,10 @@ function media_theplatform_mpx_uninstall() {
 }
 
 /**
- * Adds support for separate mimetypes for players and videos
- */
-function media_theplatform_mpx_update_7200() {
-  db_query("UPDATE file_managed m SET m.filemime = 'player/mpx' WHERE m.uri LIKE 'mpx://p/%'");
-}
-
-/**
  * Add player_id field to mpx_video table.
  */
-function media_theplatform_mpx_update_7201() {
+function media_theplatform_mpx_update_7200() {
+
   $default_player_fid = media_theplatform_mpx_variable_get('default_player_fid', '');
   $default_player_id = db_query('SELECT player_id FROM {mpx_player} WHERE fid = :fid',
     array(':fid' => $default_player_fid))->fetchField();
@@ -291,38 +489,355 @@ function media_theplatform_mpx_update_7201() {
 }
 
 /**
- * Add height and width fields to player table
+ * Encrypt existing sensitive variables.
  */
-function media_theplatform_mpx_update_7202() {
-  $height_field = array(
-    'description' => 'height of the player',
-    'type' => 'int',
-  );
-  $width_field = array(
-    'description' => 'width of the player',
-    'type' => 'int',
-  );
-  db_add_field('mpx_player', 'height', $height_field);
-  db_add_field('mpx_player', 'width', $width_field);
+function media_theplatform_mpx_update_7201() {
 
-  // Update existing players
-  media_theplatform_mpx_import_all_players();
+  if (db_table_exists('cache_libraries')) {
+    cache_set('module_implements', array(), 'cache_bootstrap');
+    drupal_static_reset('module_implements');
+    cache_clear_all('*', 'cache_libraries', TRUE);
+    drupal_static_reset('libraries_info');
+  }
+
+  if ($username = variable_get(media_theplatform_mpx_NAMESPACE . 'username', NULL)) {
+    media_theplatform_mpx_variable_set('username', base64_decode($username));
+  }
+  if ($password = variable_get(media_theplatform_mpx_NAMESPACE . 'password', NULL)) {
+    media_theplatform_mpx_variable_set('password', base64_decode($password));
+  }
+  if ($token = variable_get(media_theplatform_mpx_NAMESPACE . 'token', NULL)) {
+    media_theplatform_mpx_variable_set('token', base64_decode($token));
+  }
 }
 
 /**
- * Add release_id field to video table
+ * Add the mpx_accounts table.  Add parent_account column to the mpx_player and
+ * mpx_video tables.  Convert existing mpx data to multi-account configuration.
  */
-function media_theplatform_mpx_update_7203() {
-  $release_id_field = array(
-    'description' => 'Release ID (used for JS embed)',
+function media_theplatform_mpx_update_7202() {
+
+  // Add a parent_account reference column to the mpx_player and mpx_video players.
+  $parent_account_field = array(
+    'description' => 'Top-Level Account in thePlatform',
     'type' => 'varchar',
     'length' => 255,
     'not null' => TRUE,
     'default' => '',
   );
-  db_add_field('mpx_video', 'release_id', $release_id_field);
+  db_add_field('mpx_player', 'parent_account', $parent_account_field);
+  db_add_field('mpx_video', 'parent_account', $parent_account_field);
 
-  // Update existing videos
-  media_theplatform_mpx_variable_set('last_notification', 0);
-  media_theplatform_mpx_import_all_videos('update');
+  // Create the mpx_accounts table.
+  db_create_table('mpx_accounts', drupal_get_schema_unprocessed('media_theplatform_mpx', 'mpx_accounts'));
+
+  // Convert mpx account system variables to a single entry in the mpx_accounts
+  // table.
+  $account_inserted = FALSE;
+  if (($current_username = media_theplatform_mpx_variable_get('username')) &&
+      ($current_password = media_theplatform_mpx_variable_get('password')) &&
+      ($current_token = media_theplatform_mpx_variable_get('token')) &&
+      ($current_idle_timeout = media_theplatform_mpx_variable_get('date_idletimeout'))) {
+    db_query('INSERT INTO {mpx_accounts} (username, password, token, idle_timeout)
+      VALUES (:username, :password, :token, :idle_timeout)',
+      array(
+        ':username' => _media_theplatform_mpx_encrypt_value($current_username),
+        ':password' => _media_theplatform_mpx_encrypt_value($current_password),
+        ':token' => _media_theplatform_mpx_encrypt_value($current_token),
+        ':idle_timeout' => $current_idle_timeout,
+      ));
+    $account_inserted = TRUE;
+  }
+
+  if (!$account_inserted) {
+    drupal_set_message(t('Old thePlatform mpx account were not carried over into the new multi-account configuration'));
+  }
+
+  $update_fields = array();
+
+  if (($current_import_account = media_theplatform_mpx_variable_get('import_account')) &&
+      ($current_account_id = media_theplatform_mpx_variable_get('account_id')) &&
+      ($current_account_pid = media_theplatform_mpx_variable_get('account_pid'))) {
+    $update_fields['import_account'] = $current_import_account;
+    $update_fields['account_id'] = $current_account_id;
+    $update_fields['account_pid'] = $current_account_pid;
+  }
+  if ($current_player_fid = media_theplatform_mpx_variable_get('default_player_fid')) {
+    $current_player = media_theplatform_mpx_get_mpx_player_by_fid($current_player_fid);
+    $update_fields['default_player'] = $current_player['player_id'];
+  }
+  if ($current_last_notification = media_theplatform_mpx_variable_get('last_notification')) {
+    $update_fields['last_notification'] = $current_last_notification;
+  }
+  if (($current_proprocessing_batch_url = media_theplatform_mpx_variable_get('proprocessing_batch_url')) &&
+      ($current_proprocessing_batch_item_count = media_theplatform_mpx_variable_get('proprocessing_batch_item_count')) &&
+      ($current_proprocessing_batch_current_item = media_theplatform_mpx_variable_get('proprocessing_batch_current_item'))) {
+    $update_fields['proprocessing_batch_url'] = $current_proprocessing_batch_url;
+    $update_fields['proprocessing_batch_item_count'] = $current_proprocessing_batch_item_count;
+    $update_fields['proprocessing_batch_current_item'] = $current_proprocessing_batch_current_item;
+  }
+
+  if (!empty($update_fields)) {
+    db_update('mpx_accounts')
+      ->fields($update_fields)
+      ->condition('id', 1)
+      ->execute();
+  }
+
+  // Set the new parent_account column in the mpx_player and mpx_video tables
+  // to the id of the record added above.
+  db_query('UPDATE {mpx_player} SET parent_account = 1');
+  db_query('UPDATE {mpx_video} SET parent_account = 1');
+}
+
+/**
+ * Add default mpx fields to mpx_video table.
+ */
+function media_theplatform_mpx_update_7203() {
+
+  $default_mpx_fields = array(
+    'released_file_pids',
+    'default_released_file_pid',
+    'categories',
+    'author',
+    'airdate',
+    'available_date',
+    'expiration_date',
+    'keywords',
+    'copyright',
+    'related_link',
+    'fab_rating',
+    'fab_sub_ratings',
+    'mpaa_rating',
+    'mpaa_sub_ratings',
+    'vchip_rating',
+    'vchip_sub_ratings',
+    'exclude_countries',
+    'countries',
+  );
+  $mpx_video_schema = drupal_get_schema_unprocessed('media_theplatform_mpx', 'mpx_video');
+
+  foreach ($default_mpx_fields as $field_name) {
+    db_add_field('mpx_video', $field_name, $mpx_video_schema['fields'][ $field_name ]);
+  }
+}
+
+/**
+ * Increase the length of the mpx_video thumbnail_url column.
+ */
+function media_theplatform_mpx_update_7204() {
+
+  db_change_field('mpx_video', 'thumbnail_url', 'thumbnail_url',
+    array(
+      'type' => 'varchar',
+      'length' => '1024',
+      'not null' => TRUE,
+    )
+  );
+}
+
+/**
+ * Increase the length of the mpx_accounts proprocessing_batch_url column.
+ */
+function media_theplatform_mpx_update_7205() {
+
+  db_change_field('mpx_accounts', 'proprocessing_batch_url', 'proprocessing_batch_url',
+    array(
+      'type' => 'varchar',
+      'length' => '512',
+      'not null' => FALSE,
+    )
+  );
+}
+
+/**
+ * Add an index to the db table in order to improve query performance.
+ */
+function media_theplatform_mpx_update_7206() {
+  db_add_index('mpx_player', 'fid', array('fid'));
+  db_add_index('mpx_video', 'fid', array('fid'));
+}
+
+/**
+ * Remove the mpx_log table.
+ */
+function media_theplatform_mpx_update_7207() {
+
+  db_drop_table('mpx_log');
+}
+
+/**
+ * Increase the length of the mpx_accounts proprocessing_batch_url column (again).
+ */
+function media_theplatform_mpx_update_7208() {
+
+  db_change_field('mpx_accounts', 'proprocessing_batch_url', 'proprocessing_batch_url',
+    array(
+      'type' => 'varchar',
+      'length' => '1024',
+      'not null' => FALSE,
+    )
+  );
+}
+
+/**
+ * Upping default mpx field length limits with latest findings from thePlatform.
+ */
+function media_theplatform_mpx_update_7209() {
+
+  // mpx_player table
+  db_change_field('mpx_player', 'title', 'title',
+    array(
+     'description' => 'Title in thePlatform',
+     'type' => 'varchar',
+     'length' => 2048,
+     'not null' => TRUE,
+     'default' => '',
+    )
+  );
+  db_change_field('mpx_player', 'description', 'description',
+    array(
+     'description' => 'Description in thePlatform',
+     'type' => 'text',
+     'size' => 'medium',
+     'not null' => TRUE,
+    )
+  );
+  db_change_field('mpx_player', 'guid', 'guid',
+    array(
+     'description' => 'Guid in thePlatform',
+     'type' => 'varchar',
+     'length' => 512,
+     'not null' => TRUE,
+     'default' => 0,
+    )
+  );
+
+  // mpx_video table
+  db_change_field('mpx_video', 'title', 'title',
+    array(
+     'description' => 'Title in thePlatform',
+     'type' => 'varchar',
+     'length' => 2048,
+     'not null' => TRUE,
+     'default' => '',
+    )
+  );
+  db_change_field('mpx_video', 'description', 'description',
+    array(
+     'description' => 'Description in thePlatform',
+     'type' => 'text',
+     'size' => 'medium',
+     'not null' => TRUE,
+    )
+  );
+  db_change_field('mpx_video', 'guid', 'guid',
+    array(
+     'description' => 'Guid in thePlatform',
+     'type' => 'varchar',
+     'length' => 512,
+     'not null' => TRUE,
+     'default' => 0,
+    )
+  );
+  db_change_field('mpx_video', 'thumbnail_url', 'thumbnail_url',
+    array(
+     'description' => 'thumbnail URL',
+     'type' => 'varchar',
+     'length' => '2048',
+     'not null' => TRUE,
+     'default' => '',
+    )
+  );
+  db_change_field('mpx_video', 'default_released_file_pid', 'default_released_file_pid',
+    array(
+     'description' => 'Default Video Public ID',
+     'type' => 'varchar',
+     'length' => 64,
+     'not null' => FALSE,
+     'default' => NULL,
+    )
+  );
+  db_change_field('mpx_video', 'categories', 'categories',
+    array(
+     'description' => 'Video Categories',
+     'type' => 'blob',
+     'size' => 'big',
+     'not null' => FALSE,
+     'default' => NULL,
+    )
+  );
+  db_change_field('mpx_video', 'author', 'author',
+    array(
+     'description' => 'Video Author',
+     'type' => 'varchar',
+     'length' => 512,
+     'not null' => FALSE,
+     'default' => NULL,
+    )
+  );
+  db_change_field('mpx_video', 'keywords', 'keywords',
+    array(
+     'description' => 'Video Keywords',
+     'type' => 'text',
+     'size' => 'medium',
+     'not null' => FALSE,
+     'default' => NULL,
+    )
+  );
+  db_change_field('mpx_video', 'copyright', 'copyright',
+    array(
+      'description' => 'Video Related Link',
+      'type' => 'varchar',
+      'length' => 2048,
+      'not null' => FALSE,
+      'default' => NULL,
+    )
+  );
+}
+
+/**
+ * Appending account id to mpx video file entity URIs.
+ */
+function media_theplatform_mpx_update_7210(&$sandbox) {
+
+  // Update all existing mpx video file entity URIs.
+  if (empty($sandbox['progress'])) {
+    $sandbox['progress']['current_fid'] = 0;
+    $sandbox['progress']['current_table'] = 'file_managed';
+  }
+
+  $mpx_accounts = _media_theplatform_mpx_get_account_data();
+  $mpx_account_type_id_ref = array();
+  foreach ($mpx_accounts as $id => $account) {
+    $mpx_account_type_id_ref['mpx_video_' . $id] = basename($account->account_id);
+  }
+
+  $files_to_process = db_select($sandbox['progress']['current_table'], 'f')
+    ->fields('f', array('fid', 'uri', 'type'))
+    ->condition('type', 'mpx_video_%', 'LIKE')
+    ->condition('fid', $sandbox['progress']['current_fid'], '>')
+    ->orderBy('fid', 'ASC')
+    ->range(0, 25)
+    ->execute()
+    ->fetchAll();
+
+  if (empty($files_to_process) && $sandbox['progress']['current_table'] == 'file_managed') {
+    $sandbox['progress']['current_table'] = 'file_managed_revisions';
+    $sandbox['progress']['current_fid'] = 0;
+    $sandbox['#finished'] = 0;
+    return;
+  }
+  elseif (empty($files_to_process)) {
+    $sandbox['#finished'] = 1;
+    return t('Finished appending account data to mpx video file URIs.');
+  }
+
+  foreach ($files_to_process as $file) {
+    $new_file_uri = $file->uri . '/a/' . $mpx_account_type_id_ref[$file->type];
+    _media_theplatform_mpx_update_file_uri($file->fid, $new_file_uri, $sandbox['progress']['current_table']);
+    $sandbox['progress']['current_fid'] = $file->fid;
+  }
+
+  $sandbox['#finished'] = 0;
 }

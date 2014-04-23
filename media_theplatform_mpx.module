@@ -18,33 +18,6 @@ include_once ('media_theplatform_mpx.video.php');
 include_once ('media_theplatform_mpx.version.inc');
 
 /**
- * Implements hook_page_build().
- */
-function media_theplatform_mpx_page_build(&$page) {
-  // This is now only used if the HTML+JS embed method is enabled
-  if(media_theplatform_mpx_variable_get('embed_method', 0) == 0) {
-    $page_array_text = print_r($page, TRUE);
-    // Sometimes the page array contains recursion, like on the node edit form.
-    $infinite = strpos($page_array_text, '*RECURSION*');
-    // Only extract file ID's if we're on a page array with no recursion.
-    if ($infinite === FALSE) {
-      array_walk_recursive($page, 'media_theplatform_mpx_add_player_head_recursive');
-    }
-  }
-}
-
-/**
- * Implements hook_preprocess_panels_pane().
- */
-function media_theplatform_mpx_preprocess_panels_pane(&$vars) {
-  // This is now only used if the HTML+JS embed method is enabled
-  if(media_theplatform_mpx_variable_get('embed_method', 0) == 0) {
-    // This will add MPX JS/CSS for any nodes displayed as "full" in Panels panes that have MPX Files embedded.
-    array_walk_recursive($vars, 'media_theplatform_mpx_add_player_head_recursive');
-  }
-}
-
-/**
  * Searches $item => $key for Media Files and calls MPX add_player_head for all found Files.
  *
  * @param $item
@@ -59,7 +32,7 @@ function media_theplatform_mpx_add_player_head_recursive($item, $key) {
     $fids = media_theplatform_mpx_extract_fids($item);
   }
   // Else check if this is a file object:
-  elseif ($key == '#file' && is_object($item) && isset($item->filename) && ($item->filemime == 'video/mpx' || $item->filemime == 'player/mpx')) {
+  elseif ($key == '#file' && is_object($item) && isset($item->filename) && $item->filemime == 'player/mpx') {
     $fids[] = $item->fid;
   }
   // If we found files:
@@ -158,6 +131,9 @@ function media_theplatform_mpx_menu() {
  * Implements hook_init().
  */
 function media_theplatform_mpx_init() {
+  // Register a shutdown function that expires the outstanding authentication token.
+  drupal_register_shutdown_function('_media_theplatform_mpx_expire_all_tokens');
+
   // Add module CSS.
   drupal_add_css(drupal_get_path('module', 'media_theplatform_mpx') . '/css/media_theplatform_mpx.css', array(
     'group' => CSS_DEFAULT,
@@ -239,25 +215,57 @@ function media_theplatform_mpx_media_parse($embed_code) {
  * Implements hook_file_delete().
  */
 function media_theplatform_mpx_file_delete($file) {
+
   // If its a mpx file, delete its record in mpx_player or mpx_video.
   if ($file->filemime == 'video/mpx' || $file->filemime == 'player/mpx') {
+
     $wrapper = file_stream_wrapper_get_instance_by_uri($file->uri);
     $parts = $wrapper->get_parameters();
 
     // Deleting a mpxPlayer:
     // This is assuming that you know you're doing.
-    // If a user tries to delete through the Media forms, they can't submit if the mpxPlayer is referenced by other mpxMedia.
-    // If they're just deleting this record in the database or thru PHP, well, it could kill other mpxMedia Files that reference it and then good luck to you.
+    // If a user tries to delete through the Media forms, they can't submit if
+    // the mpxPlayer is referenced by other mpxMedia. If they're just deleting
+    // this record in the database or thru PHP, well, it could kill other
+    // mpxMedia Files that reference it and then good luck to you.
     if ($parts['mpx_type'] == 'player') {
       $player = media_theplatform_mpx_get_mpx_player_by_fid($file->fid);
-      db_delete('mpx_player')->condition('fid', $file->fid)->execute();
-      $deleted_id = $player['player_id'];
+      watchdog('media_theplatform_mpx', 'Deleting player @pid in the mpx_player table which is associated with file @fid that is being deleted.',
+        array(
+          '@pid' => $player['id'],
+          '@fid' => $file->fid,
+        ),
+        WATCHDOG_DEBUG);
+      $delete_result = db_delete('mpx_player')->condition('fid', $file->fid)->execute();
+      if (!$delete_result) {
+        watchdog('media_theplatform_mpx', 'Failed to delete player @pid associated with file @fid which is being deleted.',
+          array(
+            '@pid' => $player['id'],
+            '@fid' => $file->fid,
+          ),
+          WATCHDOG_ERROR);
+      }
+      else {
+        watchdog('media_theplatform_mpx', 'Successfully deleted player @pid associated with file @fid which is being deleted.',
+          array(
+            '@pid' => $player['id'],
+            '@fid' => $file->fid,
+          ),
+          WATCHDOG_NOTICE);
+      }
     }
-
     // Deleting a Video:
     elseif ($parts['mpx_type'] == 'video') {
+
       // Check for other mpxMedia Files that also reference this mpx_video.
       $guid = $parts['mpx_id'];
+
+      // Delete any thumbnails in file system that may exist.
+      $local_path = 'public://media-mpx/' . $parts['mpx_id'] . '.jpg';
+      if (is_file($local_path)) {
+        unlink($local_path);
+      }
+
       $files = db_select('file_managed', 'f')
         ->fields('f')
         ->condition('fid', $file->fid, '!=')
@@ -279,20 +287,93 @@ function media_theplatform_mpx_file_delete($file) {
       else {
         // @todo - store video_id
         // Delete the mpx_video record.
-        $deleted_id = db_delete('mpx_video')->condition('guid', $guid)->execute();
-        // Log deletion.
-        global $user;
-        $log = array(
-          'uid' => $user->uid,
-          'type' => $parts['mpx_type'],
-          'type_id' => $deleted_id,
-          'action' => 'deleted',
-          'details' => 'deleted file id' . $file->fid,
-        );
-        media_theplatform_mpx_insert_log($log);
+        watchdog('media_theplatform_mpx', 'Deleting video with GUID "@guid" in the mpx_player table which is associated with file @fid that is being deleted.',
+          array(
+            '@guid' => $guid,
+            '@fid' => $file->fid,
+          ),
+          WATCHDOG_DEBUG);
+        $delete_result = db_delete('mpx_video')->condition('guid', $guid)->execute();
+        if (!$delete_result) {
+          watchdog('media_theplatform_mpx', 'Failed to delete video with GUID "@guid" associated with file @fid which is being deleted.',
+            array(
+              '@guid' => $guid,
+              '@fid' => $file->fid,
+            ),
+            WATCHDOG_ERROR);
+        }
+        else {
+          watchdog('media_theplatform_mpx', 'Successfully deleted video with GUID "@guid" associated with file @fid which is being deleted.',
+            array(
+              '@guid' => $guid,
+              '@fid' => $file->fid,
+            ),
+            WATCHDOG_NOTICE);
+        }
       }
     }
 
+    // Delete filed and image media references to the file about to be deleted.
+    foreach (file_usage_list($file) as $module_name => $object_info) {
+      foreach ($object_info as $entity_type => $entity_info) {
+        $entity_type_info = entity_get_info($entity_type);
+        foreach ($entity_info as $entity_id => $usage_count) {
+          $entity = entity_load($entity_type, array($entity_id));
+          $entity = reset($entity);
+          $save_entity = FALSE;
+          if (!isset($entity->{$entity_type_info['entity keys']['bundle']})) {
+            continue;
+          }
+          $field_instances = field_info_instances($entity_type, $entity->{$entity_type_info['entity keys']['bundle']});
+          foreach ($field_instances as $field_name => $field_data) {
+            $field_language = field_language($entity_type, $entity, $field_name);
+            if (!isset($entity->{$field_name}[$field_language]) || !is_array($entity->{$field_name}[$field_language])) {
+              continue;
+            }
+            $field_info = field_info_field($field_name);
+            if (($field_info['module'] == 'image' && $field_info['type'] == 'image')
+                || ($field_info['module'] == 'file' && $field_info['type'] == 'file')) {
+              foreach ($entity->{$field_name}[$field_language] as $key => $value) {
+                $value = (array)$value;
+                if (isset($value['fid']) && $value['fid'] == $file->fid) {
+                  unset($entity->{$field_name}[$field_language][$key]);
+                  $save_entity = TRUE;
+                }
+              }
+            }
+          }
+          if ($save_entity) {
+            entity_save($entity_type, $entity);
+          }
+        }
+      }
+      file_usage_delete($file, $module_name, NULL, NULL, 0);
+    }
+  }
+}
+
+/**
+ * Implements hook_watchdog_alter().
+ */
+function media_theplatform_mpx_watchdog_alter(&$log_entry) {
+
+  if ($log_entry['type'] != 'media_theplatform_mpx') {
+    return;
+  }
+
+  // Output this message to the page if the site is configured to output
+  // messages of this severity, and the message contains the necessary data.
+  if ($log_entry['severity'] <= MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL
+      && user_access('administer mpx account')
+      && $log_entry['message'] && is_array($log_entry['variables'])) {
+    $message_type = $log_entry['severity'] == WATCHDOG_ERROR ? 'error' : 'status';
+    drupal_set_message(t($log_entry['message'], $log_entry['variables']), $message_type);
+  }
+
+  // If this mpx log entry exceeds the logging level severity, empty the log
+  // entry array so it is not processed by other modules (syslog, dblog, etc).
+  if ($log_entry['severity'] > MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL) {
+    $log_entry = array();
   }
 }
 
@@ -300,31 +381,59 @@ function media_theplatform_mpx_file_delete($file) {
  * Write data from given array $data into the mpx_log table.
  */
 function media_theplatform_mpx_insert_log($data) {
-  $insert = db_insert('mpx_log')
-  ->fields(array(
-    'uid' => $data['uid'],
-    'type' => $data['type'],
-    'type_id' => $data['type_id'],
-    'action' => $data['action'],
-    'timestamp' => REQUEST_TIME,
-    'details' => $data['details'],
-  ))
-  ->execute();
+
+  $message = "Legacy media_theplatform_mpx log message: \n"
+    . "\n uid: @uid \n"
+    . "\n type: @type \n"
+    . "\n type_id: @type_id \n"
+    . "\n action: @action \n"
+    . "\n timestamp: @timestamp \n"
+    . "\n details: @details \n";
+
+  $variables = array(
+    '@uid' => $data['uid'],
+    '@type' => $data['type'],
+    '@type_id' => $data['type_id'],
+    '@action' => $data['action'],
+    '@timestamp' => REQUEST_TIME,
+    '@details' => $data['details'],
+  );
+
+  watchdog('media_theplatform_mpx', $message, $variables, WATCHDOG_DEBUG);
+}
+
+/**
+ * Helper that returns a description log string for an account if passed.
+ */
+function _media_theplatform_mpx_account_log_string($account = NULL) {
+
+  if (is_object($account) && !empty($account->account_id) && !empty($account->import_account)) {
+    return 'account "' . urldecode($account->import_account) . '" (' . basename($account->account_id) .')';
+  }
+  elseif (is_object($account) && !empty($account->import_account)) {
+    return 'account "' . urldecode($account->import_account) . '"';
+  }
+  elseif (is_object($account) && !empty($account->account_id)) {
+    return 'account "' . urldecode($account->account_id) . '"';
+  }
+  elseif (is_object($account) && !empty($account->id)) {
+    return 'account ' . urldecode($account->id);
+  }
+
+  return 'UNSPECIFIED ACCOUNT';
 }
 
 /**
  * Implements hook_cron().
  */
 function media_theplatform_mpx_cron() {
-  $import_account = media_theplatform_mpx_variable_get('import_account');
-  // Don't do anything if we don't have signIn token or import account.
-  if (media_theplatform_mpx_check_token() && $import_account) {
-    if (media_theplatform_mpx_variable_get('cron_players')) {
-      media_theplatform_mpx_import_all_players('cron');
-    }
-    if (media_theplatform_mpx_variable_get('cron_videos') && media_theplatform_mpx_is_valid_player_for_account(media_theplatform_mpx_variable_get('default_player_fid'), $import_account)) {
-      media_theplatform_mpx_import_all_videos('cron');
-    }
+
+  if (media_theplatform_mpx_variable_get('cron_players')) {
+    media_theplatform_mpx_import_all_players('via cron');
+  }
+
+  if (media_theplatform_mpx_variable_get('cron_videos')) {
+    media_theplatform_mpx_import_all_videos('via cron');
   }
 }
 
@@ -352,9 +461,803 @@ function media_theplatform_mpx_permission() {
  * Access callback for videos / players listing
  */
 function _media_theplatform_mpx_access() {
-  if (user_access('administer media') || user_access('administer files')) {
-    return true;
-  } else {
-    return false;
+  return (user_access('administer media') || user_access('administer files'));
+}
+
+/**
+ * Helper for flattening a multi-dimensional array.
+ * Found here: http://stackoverflow.com/questions/1319903/how-to-flatten-a-multidimensional-array
+ */
+function _media_theplatform_mpx_flatten_array(Array $array) {
+
+  $return = array();
+  array_walk_recursive($array, function($a) use (&$return) { $return[] = $a; });
+
+  return $return;
+}
+
+/**
+ * Helper to flatten multiple-value entity field to a single-dimensional array.
+ */
+function _media_theplatform_mpx_flatten_multiple_value_field($field, $data_key = 'value') {
+
+  $values = array();
+  if (!empty($field[ LANGUAGE_NONE ])) {
+    foreach ($field[ LANGUAGE_NONE ] as $key => $data) {
+      $values[ $key ] = $data[ $data_key ];
+    }
   }
+
+  return $values;
+}
+
+/**
+ * Helper that converts shorthand memory limits to actual bytes.
+ */
+function _media_theplatform_mpx_convert_shorthand_to_bytes($shorthand) {
+
+  $shorthand_amount = (int)$shorthand;
+  $shorthand_size = strtoupper(preg_replace('|[0-9]+|', '', $shorthand));
+
+  switch ($shorthand_size) {
+    case '':
+      return $shorthand_amount;
+    case 'K':
+      return $shorthand_amount * 1024;
+    case 'M':
+      return $shorthand_amount * 1048576;
+    case 'G':
+      return $shorthand_amount * 1073741824;
+  }
+
+  return NULL;
+}
+
+/**
+ * Helper that retrieves and returns data from an mpx feed URL.
+ */
+function _media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TRUE, $options = array()) {
+
+  // Fetch the actual feed data.
+  $feed_request_timeout = media_theplatform_mpx_variable_get('cron_videos_timeout', 180);
+
+  $options += array('timeout' => $feed_request_timeout);
+
+  // Allow for altering the URL before making the request.
+  drupal_alter('media_theplatform_mpx_feed_request', $url, $options);
+
+  // Inform site admins we're attempting to retrieve data.
+  watchdog('media_theplatform_mpx', 'Retrieving mpx feed data (timeout = @timeout seconds) from the following feed url: @url',
+    array(
+      '@timeout' => $options['timeout'],
+      '@url' => $url,
+    ),
+    WATCHDOG_INFO);
+
+  $start_time = time();
+  $result = drupal_http_request($url, $options);
+  $response_time = time() - $start_time;
+
+  if (!is_object($result)) {
+    watchdog('media_theplatform_mpx', 'Failed to retrieve mpx feed data. drupal_http_request() did not return an object.',
+      array(), WATCHDOG_ERROR);
+
+    return $json_decode ? array() : '';
+  }
+  if (empty($result->data)) {
+    watchdog('media_theplatform_mpx', 'Failed to retrieve mpx feed data. No data returned from thePlatform after @time seconds from: @url
+<br />Response information:
+<br /><pre>@response</pre>',
+      array(
+        '@time' => $response_time,
+        '@url' => $url,
+        '@response' => print_r($result, TRUE),
+      ),
+      WATCHDOG_ERROR);
+
+    return $json_decode ? array() : ''  ;
+  }
+
+  watchdog('media_theplatform_mpx', 'Request to retrieve mpx feed data took @time second(s).',
+    array('@time' => $response_time), WATCHDOG_INFO);
+
+  $memory_limit = ini_get('memory_limit');
+  $memory_limit_in_bytes = _media_theplatform_mpx_convert_shorthand_to_bytes($memory_limit);
+  $extremely_verbose_min_memory = 536870912;
+
+  // Only output this message if the mpx logging level is set to extremely
+  // verbose.  Increase memory if necessary beforehand, as this message can
+  // be extremely large and use up available memory if set lower than 512M.
+  if (MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL == WATCHDOG_DEBUG || MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL == WATCHDOG_DEBUG) {
+    if ($memory_limit_in_bytes < $extremely_verbose_min_memory) {
+      ini_set('memory_limit', '512M');
+    }
+    watchdog('media_theplatform_mpx', 'Request to retrieve mpx feed data returned the following response:
+      <br /> <pre>@response</pre>',
+      array('@response' => print_r($result, TRUE)), WATCHDOG_DEBUG);
+    if ($memory_limit_in_bytes < $extremely_verbose_min_memory) {
+      ini_set('memory_limit', $memory_limit);
+    }
+  }
+
+  $result_data = $result->data;
+
+  if ($json_decode) {
+    $result_data = drupal_json_decode($result_data);
+    if (!empty($result->data) && empty($result_data)) {
+      watchdog('media_theplatform_mpx', 'Failed to decode JSON response data with drupal_json_decode() from the following URL: @url
+<br />...and the following data returned from thePlatform:
+<br /><pre>@response</pre>.', array('@url' => $url, '@response' => print_r($result, TRUE)), WATCHDOG_ERROR);
+      return array();
+    }
+  }
+
+  if (empty($result_data)) {
+    watchdog('media_theplatform_mpx', 'Request to retrieve mpx feed data returned no data.', array(), WATCHDOG_ERROR);
+
+    return $json_decode ? array() : '';
+  }
+
+  if (isset($result_data['isException']) && $result_data['isException'] === TRUE) {
+    watchdog('media_theplatform_mpx', 'Request to retrieve mpx feed data returned a(n) "@title" exception.  Description:  @description  --  Response Code:  @response_code  --  Correlation ID:  @correlation_id',
+      array(
+        '@title' => $result_data['title'],
+        '@description' => $result_data['description'],
+        '@response_code' => $result_data['responseCode'],
+        '@correlation_id' => $result_data['correlationId'],
+      ),
+      WATCHDOG_ERROR);
+
+    return $json_decode ? array() : '';
+  }
+
+  // Only output this message if the mpx logging level is set to extremely
+  // verbose.  Increase memory if necessary beforehand, as this message can
+  // be extremely large and use up available memory if set lower than 512M.
+  if (MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL == WATCHDOG_DEBUG || MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL == WATCHDOG_DEBUG) {
+    if ($memory_limit_in_bytes < $extremely_verbose_min_memory) {
+      ini_set('memory_limit', '512M');
+    }
+    watchdog('media_theplatform_mpx', 'Request to retrieve mpx feed data returned the following data:
+      <br /> <pre>@data</pre>',
+      array(
+        '@data' => print_r($result_data, TRUE),
+      ),
+      WATCHDOG_DEBUG);
+    if ($memory_limit_in_bytes < $extremely_verbose_min_memory) {
+      ini_set('memory_limit', $memory_limit);
+    }
+  }
+
+  return $result_data;
+}
+
+/**
+ * Helper that returns a specific rating value from media feed data.
+ */
+function _media_theplatform_mpx_get_rating_media_item_data($rating_type, $media_data) {
+
+  $rating_feed_data = $media_data['media$ratings'];
+
+  foreach ($rating_feed_data as $key => $data) {
+    if ($data['scheme'] == 'urn:' . $rating_type) {
+      return $data['rating'];
+    }
+  }
+
+  return '';
+}
+
+/**
+ * Helper that returns a specific sub-rating value from media feed data.
+ */
+function _media_theplatform_mpx_get_subrating_media_item_data($rating_type, $media_data) {
+
+  $rating_feed_data = $media_data['media$ratings'];
+
+  foreach ($rating_feed_data as $key => $data) {
+    if ($data['scheme'] == 'urn:' . $rating_type) {
+      return $data['subRatings'];
+    }
+  }
+
+  return NULL;
+}
+
+/**
+ * Helper that returns the default content release file pid from media feed data.
+ */
+function _media_theplatform_mpx_get_default_released_file_pid($media_data) {
+
+  if (empty($media_data['media$content']) || !is_array($media_data['media$content'])) {
+    return '';
+  }
+
+  $default_media_content_item = NULL;
+
+  foreach ($media_data['media$content'] as $content_item) {
+    if ($content_item['plfile$isDefault']) {
+      $default_media_content_item = $content_item;
+    }
+  }
+
+  // Use the media item with the highest bitrate as a fall-back.
+  if (!$default_media_content_item && !empty($media_data['media$content'])) {
+    $media_content_items_by_bitrate = array();
+    foreach ($media_data['media$content'] as &$content_item) {
+      $media_content_items_by_bitrate[$content_item['plfile$bitrate']] = $content_item;
+    }
+    ksort($media_content_items_by_bitrate);
+    $default_media_content_item = array_pop($media_content_items_by_bitrate);
+  }
+
+  if (!$default_media_content_item
+      || !is_array($default_media_content_item['plfile$releases'])
+      || empty($default_media_content_item['plfile$releases'])) {
+    return '';
+  }
+
+  // Get the most recently added public URL to use as the default.
+  $public_url_pids = array();
+  foreach ($default_media_content_item['plfile$releases'] as $public_url_data) {
+    $public_url_pids[$public_url_data['added']] = $public_url_data['plrelease$pid'];
+  }
+  ksort($public_url_pids);
+
+  return array_pop($public_url_pids);
+}
+
+/**
+ * Helper for testing _media_theplatform_mpx_get_media_item_data().
+ */
+function _test_media_theplatform_mpx_get_media_item_data() {
+
+  $path = 'media$categories/media$name';
+  $path = 'media$content/plfile$releases/plrelease$url';
+  $path = 'media$availableDate';
+
+  $account_data = _media_theplatform_mpx_get_account_data(1);
+  $theplatform_account_id = urlencode($account_data->account_id);
+  $theplatform_token = media_theplatform_mpx_check_token($account_data->id);
+
+  $json_feed_url = 'https://read.data.media.theplatform.com/media/data/Media?schema=1.4.0&form=json&pretty=true&byOwnerId=' . $theplatform_account_id . '&token=' . $theplatform_token;
+  $json_feed_contents = file_get_contents($json_feed_url);
+  $feed_data = drupal_json_decode($json_feed_contents);
+
+  $media_data_item = $feed_data['entries'][0];
+
+  $result = _media_theplatform_mpx_get_media_item_data($path, $media_data_item);
+
+  return $result;
+}
+
+/**
+ * Helper function for getting data from thePlatform feed arrays.
+ */
+function _media_theplatform_mpx_get_media_item_data($path, $media_data) {
+
+  $data = NULL;
+  $path_parts = explode('/', $path);
+
+  // Handle single-level value paths.
+  if (count($path_parts) == 1) {
+    $field_name = array_shift($path_parts);
+    if (isset($media_data[ $field_name ])) {
+      $data = $media_data[ $field_name ];
+    }
+    elseif (is_array($media_data)) {
+      $data = array();
+      foreach ($media_data as $key => $value) {
+        if (is_array($value) && isset($value[ $field_name ])) {
+          $data[ $key ] = $value[ $field_name ];
+        }
+      }
+    }
+    return $data;
+  }
+
+  // Otherwise, we're recursing.
+  $first_path_part = array_shift($path_parts);
+
+  if (isset($media_data[ $first_path_part ])) {
+    $path = implode('/', $path_parts);
+    $media_data = $media_data[ $first_path_part ];
+    $data = _media_theplatform_mpx_get_media_item_data($path, $media_data);
+  }
+  // If the field can't be found in $media_data, this may be a recursive call,
+  // and $media_data is an array of sub-values that we need to iterate, and
+  // possibly recurse, over.
+  elseif (is_array($media_data)) {
+    $data = array();
+    $path = implode('/', $path_parts);
+    foreach ($media_data as $key => $value) {
+      if (isset($value[ $first_path_part ])) {
+        $media_data = $value[ $first_path_part ];
+        $data[ $key ] = _media_theplatform_mpx_get_media_item_data($path, $media_data);
+      }
+    }
+  }
+
+  return $data;
+}
+
+
+/**
+ * Helper that enforces field limits as defined in a database schema.
+ */
+function _media_theplatform_mpx_enforce_db_field_limits(&$fields, $module, $table) {
+
+  // Enforce database schema defined field limits on inserted values.
+  $schema = drupal_get_schema_unprocessed($module, $table);
+  $schema = $schema['fields'];
+
+  foreach ($fields as $field_name => $field_value) {
+
+    if (!isset($schema[$field_name])) {
+      unset($fields[$field_name]);
+      continue;
+    }
+
+    $field_type = $schema[$field_name]['type'];
+    $field_length = strlen($field_value);
+
+    if ($field_type == 'varchar' || $field_type == 'char') {
+      $char_limit = !empty($schema[$field_name]['length']) ? (int)$schema[$field_name]['length'] : 255;
+      if ($field_length > $char_limit) {
+        $fields[$field_name] = substr($field_value, 0, $char_limit);
+      }
+    }
+    elseif ($field_type == 'blob' || $field_type == 'text') {
+      $field_size = !empty($schema[$field_name]['size']) ? $schema[$field_name]['size'] : 'normal';
+      switch ($field_size) {
+        case 'tiny':
+        case 'small':
+          if ($field_length > 255) {
+            $fields[$field_name] = substr($field_value, 0, 255);
+          }
+          break;
+        case 'medium':
+          if ($field_length > 16777215) {
+            $fields[$field_name] = substr($field_value, 0, 16777215);
+          }
+          break;
+        case 'big':
+          if ($field_length > 4294967295) {
+            $fields[$field_name] = substr($field_value, 0, 4294967295);
+          }
+          break;
+        case 'normal':
+          if ($field_length > 65535) {
+            $fields[$field_name] = substr($field_value, 0, 65535);
+          }
+          break;
+      }
+    }
+    elseif ($field_type == 'int') {
+      $signed = empty($schema[$field_name]['unsigned']);
+      $field_size = !empty($schema[$field_name]['size']) ? $schema[$field_name]['size'] : 'normal';
+      switch ($field_size) {
+        case 'tiny':
+          if (!is_null($field_value) && $signed && $field_value < -128) {
+            $fields[$field_name] = -128;
+          }
+          elseif ($signed && $field_value > 127) {
+            $fields[$field_name] = 127;
+          }
+          elseif ($signed && $field_value > 255) {
+            $fields[$field_name] = 255;
+          }
+          break;
+        case 'small':
+          if (!is_null($field_value) && $signed && $field_value < -32768) {
+            $fields[$field_name] = -32768;
+          }
+          elseif ($signed && $field_value > 32767) {
+            $fields[$field_name] = 32767;
+          }
+          elseif ($signed && $field_value > 65535) {
+            $fields[$field_name] = 65535;
+          }
+          break;
+        case 'medium':
+          if (!is_null($field_value) && $signed && $field_value < -8388608) {
+            $fields[$field_name] = -8388608;
+          }
+          elseif ($signed && $field_value > 8388607) {
+            $fields[$field_name] = 8388607;
+          }
+          elseif ($signed && $field_value > 16777215) {
+            $fields[$field_name] = 16777215;
+          }
+          break;
+        case 'big':
+          if (!is_null($field_value) && $signed && $field_value < -9223372036854775808) {
+            $fields[$field_name] = -9223372036854775808;
+          }
+          elseif ($signed && $field_value > 9223372036854775807) {
+            $fields[$field_name] = 9223372036854775807;
+          }
+          elseif ($signed && $field_value > 18446744073709551615) {
+            $fields[$field_name] = 18446744073709551615;
+          }
+          break;
+        case 'normal':
+          if (!is_null($field_value) && $signed && $field_value < -2147483648) {
+            $fields[$field_name] = -2147483648;
+          }
+          elseif ($signed && $field_value > 2147483647) {
+            $fields[$field_name] = 2147483647;
+          }
+          elseif ($signed && $field_value > 4294967295) {
+            $fields[$field_name] = 4294967295;
+          }
+          break;
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_entity_query_alter().
+ */
+function media_theplatform_mpx_entity_query_alter(&$query) {
+
+  if (empty($query->entityConditions['bundle']['value']) || $query->deleted == TRUE) {
+    return;
+  }
+
+  $bundle_value = &$query->entityConditions['bundle']['value'];
+
+  // If the bundle defined for this EFQ is an mpx_video bundle, add a tag that
+  // will indicate that the mpx_video table needs to be joined in the query.
+  if ((is_string($bundle_value) && strpos($bundle_value, 'mpx_video') === 0) ||
+      (is_array($bundle_value) && in_array('mpx_video', $bundle_value, TRUE))) {
+    $query->addTag('media_theplatform_mpx_needs_mpx_video_join');
+  }
+  // Might as well do this for the mpx_player table as well.
+  elseif ((is_string($bundle_value) && strpos($bundle_value, 'mpx_player') === 0) ||
+      (is_array($bundle_value) && in_array('mpx_player', $bundle_value, TRUE))) {
+    $query->addTag('media_theplatform_mpx_needs_mpx_player_join');
+  }
+}
+
+/**
+ * Implements hook_query_alter().
+ */
+function media_theplatform_mpx_query_alter($query) {
+
+  if ($query->hasTag('media_theplatform_mpx_needs_mpx_video_join')) {
+
+    // Add the mpx_video table join if the tag indicating it is needed exists.
+    $query->join('mpx_video', 'mpx_video', 'mpx_video.fid = file_managed.fid');
+
+    $query_conditions = &$query->conditions();
+    $mpx_video_schema = drupal_get_schema_unprocessed('media_theplatform_mpx', 'mpx_video');
+    $file_managed_schema = drupal_get_schema_unprocessed('system', 'file_managed');
+    $mpx_video_schema_field_names = array_keys($mpx_video_schema['fields']);
+    $file_managed_schema_field_names = array_keys($file_managed_schema['fields']);
+
+    // Alter the query condition to use the mpx_video table instead of the
+    // file_managed table for fields that don't exist in file_managed but do
+    // exist in mpx_video.
+    foreach ($query_conditions as $key => &$condition) {
+      list($table, $field_name) = explode('.', $condition['field']);
+      if ($table == 'file_managed' && !in_array($field_name, $file_managed_schema_field_names) &&
+          in_array($field_name, $mpx_video_schema_field_names)) {
+        $condition['field'] = 'mpx_video.' . $field_name;
+      }
+    }
+  }
+
+  if ($query->hasTag('media_theplatform_mpx_needs_mpx_player_join')) {
+
+    // Add the mpx_player table join if the tag indicating it is needed exists.
+    $query->join('mpx_player', 'mpx_player', 'mpx_player.fid = file_managed.fid');
+
+    $query_conditions = &$query->conditions();
+    $mpx_player_schema = drupal_get_schema_unprocessed('media_theplatform_mpx', 'mpx_player');
+    $file_managed_schema = drupal_get_schema_unprocessed('system', 'file_managed');
+    $mpx_player_schema_field_names = array_keys($mpx_player_schema['fields']);
+    $file_managed_schema_field_names = array_keys($file_managed_schema['fields']);
+
+    // Alter the query condition to use the mpx_player table instead of the
+    // file_managed table for fields that don't exist in file_managed but do
+    // exist in mpx_player.
+    foreach ($query_conditions as $key => &$condition) {
+      // Don't process "AND" and "OR" conditions.
+      if (!is_array($condition)) {
+        continue;
+      }
+      // Add file_managed column prefix to avoid query ambiguity PDOs.
+      if (strpos($condition['field'], 'file_managed') !== 0) {
+        $condition['field'] = 'file_managed.' . $condition['field'];
+      }
+      list($table, $field_name) = explode('.', $condition['field']);
+      if ($table == 'file_managed' && !in_array($field_name, $file_managed_schema_field_names) &&
+          in_array($field_name, $mpx_player_schema_field_names)) {
+        $condition['field'] = 'mpx_player.' . $field_name;
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_libraries_info().
+ */
+function media_theplatform_mpx_libraries_info() {
+
+  $libraries['zend_crypt'] = array(
+    'title' => 'Zend Crypt',
+    'vendor_url' => 'https://github.com',
+    'download_url' => 'https://github.com/zendframework/zf2/tree/master/library/Zend/Crypt',
+    'version arguments' => array(
+      'file' => 'composer.json',
+      'pattern' => '/"dev-master": "([0-9.]+)-dev"/',
+      'lines' => 30,
+    ),
+    'path' => '',
+    'files' => array(
+      'php' => array(
+        'vendor/autoload.php',
+      ),
+    ),
+  );
+
+  return $libraries;
+}
+
+
+/**
+ * Helper that deletes an mpx account and all of its associated media and data.
+ */
+function _media_theplatform_mpx_delete_account($account_id) {
+
+  watchdog('media_theplatform_mpx', 'Beginning process of deleting account @id.',
+    array('@id' => $account_id), WATCHDOG_NOTICE);
+
+  // Turn off player and media sync.
+  media_theplatform_mpx_variable_set('account_' . $account_id . '_cron_player_sync', 0);
+  media_theplatform_mpx_variable_set('account_' . $account_id . '_cron_video_sync', 0);
+
+  $delete_account_batch = array(
+    'title' => t('Deleting MPX Account @id' , array('@id' => $account_id)),
+    'operations' => array(
+      array('_media_theplatform_mpx_delete_account_video_cron_queue', array($account_id)),
+      array('_media_theplatform_mpx_delete_account_media', array($account_id, 'video')),
+      array('_media_theplatform_mpx_delete_account_media', array($account_id, 'player')),
+      array('_media_theplatform_mpx_delete_account_data', array($account_id)),
+    ),
+    'finished' => '_media_theplatform_mpx_delete_account_finished',
+  );
+  batch_set($delete_account_batch);
+
+  batch_process();
+}
+
+/**
+ * Helper that delets the video cron queue items for a given account.
+ */
+function _media_theplatform_mpx_delete_account_video_cron_queue($account_id, &$context) {
+
+  watchdog('media_theplatform_mpx', 'Beginning process of deleting video cron queue items for account @id.',
+    array('@id' => $account_id), WATCHDOG_NOTICE);
+
+  // We can't use the Drupal Queue API here. When we release a queue item, we
+  // could very well get it right back when claiming an item.
+  if (empty($context['sandbox'])) {
+    $context['sandbox']['range_limit'] = 50;
+    $context['sandbox']['total_queue_items_processed'] = 0;
+    $context['sandbox']['last_processed_item_id'] = 0;
+  }
+
+  // If another account is in the process of ingesting videos, the cron queue
+  // will continue to grow.  Make sure this value is up to date on each batch
+  // iteration.
+  $context['sandbox']['total_queue_items'] = db_select('queue')
+    ->fields('queue')
+    ->condition('name', 'media_theplatform_mpx_video_cron_queue', '=')
+    ->condition('item_id', $context['sandbox']['last_processed_item_id'], '>')
+    ->execute()
+    ->rowCount();
+
+  $video_queue_items = db_select('queue')
+    ->fields('queue')
+    ->condition('name', 'media_theplatform_mpx_video_cron_queue', '=')
+    ->condition('expire', 0, '=')
+    ->condition('item_id', $context['sandbox']['last_processed_item_id'], '>')
+    ->range(0, $context['sandbox']['range_limit'])
+    ->orderBy('item_id', 'ASC')
+    ->execute()
+    ->fetchAll();
+
+  // Bail if we have no more results.
+  if (empty($video_queue_items)) {
+    $context['message'] = t('All video cron queue items have been deleted for account @account_id.',
+      array(
+        '@account_id' => $account_id,
+      ));
+    $context['finished'] = 1;
+    watchdog('media_theplatform_mpx', 'Completed process of deleting video cron queue items for account @id.',
+      array('@id' => $account_id), WATCHDOG_NOTICE);
+    return;
+  }
+
+  // Mark all queue items we're about to process as claimed by setting the
+  // expire column value to a timestamp 1 minute in the future.
+  $queued_item_ids = array();
+  foreach ($video_queue_items as $queue_item) {
+    $queued_item_ids[] = $queue_item->item_id;
+  }
+  db_update('queue')
+    ->fields(array('expire' => time() + 60))
+    ->condition('item_id', $queued_item_ids, 'IN')
+    ->execute();
+
+  $queue_items_to_delete = array();
+  $queue_items_to_keep = array();
+
+  foreach ($video_queue_items as $queue_item) {
+    $query_item->data = unserialize($queue_item->data);
+    // If a queue item has a non-zero expire value, then it has already been
+    // claimed for processing.
+    if (isset($query_item->data['account']->id) && $query_item->data['account']->id == $account_id) {
+      $queue_items_to_delete[] = $queue_item->item_id;
+      $context['results'][] = $queue_item->item_id;
+    }
+    else {
+      $queue_items_to_keep[] = $queue_item->item_id;
+    }
+    $context['sandbox']['total_queue_items_processed']++;
+  }
+
+  // Delete items to delete.
+  if (!empty($queue_items_to_delete)) {
+    db_delete('queue')
+      ->condition('name', 'media_theplatform_mpx_video_cron_queue', '=')
+      ->condition('item_id', $queue_items_to_delete, 'IN')
+      ->execute();
+  }
+  // Set expire to 0 for items not to delete - i.e. releasing the queue items.
+  if (!empty($queue_items_to_keep)) {
+    db_update('queue')
+      ->fields(array('expire' => 0))
+      ->condition('name', 'media_theplatform_mpx_video_cron_queue', '=')
+      ->condition('item_id', $queue_items_to_keep, 'IN')
+      ->execute();
+  }
+
+
+  $context['sandbox']['last_processed_item_id'] = max($queued_item_ids);
+  $context['message'] = t('@remaining_queue_items video queue items remain to be processed.  It is normal for the number of items to increase if other accounts are in the process of ingesting media.',
+    array(
+      '@remaining_queue_items' => ($context['sandbox']['total_queue_items'] - count($video_queue_items)),
+    ));
+  $context['finished'] = 0;
+}
+
+/**
+ * Helper that deletes all media for an account of a given type.
+ */
+function _media_theplatform_mpx_delete_account_media($account_id, $type, &$context) {
+
+  $mpx_table = 'mpx_' . $type;
+  $type_plural = $type . 's';
+
+  watchdog('media_theplatform_mpx', 'Beginning process of deleting @type_plural for account @id.',
+    array(
+      '@id' => $account_id,
+      '@type_plural' => $type_plural,
+    ), WATCHDOG_NOTICE);
+
+  if (empty($context['sandbox'])) {
+    $context['sandbox']['range_limit'] = 25;
+    $context['sandbox']['total_deleted'] = 0;
+    $context['sandbox']['total_media'] = db_select($mpx_table)
+      ->fields($mpx_table)
+      ->condition('parent_account', $account_id, '=')
+      ->execute()
+      ->rowCount();
+  }
+
+  $mpx_media = db_select($mpx_table)
+    ->fields($mpx_table, array())
+    ->condition('parent_account', $account_id, '=')
+    ->range(0, $context['sandbox']['range_limit'])
+    ->execute()
+    ->fetchAll();
+
+  if (empty($mpx_media)) {
+    $context['message'] = t('All @type_plural have been deleted.', array('@type_plural' => $type_plural));
+    $context['finished'] = 1;
+    watchdog('media_theplatform_mpx', 'Completed process of deleting @type_plural for account @id.',
+      array(
+        '@id' => $account_id,
+        '@type_plural' => $type_plural,
+      ), WATCHDOG_NOTICE);
+    return;
+  }
+
+  // Delete each media item retrieved.
+  foreach ($mpx_media as $media_item) {
+
+    if (empty($media_item->fid)) {
+      watchdog('media_theplatform_mpx', 'No @fid for @type @media_title when deleting all @type_plural for account @account_id.',
+        array(
+          '@fid' => $media_item->fid,
+          '@type' => $type,
+          '@media_title' => $media_item->title,
+          '@type_plural' => $type_plural,
+          '@account_id' => $account_id,
+        ),
+        WATCHDOG_ERROR);
+      continue;
+    }
+
+    $file = file_load($media_item->fid);
+
+    if (!is_object($file)) {
+      watchdog('media_theplatform_mpx', 'Unable to load file @fid for @type @media_title when deleting all @type_plural for account @account_id.',
+        array(
+          '@fid' => $media_item->fid,
+          '@type' => $type,
+          '@media_title' => $media_item->title,
+          '@type_plural' => $type_plural,
+          '@account_id' => $account_id,
+        ),
+        WATCHDOG_ERROR);
+      continue;
+    }
+
+    $form_state = array();
+    $form_state['values'] = array(
+      'fid' => $file->fid,
+      'confirm' => TRUE,
+    );
+    drupal_form_submit('file_entity_delete_form', $form_state, $file);
+
+    $context['sandbox']['total_deleted']++;
+    $context['results'][] = $media_item->title;
+  }
+
+  $context['message'] = t('Deleted @total_deleted of @total_media @type_plural.',
+    array(
+      '@total_deleted' => $context['sandbox']['total_deleted'],
+      '@total_media' => $context['sandbox']['total_media'],
+      '@type_plural' => $type_plural,
+    ));
+  $context['finished'] = 0;
+}
+
+/**
+ * Helper that deletes all data for an mpx account after its media are deleted.
+ */
+function _media_theplatform_mpx_delete_account_data($account_id) {
+
+  drupal_static_reset(MEDIA_THEPLATFORM_MPX_ACCOUNT_DATA_STATIC_CACHE);
+
+  $token = _media_theplatform_mpx_get_account_value($account_id, 'token');
+  if ($token) {
+    media_theplatform_mpx_expire_token($token);
+  }
+
+  module_invoke_all('media_theplatform_mpx_delete_account', $account_id);
+
+  db_delete('mpx_accounts')->condition('id', $account_id, '=')->execute();
+}
+
+/**
+ * Finished callback for when an account has been deleted.
+ */
+function _media_theplatform_mpx_delete_account_finished($account_id) {
+
+  // Remove variables disabling video and player sync for this account.
+  media_theplatform_mpx_variable_del('account_' . $account_id . '_cron_player_sync');
+  media_theplatform_mpx_variable_del('account_' . $account_id . '_cron_video_sync');
+
+  drupal_static_reset(MEDIA_THEPLATFORM_MPX_ACCOUNT_DATA_STATIC_CACHE);
+  drupal_flush_all_caches();
+  drupal_set_message('All caches have been flushed.');
+
+  watchdog('media_theplatform_mpx', 'Completed process of deleting account @id.',
+    array('@id' => $account_id), WATCHDOG_NOTICE);
 }

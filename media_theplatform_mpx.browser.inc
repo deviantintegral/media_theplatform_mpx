@@ -115,7 +115,6 @@ function media_theplatform_mpx_form_media_browser_submit($form, &$form_state) {
   if ($mpx_type == 'players') {
     $fid = db_query("SELECT fid FROM {file_managed} WHERE uri=:uri", array(':uri' => $embed_code))->fetchField();
   }
-
   // Elseif its mpxMedia:
   elseif ($mpx_type == 'videos') {
 
@@ -128,19 +127,42 @@ function media_theplatform_mpx_form_media_browser_submit($form, &$form_state) {
     // Check if this mpxMedia / mpxPlayer combo exists.
     $key = 'player_fid_' . $account_label;
     $player_fid = $form_state['input'][$key];
-    $uri = 'mpx://m/' . $parts[1] . '/p/' . $player_fid;
+    $uri = _media_theplatform_mpx_get_video_file_uri($video);
     $fid = db_query("SELECT fid FROM {file_managed} WHERE uri=:uri", array(':uri' => $uri))->fetchField();
 
     // If it doesn't exist, create the file.
     if (!$fid) {
+      watchdog('media_theplatform_mpx', 'Creating file with uri -- @uri -- for video @id and @account.',
+        array(
+          '@uri' => $uri,
+          '@id' => $video['id'],
+          '@account' => _media_theplatform_mpx_account_log_string($video['account']),
+        ),
+        WATCHDOG_DEBUG);
       $provider = media_internet_get_provider($uri);
       $file = $provider->save();
       $fid = $file->fid;
+      if ($fid) {
+        watchdog('media_theplatform_mpx', 'Successfully created file @fid with uri -- @uri -- for video @id.',
+          array(
+            '@fid' => $fid,
+            '@uri' => $uri,
+            '@id' => $video['id'],
+          ),
+          WATCHDOG_NOTICE);
+      }
+      else {
+        watchdog('media_theplatform_mpx', 'Failed to create file with uri -- @uri -- for video @id.',
+          array(
+            '@uri' => $uri,
+            '@id' => $video['id'],
+          ),
+          WATCHDOG_ERROR);
+      }
       // Update the new file's name.
       $player = media_theplatform_mpx_get_mpx_player_by_fid($player_fid);
       media_theplatform_mpx_update_video_filename($fid, $video['title'], $player['title']);
     }
-
   }
 
   // This stops page reload inside the media browser iframe.
