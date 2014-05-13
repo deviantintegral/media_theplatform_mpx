@@ -110,6 +110,11 @@ function media_theplatform_mpx_menu() {
     'type' => MENU_NORMAL_ITEM,
     'access arguments' => array('administer mpx account'),
   );
+  $items[MPX_PATH_ADMIN . '/settings'] = array(
+    'title' => 'Media: thePlatform mpx settings',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'access arguments' => array('administer mpx account'),
+  );
   $items[MPX_PATH_PLAYER] = array(
     'title' => 'mpxPlayers',
     'page callback' => 'media_theplatform_mpx_page_mpx_players',
@@ -364,7 +369,7 @@ function media_theplatform_mpx_watchdog_alter(&$log_entry) {
   // Output this message to the page if the site is configured to output
   // messages of this severity, and the message contains the necessary data.
   if ($log_entry['severity'] <= MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL
-      && user_access('administer mpx account')
+      #&& user_access('administer mpx account')
       && $log_entry['message'] && is_array($log_entry['variables'])) {
     $message_type = $log_entry['severity'] == WATCHDOG_ERROR ? 'error' : 'status';
     drupal_set_message(t($log_entry['message'], $log_entry['variables']), $message_type);
@@ -427,6 +432,13 @@ function _media_theplatform_mpx_account_log_string($account = NULL) {
  * Implements hook_cron().
  */
 function media_theplatform_mpx_cron() {
+
+  // Save last cron time to determine which videos were processed during the
+  // last cron run.
+  //   i.e. updated time > cron_next_to_last && updated time < cron_last
+  if ($cron_last = variable_get('cron_last', 0)) {
+    media_theplatform_mpx_variable_set('cron_next_to_last', $cron_last);
+  }
 
   if (media_theplatform_mpx_variable_get('cron_players')) {
     media_theplatform_mpx_import_all_players('via cron');
@@ -1097,10 +1109,10 @@ function _media_theplatform_mpx_delete_account_video_cron_queue($account_id, &$c
   $queue_items_to_keep = array();
 
   foreach ($video_queue_items as $queue_item) {
-    $query_item->data = unserialize($queue_item->data);
+    $queue_item->data = unserialize($queue_item->data);
     // If a queue item has a non-zero expire value, then it has already been
     // claimed for processing.
-    if (isset($query_item->data['account']->id) && $query_item->data['account']->id == $account_id) {
+    if (isset($queue_item->data['account']->id) && $queue_item->data['account']->id == $account_id) {
       $queue_items_to_delete[] = $queue_item->item_id;
       $context['results'][] = $queue_item->item_id;
     }

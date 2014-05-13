@@ -110,6 +110,8 @@ function media_theplatform_mpx_cron_queue_info() {
  */
 function process_media_theplatform_mpx_video_cron_queue_item($item) {
 
+  $start_microtime = microtime(TRUE);
+
   watchdog('media_theplatform_mpx', 'Processing video cron queue item:
     <br /> <pre>@item</pre>',
     array('@item' => print_r($item, TRUE)), WATCHDOG_DEBUG);
@@ -187,6 +189,13 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
       ),
       WATCHDOG_ERROR);
   }
+
+  // @todo: Do this per account?  By type of operation?
+  $current_total_videos_processed = media_theplatform_mpx_variable_get('running_total_videos_processed', 0);
+  $current_total_video_processing_time = media_theplatform_mpx_variable_get('running_total_video_processing_time', 0);
+  $processing_time = microtime(TRUE) - $start_microtime;
+  media_theplatform_mpx_variable_set('running_total_videos_processed', 1 + $current_total_videos_processed);
+  media_theplatform_mpx_variable_set('running_total_video_processing_time', $current_total_video_processing_time + $processing_time);
 }
 
 /**

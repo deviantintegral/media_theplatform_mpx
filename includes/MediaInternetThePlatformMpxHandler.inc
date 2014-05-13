@@ -43,7 +43,7 @@ class MediaInternetThePlatformMpxHandler extends MediaInternetBaseHandler {
    */
   public function save($account = NULL, $title = NULL) {
     $file = $this->getFileObject($account);
-    
+
     if ($title != NULL) {
       $file->filename = $title;
     }

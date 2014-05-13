@@ -1,0 +1,583 @@
+<?php
+
+
+/**
+ * Implements hook_menu().
+ */
+function media_theplatform_mpx_reports_menu() {
+
+  $items = array();
+
+  $items[MPX_PATH_ADMIN . '/status'] = array(
+    'title' => t('Media: thePlatform MPX Status (BETA)'),
+    'description' => t('BETA: Reports current ingestion status.'),
+    'page callback' => 'media_theplatform_mpx_reports_page_status',
+    'type' => MENU_LOCAL_TASK,
+    'access arguments' => array('administer mpx account'),
+  );
+
+  return $items;
+}
+
+/**
+ * Helper to output a themed cron queue listing table.
+ */
+function _media_theplatform_mpx_reports_page_status_videos_updated_last_cron_table($rows) {
+
+  $header = array(
+    t('Account'),
+    t('Video ID'),
+    t('Title'),
+    t('Reference ID (guid)'),
+    t('Last Updated'),
+    t('Status'),
+  );
+
+  $table_fieldset = array(
+    '#theme' => 'fieldset',
+    '#title' => t('View Videos Updated During Last Cron Run'),
+    '#value' => theme('table', array(
+      'header' => $header,
+      'rows' => $rows,
+      'sticky' => TRUE,
+      'empty' => t('No videos were updated.'),
+    )),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+
+  $table_fieldset['#attributes']['class'][] = 'collapsible';
+  $table_fieldset['#attributes']['class'][] = 'collapsed';
+
+  return $table_fieldset;
+}
+
+/**
+ * Helper to output a themed cron queue listing table.
+ */
+function _media_theplatform_mpx_reports_page_status_players_updated_last_cron_table($rows) {
+
+  $header = array(
+    t('Account'),
+    t('Player ID'),
+    t('Title'),
+    t('Reference ID (guid)'),
+    t('Public ID'),
+    t('Last Updated'),
+    t('Status'),
+  );
+
+  $table_fieldset = array(
+    '#theme' => 'fieldset',
+    '#title' => t('View Players Updated During Last Cron Run'),
+    '#value' => theme('table', array(
+      'header' => $header,
+      'rows' => $rows,
+      'sticky' => TRUE,
+      'empty' => t('No players were updated.'),
+    )),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+
+  $table_fieldset['#attributes']['class'][] = 'collapsible';
+  $table_fieldset['#attributes']['class'][] = 'collapsed';
+
+  return $table_fieldset;
+}
+
+/**
+ * Helper to output a themed cron queue listing table.
+ */
+function _media_theplatform_mpx_reports_page_status_cron_queue_table($rows) {
+
+  $header = array(
+    t('Queue Item ID'),
+    t('Queue Operation'),
+    t('Account'),
+    t('Video ID'),
+    t('Title'),
+    t('Reference ID (guid)'),
+    t('Last Updated'),
+    t('Approved'),
+    t('Available Date'),
+    t('Expiration Date'),
+  );
+
+  $table_fieldset = array(
+    '#theme' => 'fieldset',
+    '#title' => t('View Videos in Cron Queue'),
+    '#value' => theme('table', array(
+      'header' => $header,
+      'rows' => $rows,
+      'sticky' => TRUE,
+      'empty' => t('No videos in the cron queue.'),
+    )),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+
+  $table_fieldset['#attributes']['class'][] = 'collapsible';
+  $table_fieldset['#attributes']['class'][] = 'collapsed';
+
+  return $table_fieldset;
+}
+
+/**
+ * Helper to output a themed videos-to-be-queued listing table.
+ */
+function _media_theplatform_mpx_reports_page_status_videos_to_be_queued_table($rows) {
+
+  $header = array(
+    t('Account'),
+    t('Video ID'),
+    t('Title'),
+    t('Reference ID (guid)'),
+    t('Last Updated'),
+    t('Approved'),
+    t('Available Date'),
+    t('Expiration Date'),
+  );
+
+  $table_fieldset = array(
+    '#theme' => 'fieldset',
+    '#title' => t('View Videos Waiting to be Placed in the Cron Queue'),
+    '#value' => theme('table', array(
+      'header' => $header,
+      'rows' => $rows,
+      'sticky' => TRUE,
+      'empty' => t('No video updates waiting to be processed.'),
+    )),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $table_fieldset['#attributes']['class'][] = 'collapsible';
+  $table_fieldset['#attributes']['class'][] = 'collapsed';
+
+  return $table_fieldset;
+}
+
+/**
+ * Helper to output a themed video-updates-to-be-processed listing table.
+ */
+function _media_theplatform_mpx_reports_page_status_updates_to_be_processed_table($rows) {
+
+  $header = array(
+    t('Method'),
+    t('Type'),
+    t('ID'),
+    t('Title'),
+    t('Reference ID (guid)'),
+    t('Last Updated'),
+    t('Approved'),
+    t('Availability State'),
+  );
+
+  $table_fieldset = array(
+    '#theme' => 'fieldset',
+    '#title' => t('View Video Updates Waiting to be Processed'),
+    '#value' => theme('table', array(
+      'header' => $header,
+      'rows' => $rows,
+      'sticky' => TRUE,
+      'empty' => t('No video updates waiting to be processed.'),
+    )),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+
+  $table_fieldset['#attributes']['class'][] = 'collapsible';
+  $table_fieldset['#attributes']['class'][] = 'collapsed';
+
+  return $table_fieldset;
+}
+
+/**
+ * Page callback for the mpx status page.
+ */
+function media_theplatform_mpx_reports_page_status() {
+
+  drupal_page_is_cacheable(FALSE);
+
+  drupal_add_library('system', 'drupal.collapse');
+
+  $feed_request_item_limit = media_theplatform_mpx_variable_get('cron_videos_per_run', 250);
+
+  $build = array();
+  $build['#cache'] = FALSE;
+
+  $build['video_total'] = array(
+    '#theme' => 'html_tag',
+    '#tag' => 'h3',
+    '#value' => t('Total Videos Ingested: @video_total',
+      array(
+        '@video_total' => db_select('mpx_video', 'v')
+          ->countQuery()
+          ->execute()
+          ->fetchField(),
+      )),
+  );
+  $build['video_link'] = array(
+    '#theme' => 'html_tag',
+    '#tag' => 'div',
+    '#value' => t('&nbsp;&nbsp;&nbsp;&nbsp; View all videos !link.', array('!link' => l(t('here'), 'admin/content/file/mpxmedia'))),
+  );
+
+  $build['player_total'] = array(
+    '#theme' => 'html_tag',
+    '#tag' => 'h3',
+    '#value' => t('Total Players Ingested: @player_total',
+      array(
+        '@player_total' => db_select('mpx_player', 'v')
+          ->countQuery()
+          ->execute()
+          ->fetchField(),
+      )),
+  );
+  $build['player_link'] = array(
+    '#theme' => 'html_tag',
+    '#tag' => 'div',
+    '#value' => t('&nbsp;&nbsp;&nbsp;&nbsp; View all players !link.', array('!link' => l(t('here'), 'admin/content/file/mpxplayer'))),
+  );
+
+  $cron_next_to_last = media_theplatform_mpx_variable_get('cron_next_to_last', 0);
+  $cron_last = variable_get('cron_last', 0);
+
+  if ($cron_next_to_last && $cron_last) {
+
+    $videos_updated_last_cron = db_select('mpx_video', 'v')
+      ->fields('v')
+      ->condition('updated', $cron_next_to_last, '>')
+      ->condition('updated', $cron_last, '<=')
+      ->execute()
+      ->fetchAll();
+
+    $build['videos_updated_last_cron'] = array(
+      '#theme' => 'html_tag',
+      '#tag' => 'h3',
+      '#value' => t('Videos Updated Last Cron:  @count', array('@count' => count($videos_updated_last_cron))),
+    );
+
+    $videos_updated_last_cron_rows = array();
+    foreach ($videos_updated_last_cron as $data) {
+      $video_account = _media_theplatform_mpx_get_account_data($data->parent_account);
+      $video_file = file_load($data->fid);
+      $videos_updated_last_cron_rows[] = array(
+        urldecode($video_account->import_account),
+        $data->id,
+        $data->title,
+        $data->guid,
+        date('m/d/Y g:i:s a', $data->updated),
+        !empty($video_file->published) ? t('Published') : t('Unpublished'),
+      );
+    }
+
+    $build['videos_updated_last_cron_preview'][0] = _media_theplatform_mpx_reports_page_status_videos_updated_last_cron_table($videos_updated_last_cron_rows);
+
+
+    $players_updated_last_cron = db_select('mpx_player', 'p')
+      ->fields('p')
+      ->condition('updated', $cron_next_to_last, '>')
+      ->condition('updated', $cron_last, '<=')
+      ->execute()
+      ->fetchAll();
+
+    $build['players_updated_last_cron'] = array(
+      '#theme' => 'html_tag',
+      '#tag' => 'h3',
+      '#value' => t('Players Updated Last Cron:  @count', array('@count' => count($players_updated_last_cron))),
+    );
+
+    $players_updated_last_cron_rows = array();
+    foreach ($players_updated_last_cron as $data) {
+      $player_account = _media_theplatform_mpx_get_account_data($data->parent_account);
+      $player_file = file_load($data->fid);
+      $players_updated_last_cron_rows[] = array(
+        urldecode($player_account->import_account),
+        $data->id,
+        $data->title,
+        $data->guid,
+        $data->pid,
+        date('m/d/Y g:i:s a', $data->updated),
+        !empty($player_file->published) ? t('Published') : t('Unpublished'),
+      );
+    }
+
+    $build['players_updated_last_cron_preview'][0] = _media_theplatform_mpx_reports_page_status_players_updated_last_cron_table($players_updated_last_cron_rows);
+  }
+
+  $cron_queue_total = db_select('queue', 'q')
+    ->condition('name', 'media_theplatform_mpx_video_cron_queue', '=')
+    ->countQuery()
+    ->execute()
+    ->fetchField();
+
+  $build['cron_queue_total'] = array(
+    '#theme' => 'html_tag',
+    '#tag' => 'h3',
+    '#value' => t('Total Videos Queued for Ingestion: @cron_queue_total',
+      array(
+        '@cron_queue_total' => $cron_queue_total,
+      )),
+  );
+  if ($cron_queue_total) {
+
+    // @todo: Make this fieldset populate via ajax, to avoid the potentially
+    // slow query on page load.
+
+    $cron_queue_items = db_select('queue', 'q')
+      ->fields('q')
+      ->condition('name', 'media_theplatform_mpx_video_cron_queue', '=')
+      ->orderBy('item_id', 'ASC')
+      ->execute()
+      ->fetchAll();
+
+
+    if (module_exists('devel')) {
+      dpm('Cron Queue Item Data');
+      dpm($cron_queue_items);
+    }
+
+
+    $cron_queue_table_rows = array();
+    foreach ($cron_queue_items as $data) {
+      $item_data = unserialize($data->data);
+      $cron_queue_table_rows[] = array(
+        $data->item_id,
+        $item_data['queue_operation'] == 'publish' ? t('Publish / Update') : ucwords($item_data['queue_operation']),
+        urldecode($item_data['account']->import_account),
+        basename($item_data['video']['id']),
+        $item_data['video']['title'],
+        $item_data['video']['guid'],
+        date('m/d/Y g:i:s a', $item_data['video']['updated'] / 1000),
+        $item_data['video']['plmedia$approved'] ? t('Yes') : t('No'),
+        $item_data['video']['media$availableDate'] ? date('m/d/Y g:i:s a', $item_data['video']['media$availableDate'] / 1000) : '',
+        $item_data['video']['media$expirationDate'] ? date('m/d/Y g:i:s a', $item_data['video']['media$expirationDate'] / 1000) : '',
+      );
+    }
+
+    $current_total_videos_processed = media_theplatform_mpx_variable_get('running_total_videos_processed', 0);
+    $current_total_video_processing_time = media_theplatform_mpx_variable_get('running_total_video_processing_time', 0);
+
+    if ($current_total_videos_processed && $current_total_video_processing_time) {
+
+      $avg_video_processed_per_second = ($current_total_videos_processed / $current_total_video_processing_time);
+      $cron_queue_time_limit = media_theplatform_mpx_variable_get('cron_queue_processing_time', 10);
+      $videos_processed_per_cron_run = floor($cron_queue_time_limit * $avg_video_processed_per_second);
+      $total_queue_cron_runs = ceil(count($cron_queue_table_rows) / $videos_processed_per_cron_run);
+
+      $build['cron_queue_processing_time'] = array(
+        '#theme' => 'html_tag',
+        '#tag' => 'h3',
+        '#value' => t('Average Number of Videos Processed Per Cron Run: @avg_per_cron  (based on @total videos processed)',
+          array(
+            '@avg_per_cron' => $videos_processed_per_cron_run,
+            '@total' => $current_total_videos_processed,
+          )),
+      );
+
+      $first_cron_run_queue_rows = array_splice($cron_queue_table_rows, 0, $videos_processed_per_cron_run);
+      $build['first_cron_run_queue_preview'][0] = _media_theplatform_mpx_reports_page_status_cron_queue_table($first_cron_run_queue_rows);
+      $build['first_cron_run_queue_preview'][0]['#title'] = t('Videos to be Ingested During the Next Cron Run');
+
+      for ($i = 1; $i <= $total_queue_cron_runs; $i++) {
+        $next_cron_run_rows = array_splice($cron_queue_table_rows, 0, $videos_processed_per_cron_run);
+        $build['first_cron_run_queue_preview'][$i] = _media_theplatform_mpx_reports_page_status_cron_queue_table($next_cron_run_rows);
+        $build['first_cron_run_queue_preview'][$i]['#title'] = t('... and the cron run after that (in @num cron runs)',
+          array('@num' => $i + 1));
+      }
+    }
+    // If there are no performance metrics, just dump the entire queue into a table.
+    // @todo: Add pager to table.
+    else {
+
+      $build['first_cron_run_queue_preview'] = _media_theplatform_mpx_reports_page_status_cron_queue_table($cron_queue_table_rows);
+    }
+  }
+
+  foreach (_media_theplatform_mpx_get_account_data() as $account_id => $account_data) {
+
+
+    if (module_exists('devel')) {
+      dpm('Account Data');
+      dpm($account_data);
+    }
+
+    $build['account_' . $account_id] = array(
+      '#prefix' => '<br /><h1>' . t('Video Ingestion Details for Account @id', array('@id' => $account_id)) . '</h1>',
+    );
+
+    $videos_to_be_queued = $account_data->proprocessing_batch_item_count ? $account_data->proprocessing_batch_item_count - ($account_data->proprocessing_batch_current_item - 1) : 0;
+    $total_videos_to_be_queued_cron_runs = 0;
+
+    $build['account_' . $account_id]['videos_to_be_queued_total'] = array(
+      '#theme' => 'html_tag',
+      '#tag' => 'h3',
+      '#value' => t('Total Videos Waiting to be Placed in the Cron Queue: @videos_to_be_queued_total',
+        array(
+          '@videos_to_be_queued_total' => (int)$videos_to_be_queued,
+        )),
+    );
+
+    if ($videos_to_be_queued) {
+
+      $videos_to_be_queued_url = $account_data->proprocessing_batch_url;
+      $token = media_theplatform_mpx_check_token($account_id);
+      $videos_to_be_queued_url = $videos_to_be_queued_url . '&range=' . (int) $account_data->proprocessing_batch_current_item . '-' . $account_data->proprocessing_batch_item_count;
+      $videos_to_be_queued_url .= '&token=' . $token;
+      $videos_to_be_queued_url .= '&fields=id,title,guid,updated,plmedia$approved,media$availableDate,media$expirationDate';
+
+      $videos_to_be_queued_result = _media_theplatform_mpx_retrieve_feed_data($videos_to_be_queued_url);
+
+
+      if (module_exists('devel')) {
+        dpm('Videos-to-be-Queued Data');
+        dpm($videos_to_be_queued_result);
+      }
+
+      if (!empty($videos_to_be_queued_result['entries'])) {
+
+        $videos_to_be_queued_table_rows = array();
+        foreach ($videos_to_be_queued_result['entries'] as $data) {
+          $videos_to_be_queued_table_rows[] = array(
+            urldecode($account_data->import_account),
+            basename($data['id']),
+            $data['title'],
+            $data['guid'],
+            date('m/d/Y g:i:s a', $data['updated'] / 1000),
+            $data['plmedia$approved'] ? t('Yes') : t('No'),
+            $data['media$availableDate'] ? date('m/d/Y g:i:s a', $data['media$availableDate'] / 1000) : '',
+            $data['media$expirationDate'] ? date('m/d/Y g:i:s a', $data['media$expirationDate'] / 1000) : '',
+          );
+        }
+
+        $next_cron_run_rows = array_splice($videos_to_be_queued_table_rows, (-1 * $feed_request_item_limit));
+        $total_videos_to_be_queued_cron_runs = 1 + ceil(count($videos_to_be_queued_table_rows) / $feed_request_item_limit);
+
+        $build['account_' . $account_id]['videos_to_be_queued_preview'][0] = _media_theplatform_mpx_reports_page_status_videos_to_be_queued_table($next_cron_run_rows);
+        $build['account_' . $account_id]['videos_to_be_queued_preview'][0]['#title'] = t('Videos to be Queued During the Next Cron Run');
+
+        for ($i = 1; $i <= ($total_videos_to_be_queued_cron_runs - 1); $i++) {
+          $next_cron_run_rows = array_splice($videos_to_be_queued_table_rows, (-1 * $feed_request_item_limit));
+          $build['account_' . $account_id]['videos_to_be_queued_preview'][$i] = _media_theplatform_mpx_reports_page_status_videos_to_be_queued_table($next_cron_run_rows);
+          $build['account_' . $account_id]['videos_to_be_queued_preview'][$i]['#title'] = t('... and the cron run after that (in @num cron runs)', array('@num' => ($i + 1)));
+        }
+      }
+    }
+
+    // Once the videos waiting to be queued are added to the cron queue, then
+    // video updates will be processed.
+    $notification_token = media_theplatform_mpx_check_token($account_id);
+    $notification_url_base = 'https://read.data.media.theplatform.com/media/notify?token=' . $notification_token
+      . '&account=' . $account_data->import_account
+      . '&block=false&filter=Media&clientId=drupal_media_theplatform_mpx_reports_' . $account_data->account_pid
+      . '&fields=true';
+    $notification_url = $notification_url_base . '&since=' . $account_data->last_notification;
+
+    $notification_response = _media_theplatform_mpx_retrieve_feed_data($notification_url);
+    $notification_request_failed = isset($notification_response[0]['type']) && $notification_response[0]['type'] == 'Exception';
+    $notification_sequence_id_invalid = $notification_request_failed && $notification_response[0]['entry']['title'] == 'ObjectNotFoundException';
+
+
+    if (module_exists('devel')) {
+      dpm('Update Notification Data');
+      dpm($notification_response);
+    }
+
+    if ($notification_sequence_id_invalid) {
+      // @todo: Resolve this automatically instead of simply notifying admin.
+      $build['account_' . $account_id]['notification_sequence_id_valid'] = array(
+        '#theme' => 'html_tag',
+        '#tag' => 'div',
+        '#value' => t('Update Notification Sequence ID has expired!'),
+      );
+    }
+    elseif ($notification_request_failed) {
+      $build['account_' . $account_id]['notification_sequence_id_valid'] = array(
+        '#theme' => 'html_tag',
+        '#tag' => 'div',
+        '#value' => t('Notification request failed!  Exception: @title - @description',
+          array(
+            '@title' => $notification_response[0]['entry']['title'],
+            '@description' => $notification_response[0]['entry']['description'],
+          )),
+      );
+    }
+    else {
+      $build['account_' . $account_id]['notification_sequence_id_valid'] = array(
+        '#theme' => 'html_tag',
+        '#tag' => 'div',
+        '#value' => t('Update Notification Sequence ID is valid.'),
+      );
+    }
+
+    $notifications = array();
+    if (!$notification_request_failed && !empty($notification_response[0]['method'])) {
+      $notifications = $notification_response;
+      while (count($notification_response) == 500) {
+        $notification_url = $notification_url_base . '&since=' . $notification_response[499]['id'];
+        $notification_response = _media_theplatform_mpx_retrieve_feed_data($notification_url);
+        if (isset($notification_response[0]['type']) && $notification_response[0]['type'] == 'Exception') {
+          break;
+        }
+        $notifications = array_merge($notifications, $notification_response);
+      }
+    }
+
+    $build['account_' . $account_id]['notifications_to_be_processed'] = array(
+      '#theme' => 'html_tag',
+      '#tag' => 'h3',
+      '#value' => t('Total Video Updates Waiting to be Processed: @notifications_to_be_processed_total',
+        array(
+          '@notifications_to_be_processed_total' => count($notifications),
+        )),
+    );
+
+    if (!empty($notifications)) {
+
+      // @todo: Make this fieldset populate via ajax, to avoid the potentially
+      // slow query on page load.
+
+      $notification_table_rows = array();
+      foreach ($notifications as $data) {
+        $notification_table_rows[] = array(
+          $data['method'],
+          $data['type'],
+          basename($data['entry']['id']),
+          $data['entry']['title'],
+          $data['entry']['guid'],
+          date('m/d/Y g:i:s a', $data['entry']['updated'] / 1000),
+          $data['entry']['plmedia$approved'] ? t('Yes') : t('No'),
+          $data['entry']['plmedia$availabilityState'],
+        );
+      }
+
+      $total_updates_to_be_processed_cron_runs = ceil(count($notification_table_rows) / $feed_request_item_limit);
+
+      for ($i = 0; $i < $total_updates_to_be_processed_cron_runs; $i++) {
+
+        $next_cron_run_rows = array_splice($notification_table_rows, (-1 * $feed_request_item_limit));
+        $build['account_' . $account_id]['notifications_to_be_processed_preview'][$i] = _media_theplatform_mpx_reports_page_status_updates_to_be_processed_table($next_cron_run_rows);
+
+        if ($i == 0 && $total_videos_to_be_queued_cron_runs == 0) {
+          $build['account_' . $account_id]['notifications_to_be_processed_preview'][$i]['#title'] = t('Video Updates to be Processed During the Next Cron Run');
+        }
+        elseif ($i == 0) {
+          $build['account_' . $account_id]['notifications_to_be_processed_preview'][$i]['#title'] = t('... Video Updates to be Processed in @num Cron Runs (after the above videos are placed in the cron queue)', array('@num' => $total_videos_to_be_queued_cron_runs + 1));
+        }
+        else {
+          $build['account_' . $account_id]['notifications_to_be_processed_preview'][$i]['#title'] = t('... and the cron run after that (in @num cron runs)', array('@num' => $total_videos_to_be_queued_cron_runs + $i + 1));
+        }
+      }
+    }
+  }
+
+  return $build;
+}
+
+
+
+
+
+
+

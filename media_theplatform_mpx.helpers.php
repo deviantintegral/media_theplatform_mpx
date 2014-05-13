@@ -330,6 +330,9 @@ function media_theplatform_mpx_check_token($account_id) {
 
   watchdog('media_theplatform_mpx', 'Checking token stored in the database for account @id.', array('@id' => $account_id), WATCHDOG_INFO);
 
+  // Reset the account data static cache.
+  drupal_static_reset(MEDIA_THEPLATFORM_MPX_ACCOUNT_DATA_STATIC_CACHE);
+
   $token = _media_theplatform_mpx_get_account_value($account_id, 'token');
 
   if (!$token) {
@@ -374,6 +377,12 @@ function _media_theplatform_mpx_expire_all_tokens() {
  */
 function media_theplatform_mpx_expire_token($token, $account_id = NULL) {
 
+  if ($account_id) {
+    _media_theplatform_mpx_set_account_value($account_id, 'token', NULL);
+    // Reset the account data static cache.
+    drupal_static_reset(MEDIA_THEPLATFORM_MPX_ACCOUNT_DATA_STATIC_CACHE);
+  }
+
   $url = 'https://identity.auth.theplatform.com/idm/web/Authentication/signOut?schema=1.0&form=json&_token=' . $token;
 
   watchdog('media_theplatform_mpx', 'Expiring mpx token @token.',
@@ -388,12 +397,6 @@ function media_theplatform_mpx_expire_token($token, $account_id = NULL) {
   }
 
   watchdog('media_theplatform_mpx', 'Expiring mpx token @token successful.', array('@token' => $token), WATCHDOG_NOTICE);
-
-  if ($account_id) {
-    _media_theplatform_mpx_set_account_value($account_id, 'token', NULL);
-    // Reset the account data static cache.
-    drupal_static_reset(MEDIA_THEPLATFORM_MPX_ACCOUNT_DATA_STATIC_CACHE);
-  }
 
   return TRUE;
 }

@@ -1,0 +1,5 @@
+name = Media: ThePlatform mpx Reports
+description = Provides 'ThePlatform mpx' reporting.
+package = "Media"
+core = 7.x
+dependencies[] = media_theplatform_mpx

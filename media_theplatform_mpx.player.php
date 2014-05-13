@@ -84,14 +84,20 @@ function media_theplatform_mpx_get_players_from_theplatform($account) {
 /**
  * Returns array of mpxPlayer fid's and Titles.
  */
-function media_theplatform_mpx_get_players_select($account) {
+function media_theplatform_mpx_get_players_select($account = NULL, $key = 'player_id') {
 
   // Retrieve players from mpx_player.
-  $query = db_select('mpx_player', 'p')
-    ->fields('p', array('player_id', 'title'));
+  $query = db_select('mpx_player', 'p');
+  $query->join('mpx_accounts', 'a', 'a.id = p.parent_account');
+  $query->fields('p', array($key, 'title', 'pid', 'id'))
+    ->fields('a', array('import_account'))
+    ->condition('p.status', 1, '=')
+    ->orderBy('title', 'ASC');
+
   if ($account) {
     $query = $query->condition('parent_account', $account->id, '=');
   }
+
   $result = $query->execute();
   $num_rows = $query->countQuery()->execute()->fetchField();
 
@@ -101,7 +107,7 @@ function media_theplatform_mpx_get_players_select($account) {
 
   // Index by file fid.
   while ($record = $result->fetchAssoc()) {
-    $players[ $record['player_id'] ] = $record['title'];
+    $players[ urldecode($record['import_account']) ][ $record[$key] ] = $record['id'] . ' - ' . $record['pid'] . ' - ' . $record['title'];
   }
 
   return $players;
@@ -118,8 +124,8 @@ function media_theplatform_mpx_is_valid_player_for_account($player_id, $account 
 
   $player = media_theplatform_mpx_get_mpx_player_by_player_id($player_id);
 
-  if ($player) {
-    return ($player['parent_account'] == $account->id && $player['account'] == $account->import_account);
+  if (is_array($player) && !empty($player['player_id'])) {
+    return TRUE;
   }
 
   return FALSE;
@@ -253,6 +259,12 @@ function media_theplatform_mpx_import_all_players($type = NULL) {
         WATCHDOG_NOTICE);
     }
     $inactives[] = $record['id'];
+    // Unpublish the file entity if the file_admin module is enabled.
+    if (module_exists('file_admin')) {
+      $player_file = file_load($record['fid']);
+      $player_file->published = 0;
+      file_save($player_file);
+    }
   }
 
   watchdog('media_theplatform_mpx', 'Processed players @method for all accounts:
@@ -423,6 +435,13 @@ function media_theplatform_mpx_insert_player($player, $fid = NULL, $account = NU
     ->execute();
 
   if ($player_id) {
+    // When the file_admin module is enabled, setting the "published" property
+    // the save handler or in hook_file_presave() won't work.  The value is
+    // overridden and set to zero.  Re-save the file entity to publish it.
+    if (module_exists('file_admin')) {
+      $file->published = 1;
+      file_save($file);
+    }
     watchdog('media_theplatform_mpx', 'Successfully created new player @pid - "@title" - associated with file @fid for @account.',
       array(
         '@pid' => $player['pid'],
@@ -479,7 +498,6 @@ function media_theplatform_mpx_update_player($player, $fid, $mpx_player = NULL, 
     'body_html' => media_theplatform_mpx_get_player_html($player['pid'], 'body', $account),
     'player_data' => serialize(media_theplatform_mpx_extract_mpx_player_data($head_html)),
     'status' => 1,
-    'updated' => REQUEST_TIME,
   );
 
   watchdog('media_theplatform_mpx', 'Updating and publishing @status player @pid - "@title" - associated with file @fid with the following data: <br /><br /> <pre>@data</pre>',
@@ -499,6 +517,15 @@ function media_theplatform_mpx_update_player($player, $fid, $mpx_player = NULL, 
     ->condition('fid', $fid, '=')
     ->execute();
 
+  // Update the "updated" field if player data has changed.
+  if ($update) {
+    $update = db_update('mpx_player')
+      ->fields(array('updated' => REQUEST_TIME))
+      ->condition('id', $player['id'], '=')
+      ->condition('fid', $fid, '=')
+      ->execute();
+  }
+
   if ($update) {
     watchdog('media_theplatform_mpx', 'Successfully updated player @pid -- @title -- associated with file @fid for @account.',
       array(
@@ -510,23 +537,27 @@ function media_theplatform_mpx_update_player($player, $fid, $mpx_player = NULL, 
       WATCHDOG_NOTICE);
   }
   else {
-    watchdog('media_theplatform_mpx', 'Failed to update existing player  @pid -- "@title" -- associated with file @fid for @account in the mpx_player table.',
+    watchdog('media_theplatform_mpx', 'Failed to update existing player  @pid -- "@title" -- associated with file @fid for @account in the mpx_player table.  Player data has likely not changed.',
       array(
         '@pid' => $player['pid'],
         '@title' => $player['title'],
         '@fid' => $fid,
         '@account' => _media_theplatform_mpx_account_log_string($account),
       ),
-      WATCHDOG_ERROR);
+      WATCHDOG_NOTICE);
   }
 
-  // Update file_managed filename with title of player.
-  $file_title = db_update('file_managed')
-    ->fields(array(
-      'filename' => $player['title'],
-    ))
-    ->condition('fid', $fid, '=')
-    ->execute();
+  // Update file entity with (new) title of player and (un)publish status if
+  // the player data has changed.
+  if ($update) {
+    $player_file = file_load($fid);
+    $player_file->status = 1;
+    $player_file->filename = $player['title'];
+    if (module_exists('file_admin')) {
+      $player_file->published = 1;
+    }
+    file_save($player_file);
+  }
 
   // Return code to be used by media_theplatform_mpx_import_all_players().
   return 'update';

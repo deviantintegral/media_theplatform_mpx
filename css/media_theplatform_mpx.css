@@ -30,3 +30,12 @@ li.mpx-browser div.item-data{
   overflow-x: hidden;
   overflow-y: auto;
 }
+#-media-theplatform-mpx-signin-form .form-submit {
+  float: left;
+}
+#-media-theplatform-mpx-account-list-form input[type="submit"] {
+  float: left;
+}
+#-media-theplatform-mpx-account-list-form hr {
+  clear: both;
+}
