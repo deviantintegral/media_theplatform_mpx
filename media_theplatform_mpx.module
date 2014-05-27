@@ -369,7 +369,7 @@ function media_theplatform_mpx_watchdog_alter(&$log_entry) {
   // Output this message to the page if the site is configured to output
   // messages of this severity, and the message contains the necessary data.
   if ($log_entry['severity'] <= MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL
-      #&& user_access('administer mpx account')
+      && user_access('administer mpx account')
       && $log_entry['message'] && is_array($log_entry['variables'])) {
     $message_type = $log_entry['severity'] == WATCHDOG_ERROR ? 'error' : 'status';
     drupal_set_message(t($log_entry['message'], $log_entry['variables']), $message_type);
