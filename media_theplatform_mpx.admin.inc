@@ -552,6 +552,7 @@ function media_theplatform_mpx_check_account_settings($account_id = NULL) {
   // If an account ID is passed, check settings for that account.  Otherwise,
   // check all available accounts that at least one account is configured
   // properly.
+  $account_configured = FALSE;
   $account_data = _media_theplatform_mpx_get_account_data($account_id);
 
   if ($account_id) {

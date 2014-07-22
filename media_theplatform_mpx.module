@@ -575,19 +575,19 @@ function _media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TRUE, $o
 
   $memory_limit = ini_get('memory_limit');
   $memory_limit_in_bytes = _media_theplatform_mpx_convert_shorthand_to_bytes($memory_limit);
-  $extremely_verbose_min_memory = 536870912;
+  $expensive_operation_min_memory = 536870912;
 
   // Only output this message if the mpx logging level is set to extremely
   // verbose.  Increase memory if necessary beforehand, as this message can
   // be extremely large and use up available memory if set lower than 512M.
   if (MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL == WATCHDOG_DEBUG || MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL == WATCHDOG_DEBUG) {
-    if ($memory_limit_in_bytes < $extremely_verbose_min_memory) {
+    if ($memory_limit_in_bytes < $expensive_operation_min_memory) {
       ini_set('memory_limit', '512M');
     }
     watchdog('media_theplatform_mpx', 'Request to retrieve mpx feed data returned the following response:
       <br /> <pre>@response</pre>',
       array('@response' => print_r($result, TRUE)), WATCHDOG_DEBUG);
-    if ($memory_limit_in_bytes < $extremely_verbose_min_memory) {
+    if ($memory_limit_in_bytes < $expensive_operation_min_memory) {
       ini_set('memory_limit', $memory_limit);
     }
   }
@@ -595,7 +595,17 @@ function _media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TRUE, $o
   $result_data = $result->data;
 
   if ($json_decode) {
+
+    if ($memory_limit_in_bytes < $expensive_operation_min_memory) {
+      ini_set('memory_limit', '512M');
+    }
+
     $result_data = drupal_json_decode($result_data);
+
+    if ($memory_limit_in_bytes < $expensive_operation_min_memory) {
+      ini_set('memory_limit', $memory_limit);
+    }
+
     if (!empty($result->data) && empty($result_data)) {
       watchdog('media_theplatform_mpx', 'Failed to decode JSON response data with drupal_json_decode() from the following URL: @url
 <br />...and the following data returned from thePlatform:
@@ -627,7 +637,7 @@ function _media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TRUE, $o
   // verbose.  Increase memory if necessary beforehand, as this message can
   // be extremely large and use up available memory if set lower than 512M.
   if (MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL == WATCHDOG_DEBUG || MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL == WATCHDOG_DEBUG) {
-    if ($memory_limit_in_bytes < $extremely_verbose_min_memory) {
+    if ($memory_limit_in_bytes < $expensive_operation_min_memory) {
       ini_set('memory_limit', '512M');
     }
     watchdog('media_theplatform_mpx', 'Request to retrieve mpx feed data returned the following data:
@@ -636,7 +646,7 @@ function _media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TRUE, $o
         '@data' => print_r($result_data, TRUE),
       ),
       WATCHDOG_DEBUG);
-    if ($memory_limit_in_bytes < $extremely_verbose_min_memory) {
+    if ($memory_limit_in_bytes < $expensive_operation_min_memory) {
       ini_set('memory_limit', $memory_limit);
     }
   }
@@ -1272,4 +1282,41 @@ function _media_theplatform_mpx_delete_account_finished($account_id) {
 
   watchdog('media_theplatform_mpx', 'Completed process of deleting account @id.',
     array('@id' => $account_id), WATCHDOG_NOTICE);
+}
+
+/**
+ * Implements hook_representative_image_views_handler_render().
+ *
+ * Provides Views support for Representative Image.
+ */
+function media_theplatform_mpx_representative_image_views_handler_render($type, $entity, $field, $bundle, $values, $options) {
+  $mpx_bundle = (strpos($bundle,'mpx_video') === 0);
+
+  if ($mpx_bundle && !empty($entity->mpx_video_data['thumbnail_url'])) {
+    $local_thumbnail = pub_mpx_cache_thumbnail($entity->mpx_video_data['thumbnail_url']);
+
+    // By default the Image Style is not set and uses original.
+    if (empty($options['image_style'])) {
+      return array(
+        '#theme' => 'image',
+        '#path' => $local_thumbnail,
+        '#attributes' => array(
+          'class' => 'mpx-video-thumbnail',
+        ),
+      );
+    }
+
+    // If Image Style is set then use it.
+    return array(
+      '#theme' => 'image_style',
+      '#style_name' => $options['image_style'],
+      '#path' => $local_thumbnail,
+      '#attributes' => array(
+        'class' => 'mpx-video-thumbnail',
+      ),
+    );
+  }
+  else {
+    return NULL;
+  }
 }

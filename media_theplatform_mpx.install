@@ -800,44 +800,10 @@ function media_theplatform_mpx_update_7209() {
  * Appending account id to mpx video file entity URIs.
  */
 function media_theplatform_mpx_update_7210(&$sandbox) {
-
-  // Update all existing mpx video file entity URIs.
-  if (empty($sandbox['progress'])) {
-    $sandbox['progress']['current_fid'] = 0;
-    $sandbox['progress']['current_table'] = 'file_managed';
+  // db_update() doesn't allow for multiple tables, so we fall back to
+  // db_query().
+  $tables = array('file_managed', 'file_managed_revisions');
+  foreach($tables as $table) {
+    db_query("UPDATE " . $table . " f, mpx_accounts m SET f.uri = CONCAT(f.uri, '/a/', SUBSTRING(m.account_id, 50)) WHERE f.type = CONCAT('mpx_video_', m.id);");
   }
-
-  $mpx_accounts = _media_theplatform_mpx_get_account_data();
-  $mpx_account_type_id_ref = array();
-  foreach ($mpx_accounts as $id => $account) {
-    $mpx_account_type_id_ref['mpx_video_' . $id] = basename($account->account_id);
-  }
-
-  $files_to_process = db_select($sandbox['progress']['current_table'], 'f')
-    ->fields('f', array('fid', 'uri', 'type'))
-    ->condition('type', 'mpx_video_%', 'LIKE')
-    ->condition('fid', $sandbox['progress']['current_fid'], '>')
-    ->orderBy('fid', 'ASC')
-    ->range(0, 25)
-    ->execute()
-    ->fetchAll();
-
-  if (empty($files_to_process) && $sandbox['progress']['current_table'] == 'file_managed') {
-    $sandbox['progress']['current_table'] = 'file_managed_revisions';
-    $sandbox['progress']['current_fid'] = 0;
-    $sandbox['#finished'] = 0;
-    return;
-  }
-  elseif (empty($files_to_process)) {
-    $sandbox['#finished'] = 1;
-    return t('Finished appending account data to mpx video file URIs.');
-  }
-
-  foreach ($files_to_process as $file) {
-    $new_file_uri = $file->uri . '/a/' . $mpx_account_type_id_ref[$file->type];
-    _media_theplatform_mpx_update_file_uri($file->fid, $new_file_uri, $sandbox['progress']['current_table']);
-    $sandbox['progress']['current_fid'] = $file->fid;
-  }
-
-  $sandbox['#finished'] = 0;
 }

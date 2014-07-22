@@ -37,18 +37,21 @@ function media_theplatform_mpx_get_changed_ids($account) {
   // Initalize arrays to store active and deleted ID's.
   $actives = array();
   $deletes = array();
-  $last_notification_ids = array();
+  $last_notification = NULL;
 
   foreach ($result_data as $changed) {
+    // Store last notification.
+    if ($changed['id']) {
+      $last_notification = $changed['id'];
+    }
+
     // If no method has been returned, there are no changes.
     if (!isset($changed['method'])) {
       watchdog('media_theplatform_mpx', 'Fetching changed media IDs for @account returned no changes.  "method" field value not set.',
         array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_INFO);
 
-      return FALSE;
+      break;
     }
-    // Store last notification.
-    $last_notification_ids[] = $changed['id'];
     // Grab the last component of the URL.
     $media_id = basename($changed['entry']['id']);
     if ($changed['method'] !== 'delete') {
@@ -65,9 +68,10 @@ function media_theplatform_mpx_get_changed_ids($account) {
       }
     }
   }
-
-  sort($last_notification_ids);
-  $last_notification = array_pop($last_notification_ids);
+  
+  if ($last_notification) {
+    media_theplatform_mpx_set_last_notification($account, $last_notification);
+  }
 
   // Remove any deletes from actives, because it causes errors when updating.
   $actives = array_diff($actives, $deletes);
@@ -133,12 +137,20 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
           }
           $video = $item['video'];
           // Prepare the video item for import/update.
+
+          // Sometimes MPX will send us invalid URLs like:
+          // "{ssl:https:http}://mpxstatic-nbcmpx.nbcuni.com/...jpg". We need to
+          // fix the protocol for the ingestion to work.
+          // When the root cause is fixed this code may go away.
+          $thumbnail_url = $video['plmedia$defaultThumbnailUrl'];
+          $thumbnail_url = preg_replace('/(\{.*\})\:\/\/(.*)/', "http://$2", $thumbnail_url);
+
           $video_item = array(
             'id' => basename($video['id']),
             'guid' => $video['guid'],
             'title' => $video['title'],
             'description' => $video['description'],
-            'thumbnail_url' => $video['plmedia$defaultThumbnailUrl'],
+            'thumbnail_url' => $thumbnail_url,
             // Additional default mpx fields.
             'released_file_pids' => serialize(_media_theplatform_mpx_flatten_array(_media_theplatform_mpx_get_media_item_data('media$content/plfile$releases/plrelease$pid', $video))),
             'default_released_file_pid' => _media_theplatform_mpx_get_default_released_file_pid($video),
