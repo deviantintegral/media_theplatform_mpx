@@ -132,13 +132,6 @@ function media_theplatform_mpx_form_media_browser_submit($form, &$form_state) {
 
     // If it doesn't exist, create the file.
     if (!$fid) {
-      watchdog('media_theplatform_mpx', 'Creating file with uri -- @uri -- for video @id and @account.',
-        array(
-          '@uri' => $uri,
-          '@id' => $video['id'],
-          '@account' => _media_theplatform_mpx_account_log_string($video['account']),
-        ),
-        WATCHDOG_DEBUG);
       $provider = media_internet_get_provider($uri);
       $file = $provider->save();
       $fid = $file->fid;

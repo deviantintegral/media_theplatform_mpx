@@ -82,6 +82,7 @@ function media_theplatform_mpx_schema() {
       'player_data' => array(
         'type' => 'blob',
         'description' => 'Serialized array of player data',
+        'size' => 'big',
       ),
       'created' => array(
         'description' => 'timestamp of created',
@@ -105,6 +106,7 @@ function media_theplatform_mpx_schema() {
     'primary key' => array('player_id'),
     'indexes' => array(
       'fid' => array('fid'),
+      'guid' => array(array('guid', 255)),
     ),
   );
 
@@ -225,24 +227,24 @@ function media_theplatform_mpx_schema() {
       ),
       'airdate' => array(
         'description' => 'Video Air Date',
-        'type' => 'varchar',
-        'length' => 64,
-        'not null' => FALSE,
-        'default' => NULL,
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+        'default' => 0,
       ),
       'available_date' => array(
         'description' => 'Video Available Date',
-        'type' => 'varchar',
-        'length' => 64,
-        'not null' => FALSE,
-        'default' => NULL,
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+        'default' => 0,
       ),
       'expiration_date' => array(
         'description' => 'Video Expiration Date',
-        'type' => 'varchar',
-        'length' => 64,
-        'not null' => FALSE,
-        'default' => NULL,
+        'type' => 'int',
+        'not null' => TRUE,
+        'unsigned' => TRUE,
+        'default' => 0,
       ),
       'keywords' => array(
         'description' => 'Video Keywords',
@@ -325,6 +327,7 @@ function media_theplatform_mpx_schema() {
     'primary key' => array('video_id'),
     'indexes' => array(
       'fid' => array('fid'),
+      'guid' => array(array('guid', 255)),
     ),
   );
 
@@ -386,8 +389,9 @@ function media_theplatform_mpx_schema() {
         'not null' => FALSE,
       ),
       'last_notification' => array(
-        'description' => 'Last Notification Request Indicator',
+        'description' => 'Last Notification Sequence ID',
         'type' => 'int',
+        'size' => 'big',
         'not null' => FALSE,
       ),
       'proprocessing_batch_url' => array(
@@ -806,4 +810,71 @@ function media_theplatform_mpx_update_7210(&$sandbox) {
   foreach($tables as $table) {
     db_query("UPDATE " . $table . " f, mpx_accounts m SET f.uri = CONCAT(f.uri, '/a/', SUBSTRING(m.account_id, 50)) WHERE f.type = CONCAT('mpx_video_', m.id);");
   }
+}
+
+/**
+ * Change Last Notification ID column Type.
+ */
+function media_theplatform_mpx_update_7211(&$sandbox) {
+  // Changing to bigint over int (& varchar).
+  db_change_field('mpx_accounts', 'last_notification', 'last_notification',
+    array(
+      'description' => 'Last Notification Sequence ID',
+      'type' => 'int',
+      'size' => 'big',
+      'not null' => FALSE,
+    )
+  );
+}
+
+/**
+ * Change Available Date, Expiration Date, and Air Date column type to int.
+ */
+function media_theplatform_mpx_update_7212(&$sandbox) {
+  db_change_field('mpx_video', 'airdate', 'airdate',
+    array(
+     'description' => 'Video Air Date',
+     'type' => 'int',
+     'not null' => TRUE,
+     'unsigned' => TRUE,
+     'default' => 0,
+    )
+  );
+  db_change_field('mpx_video', 'available_date', 'available_date',
+    array(
+     'description' => 'Video Available Date',
+     'type' => 'int',
+     'not null' => TRUE,
+     'unsigned' => TRUE,
+     'default' => 0,
+    )
+  );
+  db_change_field('mpx_video', 'expiration_date', 'expiration_date',
+    array(
+     'description' => 'Video Expiration Date',
+     'type' => 'int',
+     'not null' => TRUE,
+     'unsigned' => TRUE,
+     'default' => 0,
+    )
+  );
+}
+
+/**
+ * Increase the size of the {mpx_players}.player_data column.
+ */
+function media_theplatform_mpx_update_7213() {
+  db_change_field('mpx_player', 'player_data', 'player_data', array(
+    'type' => 'blob',
+    'description' => 'Serialized array of player data',
+    'size' => 'big',
+  ));
+}
+
+/**
+ * Add indexes on mpx_player.guid and mpx_video.guid.
+ */
+function media_theplatform_mpx_update_7214() {
+  db_add_index('mpx_player', 'guid', array(array('guid', 255)));
+  db_add_index('mpx_video', 'guid', array(array('guid', 255)));
 }

@@ -3,6 +3,16 @@
 
 define('MEDIA_THEPLATFORM_MPX_VIDEO_INGESTION_LOCK_BASENAME', 'drush_media_theplatform_mpx_ingest_mpx_videos');
 
+// 870 s are 14 min 30 sec
+define('MTPM_HANDLER_TIMEOUT', 870.0);
+define('MTPM_LOCK_TIMEOUT', 60.0);
+define('MTPM_PARENT_LOCK_TIMEOUT', 900.0);
+define('MTPM_REQUEST_ITEM_LIMIT', 25);
+define('MTPM_PROCESS_TIMEOUT', 300.0);
+define('MTPM_REQUEST_TIMEOUT', 60.0);
+define('MTPM_REQUEST_TIMEOUT_SHORT', 30.0);
+define('MTPM_TIMEOUT_DELTA', 0.1);
+
 
 /**
  * Implements hook_drush_command().
@@ -10,6 +20,17 @@ define('MEDIA_THEPLATFORM_MPX_VIDEO_INGESTION_LOCK_BASENAME', 'drush_media_thepl
 function media_theplatform_mpx_drush_command() {
 
   $commands = array();
+
+  $commands['restore-mpx-last-notification'] = array(
+    'description' => dt('Restores the most recently saved last_notification sequence ID from a backup system variable.'),
+    'aliases' => array('mpxrln'),
+    'options' => array(
+      'account-id' => array(
+        'description' => dt('The ID of the account the value will be reset for, from the "id" column in the mpx_accounts table.') . "\n",
+        'example_value' => '1',
+      ),
+    ),
+  );
 
   $commands['ingest-mpx-videos'] = array(
     'description' => dt('Runs a continuous mpx video ingestion process.'),
@@ -71,6 +92,43 @@ function media_theplatform_mpx_drush_command() {
   );
 
   return $commands;
+}
+
+/**
+ * Validation for the restore-last-notification command.
+ */
+function drush_media_theplatform_mpx_restore_mpx_last_notification_validate($account_id) {
+  $account = _media_theplatform_mpx_get_account_data($account_id);
+
+  if (empty($account)) {
+    return _drush_media_theplatform_mpx_print('Account ID is invalid.  Account data was not retrieved.',
+      array(), 'error');
+  }
+
+  $backup_last_notification_value = media_theplatform_mpx_variable_get('backup_last_notification_value');
+
+  if (!$backup_last_notification_value) {
+    return _drush_media_theplatform_mpx_print('Backup last notification value does not exist.',
+      array(), 'error');
+  }
+
+  return TRUE;
+}
+
+/**
+ * Command that restores backup last notification sequence ID in cases
+ * where the value may be set to NULL in the database accidentally.
+ */
+function drush_media_theplatform_mpx_restore_mpx_last_notification($account_id) {
+  $account = _media_theplatform_mpx_get_account_data($account_id);
+
+  $success = _media_theplatform_mpx_restore_last_notification($account);
+
+  if (!$success) {
+    return _drush_media_theplatform_mpx_print('Last notification value failed to be restored.  Check watchdog logs for errors.', array(), 'error');
+  }
+
+  return _drush_media_theplatform_mpx_print('Last notification value was restored.');
 }
 
 /**
@@ -219,7 +277,7 @@ function drush_media_theplatform_mpx_ingest_mpx_videos($account_id = 'all') {
   else {
 
     $account_data = _media_theplatform_mpx_get_account_data($account_id);
-    $parent_lock_timeout = 900.1;
+    $parent_lock_timeout = MTPM_PARENT_LOCK_TIMEOUT + MTPM_TIMEOUT_DELTA;
     $quit_when_complete = drush_get_option('quit-when-complete');
 
     _drush_media_theplatform_mpx_print('Ingesting mpx videos for account @id "@name".',
@@ -310,7 +368,7 @@ function _drush_media_theplatform_mpx_print($message, $message_variables = array
  * Helper function that assigns a lock name to a parent process, and acquires
  * the corresponding lock to maintain while the process is running.
  */
-function _drush_media_theplatform_mpx_acquire_parent_process_lock($account_id, $lock_timeout = 900.0) {
+function _drush_media_theplatform_mpx_acquire_parent_process_lock($account_id, $lock_timeout = MTPM_PARENT_LOCK_TIMEOUT) {
 
   $process_metadata = array();
 
@@ -400,8 +458,8 @@ function _drush_media_theplatform_mpx_invoke_account_handler_processes($account_
   // Set processing times for this parent process and each account handler.
   // Add 0.1 to avoid a bug due to microtime()'s lack of fine precision on
   // (some of) Acquia's servers.
-  $parent_lock_timeout = 900.1;
-  $child_max_processing_time = 870;
+  $parent_lock_timeout = MTPM_PARENT_LOCK_TIMEOUT + MTPM_TIMEOUT_DELTA;
+  $child_max_processing_time = MTPM_HANDLER_TIMEOUT;
 
   $invocation_command = array(
     'site' => '@self',
@@ -474,7 +532,7 @@ function _drush_media_theplatform_mpx_invoke_account_handler_processes($account_
  * Invoke the processes that retrieve video data from thePlatform and process
  * the cron queue items created from this retrieved data.
  */
-function _drush_media_theplatform_mpx_invoke_retriever_and_worker_processes($account, $max_processing_time = 300, $request_item_limit = NULL) {
+function _drush_media_theplatform_mpx_invoke_retriever_and_worker_processes($account, $max_processing_time = MTPM_PROCESS_TIMEOUT, $request_item_limit = NULL) {
 
   global $process_metadata;
 
@@ -577,7 +635,7 @@ function _drush_media_theplatform_mpx_start_child_process() {
   $process_count = drush_get_option('process-count', 10);
   $sibling_count = drush_get_option('x-sibling-count', $process_count);
   $max_processing_time = drush_get_option('x-max-processing-time', 90.0);
-  $initial_lock_timeout = 60.0;
+  $initial_lock_timeout = MTPM_LOCK_TIMEOUT;
 
   if (!$parent_id) {
     return _drush_media_theplatform_mpx_print('Unable to determine parent ID.  Aborting child process.', array(), 'error');
@@ -644,7 +702,7 @@ function _drush_media_theplatform_mpx_start_child_process() {
  * assumption is that the current process should shutdown.  It then checks
  * that the current child process is able to re-acquire its own lock.
  */
-function _drush_media_theplatform_mpx_check_process_health($lock_timeout = 60.0) {
+function _drush_media_theplatform_mpx_check_process_health($lock_timeout = MTPM_LOCK_TIMEOUT) {
 
   global $process_metadata;
 
@@ -652,10 +710,6 @@ function _drush_media_theplatform_mpx_check_process_health($lock_timeout = 60.0)
 
   if (!$start_time) {
     $start_time = time();
-  }
-
-  if (!$lock_timeout) {
-    $lock_timeout = 60.0;
   }
 
   // Check that cron ingestion hasn't been re-enabled.  The database has
@@ -671,7 +725,7 @@ function _drush_media_theplatform_mpx_check_process_health($lock_timeout = 60.0)
     return _drush_media_theplatform_mpx_print('Cron ingestion has been enabled.  Aborting child retriever and worker process invocation.', array(), 'error');
   }
 
-  $max_processing_time = !empty($process_metadata['max_processing_time']) ? $process_metadata['max_processing_time'] : drush_get_option('x-max-processing-time', 900.1);
+  $max_processing_time = !empty($process_metadata['max_processing_time']) ? $process_metadata['max_processing_time'] : drush_get_option('x-max-processing-time', MTPM_PARENT_LOCK_TIMEOUT + MTPM_TIMEOUT_DELTA);
   $run_time = time() - $start_time;
 
   if ($run_time >= $max_processing_time) {
@@ -769,7 +823,7 @@ function _drush_media_theplatform_mpx_process_complete_video_ingestion($account)
 
   // Invoke the child retriever and worker processes that will actually request
   // and process the video data.
-  _drush_media_theplatform_mpx_invoke_retriever_and_worker_processes($account, 870);
+  _drush_media_theplatform_mpx_invoke_retriever_and_worker_processes($account, MTPM_HANDLER_TIMEOUT);
 
   // Reset the batch system variables to indicate the ingestion is done.
   if (!$request_queue->numberOfItems()) {
@@ -855,7 +909,7 @@ function _drush_media_theplatform_mpx_process_notification_data($notification_da
 
   // Invoke the retriever and worker processes to actually ingest the videos.
   if ($request_queue_item_count || $cron_queue_item_count) {
-    _drush_media_theplatform_mpx_invoke_retriever_and_worker_processes($account, 300, 25);
+    _drush_media_theplatform_mpx_invoke_retriever_and_worker_processes($account, MTPM_PROCESS_TIMEOUT, MTPM_REQUEST_ITEM_LIMIT);
   }
 
   media_theplatform_mpx_set_last_notification($account, $last_notification_id);
@@ -874,7 +928,7 @@ function _drush_media_theplatform_mpx_process_outstanding_video_notifications($a
   // The timeout setting is hardly respected by drupal_http_request().  Set
   // a 2-minute lock timeout to be sure it doesn't expire while the request
   // is being made.
-  if (!_drush_media_theplatform_mpx_check_process_health(120.0)) {
+  if (!_drush_media_theplatform_mpx_check_process_health(2 * MTPM_REQUEST_TIMEOUT)) {
     return _drush_media_theplatform_mpx_print('Aborting video change notification processing.', array(), 'warning');
   }
 
@@ -988,7 +1042,7 @@ function _drush_media_theplatform_mpx_process_video_ingestion_as_account_handler
   global $process_metadata;
 
   $start_time = time();
-  $account_handler_timeout = 870.0;  // 14 min 30 sec
+  $account_handler_timeout = MTPM_HANDLER_TIMEOUT;
   $parent_process_metadata = NULL;
 
   // Account handlers will act as parent processes to the child retriever and
@@ -1039,7 +1093,7 @@ function _drush_media_theplatform_mpx_process_video_ingestion_as_account_handler
   // Check if there are any cron queue items left, and process them.  If the
   // complete (re-)ingestion could not complete, this can act as a second
   // attempt to complete it.
-  _drush_media_theplatform_mpx_invoke_retriever_and_worker_processes($account, 870);
+  _drush_media_theplatform_mpx_invoke_retriever_and_worker_processes($account, MTPM_HANDLER_TIMEOUT);
 
   // Leave if we've been processing cron queue items for the entire time this
   // process/function should run.
@@ -1076,7 +1130,7 @@ function _drush_media_theplatform_mpx_process_video_ingestion_as_account_handler
  */
 function _drush_media_theplatform_mpx_request_video_data($request_queue_item) {
 
-  $request_timeout = media_theplatform_mpx_variable_get('drush_video_ingestion_request_timeout', 60);
+  $request_timeout = media_theplatform_mpx_variable_get('drush_video_ingestion_request_timeout', MTPM_REQUEST_TIMEOUT);
 
   $request_url = $request_queue_item->data['request_url'];
   $request_account = $request_queue_item->data['account'];
@@ -1109,7 +1163,7 @@ function _drush_media_theplatform_mpx_request_video_data($request_queue_item) {
   // Rertrieve the video data with a maximum of 20 request attempts.
   for ($i = 0; $i < 20; $i++) {
 
-    if (!_drush_media_theplatform_mpx_check_process_health(30)) {
+    if (!_drush_media_theplatform_mpx_check_process_health(MTPM_REQUEST_TIMEOUT_SHORT)) {
       return _drush_media_theplatform_mpx_print('Aborting request queue processing.', array(), 'warning');
     }
 
@@ -1461,10 +1515,10 @@ function _drush_media_theplatform_mpx_http_request($url, array $options = array(
     return $result;
   }
 
-  if (!isset($uri['scheme'])) {
-    $result->error = 'missing schema';
-    $result->code = -1002;
-    return $result;
+  if (empty($uri['scheme'])) {
+    // Since we're executing this from the drush context we can't determine the
+    // current page's protocol. Fallback to 'https'.
+    $uri['scheme'] = variable_get('media_theplatform_mpx_assets_protocol_fallback', 'https');
   }
 
   timer_start(__FUNCTION__);
@@ -1475,7 +1529,7 @@ function _drush_media_theplatform_mpx_http_request($url, array $options = array(
     'method' => 'GET',
     'data' => NULL,
     'max_redirects' => 3,
-    'timeout' => 30.0,
+    'timeout' => MTPM_REQUEST_TIMEOUT_SHORT,
     'context' => NULL,
   );
 
@@ -1848,10 +1902,23 @@ function _drush_media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TR
       ini_set('memory_limit', $memory_limit);
     }
 
+    // Build a list of constant names associated to their values. This is done
+    // to identify what error happened.
     if (!empty($result->data) && empty($result_data)) {
-      watchdog('media_theplatform_mpx', 'Failed to decode JSON response data with drupal_json_decode() from the following URL: @url
+      $constants = get_defined_constants(true);
+      $json_errors = array();
+      foreach ($constants["json"] as $name => $value) {
+        if (!strncmp($name, "JSON_ERROR_", 11)) {
+          $json_errors[$value] = $name;
+        }
+      }
+      watchdog('media_theplatform_mpx', 'Failed to decode JSON response data with drupal_json_decode() with error @json_error from the following URL: @url
 <br />...and the following data returned from thePlatform:
-<br /><pre>@response</pre>.', array('@url' => $url, '@response' => print_r($result, TRUE)), WATCHDOG_ERROR);
+<br /><pre>@response</pre>.', array(
+        '@json_error' => $json_errors[json_last_error()],
+        '@url' => $url,
+        '@response' => print_r($result, TRUE)
+      ), WATCHDOG_ERROR);
       return array();
     }
   }

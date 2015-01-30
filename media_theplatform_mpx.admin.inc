@@ -301,10 +301,6 @@ function media_theplatform_mpx_signin_form_submit($form, &$form_state) {
   // Add new accounts.
   if (!empty($form_state['values']['accounts']['new'])) {
     foreach ($form_state['values']['accounts']['new'] as $key => $values) {
-
-      watchdog('media_theplatform_mpx', 'Inserting username, password and token for user "@username" in the mpx_accounts table.',
-        array('@username' => $values['theplatform_username']), WATCHDOG_INFO);
-
       try {
         $account_id = db_insert('mpx_accounts')
           ->fields(array(
@@ -454,6 +450,12 @@ function media_theplatform_mpx_import_account_form_submit($form, &$form_state) {
 
     $account_data = _media_theplatform_mpx_get_account_data($account_id);
 
+    // If an import account is already set, resetting it will cause an 
+    // unwanted complete re-ingestion of all videos.
+    if (!empty($account_data->import_account)) {
+      continue;
+    }
+
     watchdog('media_theplatform_mpx', 'Setting import account "@import_account" for @account.',
       array(
         '@import_account' => $import_account,
@@ -506,7 +508,8 @@ function media_theplatform_mpx_import_account_form_submit($form, &$form_state) {
       WATCHDOG_INFO);
 
     // Save the new import account data for this account. Reset last
-    // notification, since it's account specific.
+    // notification, since a newly set import account will need a
+    // complete video ingestion.
     try {
 
       db_update('mpx_accounts')
@@ -524,7 +527,7 @@ function media_theplatform_mpx_import_account_form_submit($form, &$form_state) {
     }
     catch (Exception $e) {
 
-      watchdog('media_theplatform_mpx', 'FATAL ERROR occurred while updating import account data for @account. --  "@message"  -- Exception output: @output.',
+      watchdog('media_theplatform_mpx', 'EXCEPTION THROWN occurred while updating import account data for @account. --  "@message"  -- Exception output: @output.',
         array(
           '@account' => _media_theplatform_mpx_account_log_string($account_data),
           '@message' => $e->getMessage(),

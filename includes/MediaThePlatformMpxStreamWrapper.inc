@@ -90,13 +90,6 @@ class MediaThePlatformMpxStreamWrapper extends MediaReadOnlyStreamWrapper {
       file_prepare_directory($dirname, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS);
       $thumbnail_path = $this->getOriginalThumbnailPath();
 
-      watchdog('media_theplatform_mpx', 'Copying thumbnail image from "@thumbnail_path" to "@local_path".',
-        array(
-          '@thumbnail_path' => $thumbnail_path,
-          '@local_path' => $local_path,
-        ),
-        WATCHDOG_DEBUG);
-
       $success = @copy($thumbnail_path, $local_path);
 
       if (!$success) {

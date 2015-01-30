@@ -48,16 +48,6 @@ function _media_theplatform_mpx_set_field($id, $field_name, $field_value, $table
     $field_value = _media_theplatform_mpx_encrypt_value($field_value);
   }
 
-  watchdog('media_theplatform_mpx', 'Saving field @field_name with value "@field_value" in @table table where @id_field = @id.',
-    array(
-      '@field_name' => $field_name,
-      '@field_value' => $field_value,
-      '@table' => $table,
-      '@id_field' => $id_field,
-      '@id' => $id,
-    ),
-    WATCHDOG_INFO);
-
   $result = db_update($table)
     ->fields(array($field_name => $field_value))
     ->condition($id_field, $id, '=')
@@ -85,7 +75,7 @@ function _media_theplatform_mpx_set_field($id, $field_name, $field_value, $table
         '@id_field' => $id_field,
         '@id' => $id,
       ),
-      WATCHDOG_ERROR);
+      WATCHDOG_WARNING);
   }
 
   return $result;
@@ -137,9 +127,6 @@ function _media_theplatform_mpx_get_signin_token($username, $password, $idle_tim
     'timeout' => 15,
     'headers' => array('Content-Type' => 'application/x-www-form-urlencoded'),
   );
-
-  watchdog('media_theplatform_mpx', 'Retrieving authentication token for user "@username".',
-    array('@username' => $username), WATCHDOG_INFO);
 
   $result_data = _media_theplatform_mpx_retrieve_feed_data($login_url, TRUE, $options);
 
@@ -269,9 +256,6 @@ function media_theplatform_mpx_get_accounts_select($account_id, $username = NULL
   $url = 'https://access.auth.theplatform.com/data/Account?schema=1.3.0&form=json&byDisabled=false&token=' . $token
     . '&fields=id,title';
 
-  watchdog('media_theplatform_mpx', 'Retrieving import accounts for @for.',
-    array('@for' => !empty($account_id) ? 'account ' . $account_id : 'user "' . $username . '"'), WATCHDOG_INFO);
-
   $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
 
   media_theplatform_mpx_expire_token($token);
@@ -327,9 +311,6 @@ function media_theplatform_mpx_get_accounts_select($account_id, $username = NULL
  * Requests signin token if the current token's idleTimeout date has passed.
  */
 function media_theplatform_mpx_check_token($account_id) {
-
-  watchdog('media_theplatform_mpx', 'Checking token stored in the database for account @id.', array('@id' => $account_id), WATCHDOG_INFO);
-
   // Reset the account data static cache.
   drupal_static_reset(MEDIA_THEPLATFORM_MPX_ACCOUNT_DATA_STATIC_CACHE);
 
@@ -385,9 +366,6 @@ function media_theplatform_mpx_expire_token($token, $account_id = NULL) {
 
   $url = 'https://identity.auth.theplatform.com/idm/web/Authentication/signOut?schema=1.0&form=json&_token=' . $token;
 
-  watchdog('media_theplatform_mpx', 'Expiring mpx token @token.',
-    array('@token' => $token), WATCHDOG_NOTICE);
-
   $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
 
   if (empty($result_data)) {
@@ -395,8 +373,6 @@ function media_theplatform_mpx_expire_token($token, $account_id = NULL) {
 
     return FALSE;
   }
-
-  watchdog('media_theplatform_mpx', 'Expiring mpx token @token successful.', array('@token' => $token), WATCHDOG_NOTICE);
 
   return TRUE;
 }
@@ -641,9 +617,6 @@ function media_theplatform_mpx_extract_all_js_inline($text) {
  * Returns string of CSS by requesting data from given stylesheet $href.
  */
 function media_theplatform_mpx_get_external_css($href) {
-
-  watchdog('media_theplatform_mpx', 'Retrieving external CSS file contents.', array(), WATCHDOG_INFO);
-
   // Grab its CSS.
   $css = _media_theplatform_mpx_retrieve_feed_data($href, FALSE);
 

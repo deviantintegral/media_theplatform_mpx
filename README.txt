@@ -16,3 +16,8 @@ Drupal as File Entities.
 -- CONFIGURATION --
 
 See http://drupal.org/project/media_theplatform_mpx
+
+
+-- NOTES --
+
+* In order to help you build your MPX calls and test out their APIs, MPX provides this tool: http://data.media.theplatform.com/media/client 

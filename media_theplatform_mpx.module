@@ -220,7 +220,6 @@ function media_theplatform_mpx_media_parse($embed_code) {
  * Implements hook_file_delete().
  */
 function media_theplatform_mpx_file_delete($file) {
-
   // If its a mpx file, delete its record in mpx_player or mpx_video.
   if ($file->filemime == 'video/mpx' || $file->filemime == 'player/mpx') {
 
@@ -235,12 +234,6 @@ function media_theplatform_mpx_file_delete($file) {
     // mpxMedia Files that reference it and then good luck to you.
     if ($parts['mpx_type'] == 'player') {
       $player = media_theplatform_mpx_get_mpx_player_by_fid($file->fid);
-      watchdog('media_theplatform_mpx', 'Deleting player @pid in the mpx_player table which is associated with file @fid that is being deleted.',
-        array(
-          '@pid' => $player['id'],
-          '@fid' => $file->fid,
-        ),
-        WATCHDOG_DEBUG);
       $delete_result = db_delete('mpx_player')->condition('fid', $file->fid)->execute();
       if (!$delete_result) {
         watchdog('media_theplatform_mpx', 'Failed to delete player @pid associated with file @fid which is being deleted.',
@@ -271,34 +264,23 @@ function media_theplatform_mpx_file_delete($file) {
         unlink($local_path);
       }
 
-      $files = db_select('file_managed', 'f')
-        ->fields('f')
-        ->condition('fid', $file->fid, '!=')
-        ->condition('uri', 'mpx://m/' . $guid . '/%', 'LIKE')
-        ->execute()
-        ->fetchAll();
+      $fid = db_query_range("SELECT fid FROM {file_managed} WHERE fid <> :fid AND uri LIKE :uri", 0, 1, array(':fid' => $file->fid, ':uri' => db_like('mpx://m/' . $guid . '/') . '%'))->fetchField();
 
       // If other files exist:
-      if ($files) {
+      if ($fid) {
         // Update mpx_video record with the next fid.
         $update = db_update('mpx_video')
           ->fields(array(
-            'fid' => $files[0]->fid,
+            'fid' => $fid,
           ))
-          ->condition('guid', $guid, '=')
+          ->condition('fid', $file->fid)
           ->execute();
       }
       // Else no other files exist:
       else {
         // @todo - store video_id
         // Delete the mpx_video record.
-        watchdog('media_theplatform_mpx', 'Deleting video with GUID "@guid" in the mpx_player table which is associated with file @fid that is being deleted.',
-          array(
-            '@guid' => $guid,
-            '@fid' => $file->fid,
-          ),
-          WATCHDOG_DEBUG);
-        $delete_result = db_delete('mpx_video')->condition('guid', $guid)->execute();
+        $delete_result = db_delete('mpx_video')->condition('fid', $file->fid)->execute();
         if (!$delete_result) {
           watchdog('media_theplatform_mpx', 'Failed to delete video with GUID "@guid" associated with file @fid which is being deleted.',
             array(
@@ -316,43 +298,6 @@ function media_theplatform_mpx_file_delete($file) {
             WATCHDOG_NOTICE);
         }
       }
-    }
-
-    // Delete filed and image media references to the file about to be deleted.
-    foreach (file_usage_list($file) as $module_name => $object_info) {
-      foreach ($object_info as $entity_type => $entity_info) {
-        $entity_type_info = entity_get_info($entity_type);
-        foreach ($entity_info as $entity_id => $usage_count) {
-          $entity = entity_load($entity_type, array($entity_id));
-          $entity = reset($entity);
-          $save_entity = FALSE;
-          if (!isset($entity->{$entity_type_info['entity keys']['bundle']})) {
-            continue;
-          }
-          $field_instances = field_info_instances($entity_type, $entity->{$entity_type_info['entity keys']['bundle']});
-          foreach ($field_instances as $field_name => $field_data) {
-            $field_language = field_language($entity_type, $entity, $field_name);
-            if (!isset($entity->{$field_name}[$field_language]) || !is_array($entity->{$field_name}[$field_language])) {
-              continue;
-            }
-            $field_info = field_info_field($field_name);
-            if (($field_info['module'] == 'image' && $field_info['type'] == 'image')
-                || ($field_info['module'] == 'file' && $field_info['type'] == 'file')) {
-              foreach ($entity->{$field_name}[$field_language] as $key => $value) {
-                $value = (array)$value;
-                if (isset($value['fid']) && $value['fid'] == $file->fid) {
-                  unset($entity->{$field_name}[$field_language][$key]);
-                  $save_entity = TRUE;
-                }
-              }
-            }
-          }
-          if ($save_entity) {
-            entity_save($entity_type, $entity);
-          }
-        }
-      }
-      file_usage_delete($file, $module_name, NULL, NULL, 0);
     }
   }
 }
@@ -538,14 +483,6 @@ function _media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TRUE, $o
   // Allow for altering the URL before making the request.
   drupal_alter('media_theplatform_mpx_feed_request', $url, $options);
 
-  // Inform site admins we're attempting to retrieve data.
-  watchdog('media_theplatform_mpx', 'Retrieving mpx feed data (timeout = @timeout seconds) from the following feed url: @url',
-    array(
-      '@timeout' => $options['timeout'],
-      '@url' => $url,
-    ),
-    WATCHDOG_INFO);
-
   $start_time = time();
   $result = drupal_http_request($url, $options);
   $response_time = time() - $start_time;
@@ -584,9 +521,29 @@ function _media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TRUE, $o
     if ($memory_limit_in_bytes < $expensive_operation_min_memory) {
       ini_set('memory_limit', '512M');
     }
-    watchdog('media_theplatform_mpx', 'Request to retrieve mpx feed data returned the following response:
-      <br /> <pre>@response</pre>',
-      array('@response' => print_r($result, TRUE)), WATCHDOG_DEBUG);
+    $response_log_message = t('Request to retrieve mpx data with drupal_http_request() returned the following response data:
+      request: @request
+      code: @code
+      protocol: @protocol
+      status_message: @status_message
+      redirect_code: @redirect_code
+      redirect_url: @redirect_url
+      error: @error
+      headers: @headers
+      data: @data',
+    array(
+      '@request' => $result->request,
+      '@code' => $result->code,
+      '@protocol' => $result->protocol,
+      '@status_message' => $result->status_message,
+      '@redirect_code' => $result->redirect_code,
+      '@redirect_url' => $result->redirect_url,
+      '@error' => $result->error,
+      '@headers' => $result->headers,
+      '@data' => $result->data,
+    ));
+    $response_log_message = str_replace("\n", '\n', $response_log_message);
+    watchdog('media_theplatform_mpx', $response_log_message,  array(), WATCHDOG_DEBUG);
     if ($memory_limit_in_bytes < $expensive_operation_min_memory) {
       ini_set('memory_limit', $memory_limit);
     }
@@ -633,25 +590,20 @@ function _media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TRUE, $o
     return $json_decode ? array() : '';
   }
 
-  // Only output this message if the mpx logging level is set to extremely
-  // verbose.  Increase memory if necessary beforehand, as this message can
-  // be extremely large and use up available memory if set lower than 512M.
-  if (MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL == WATCHDOG_DEBUG || MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL == WATCHDOG_DEBUG) {
-    if ($memory_limit_in_bytes < $expensive_operation_min_memory) {
-      ini_set('memory_limit', '512M');
-    }
-    watchdog('media_theplatform_mpx', 'Request to retrieve mpx feed data returned the following data:
-      <br /> <pre>@data</pre>',
-      array(
-        '@data' => print_r($result_data, TRUE),
-      ),
-      WATCHDOG_DEBUG);
-    if ($memory_limit_in_bytes < $expensive_operation_min_memory) {
-      ini_set('memory_limit', $memory_limit);
-    }
-  }
-
   return $result_data;
+}
+
+/**
+ * Implements hook_media_theplatform_mpx_feed_request_alter().
+ */
+function media_theplatform_mpx_media_theplatform_mpx_feed_request_alter(&$url, &$options) {
+  // drupal_http_request will choke on protocol relative urls.
+  if (strpos($url, '//') !== 0) {
+    return;
+  }
+  global $is_https;
+  $url_scheme = $is_https ? 'https' : 'http';
+  $url = $url_scheme . $url;
 }
 
 /**
@@ -914,90 +866,6 @@ function _media_theplatform_mpx_enforce_db_field_limits(&$fields, $module, $tabl
             $fields[$field_name] = 4294967295;
           }
           break;
-      }
-    }
-  }
-}
-
-/**
- * Implements hook_entity_query_alter().
- */
-function media_theplatform_mpx_entity_query_alter(&$query) {
-
-  if (empty($query->entityConditions['bundle']['value']) || $query->deleted == TRUE) {
-    return;
-  }
-
-  $bundle_value = &$query->entityConditions['bundle']['value'];
-
-  // If the bundle defined for this EFQ is an mpx_video bundle, add a tag that
-  // will indicate that the mpx_video table needs to be joined in the query.
-  if ((is_string($bundle_value) && strpos($bundle_value, 'mpx_video') === 0) ||
-      (is_array($bundle_value) && in_array('mpx_video', $bundle_value, TRUE))) {
-    $query->addTag('media_theplatform_mpx_needs_mpx_video_join');
-  }
-  // Might as well do this for the mpx_player table as well.
-  elseif ((is_string($bundle_value) && strpos($bundle_value, 'mpx_player') === 0) ||
-      (is_array($bundle_value) && in_array('mpx_player', $bundle_value, TRUE))) {
-    $query->addTag('media_theplatform_mpx_needs_mpx_player_join');
-  }
-}
-
-/**
- * Implements hook_query_alter().
- */
-function media_theplatform_mpx_query_alter($query) {
-
-  if ($query->hasTag('media_theplatform_mpx_needs_mpx_video_join')) {
-
-    // Add the mpx_video table join if the tag indicating it is needed exists.
-    $query->join('mpx_video', 'mpx_video', 'mpx_video.fid = file_managed.fid');
-
-    $query_conditions = &$query->conditions();
-    $mpx_video_schema = drupal_get_schema_unprocessed('media_theplatform_mpx', 'mpx_video');
-    $file_managed_schema = drupal_get_schema_unprocessed('system', 'file_managed');
-    $mpx_video_schema_field_names = array_keys($mpx_video_schema['fields']);
-    $file_managed_schema_field_names = array_keys($file_managed_schema['fields']);
-
-    // Alter the query condition to use the mpx_video table instead of the
-    // file_managed table for fields that don't exist in file_managed but do
-    // exist in mpx_video.
-    foreach ($query_conditions as $key => &$condition) {
-      list($table, $field_name) = explode('.', $condition['field']);
-      if ($table == 'file_managed' && !in_array($field_name, $file_managed_schema_field_names) &&
-          in_array($field_name, $mpx_video_schema_field_names)) {
-        $condition['field'] = 'mpx_video.' . $field_name;
-      }
-    }
-  }
-
-  if ($query->hasTag('media_theplatform_mpx_needs_mpx_player_join')) {
-
-    // Add the mpx_player table join if the tag indicating it is needed exists.
-    $query->join('mpx_player', 'mpx_player', 'mpx_player.fid = file_managed.fid');
-
-    $query_conditions = &$query->conditions();
-    $mpx_player_schema = drupal_get_schema_unprocessed('media_theplatform_mpx', 'mpx_player');
-    $file_managed_schema = drupal_get_schema_unprocessed('system', 'file_managed');
-    $mpx_player_schema_field_names = array_keys($mpx_player_schema['fields']);
-    $file_managed_schema_field_names = array_keys($file_managed_schema['fields']);
-
-    // Alter the query condition to use the mpx_player table instead of the
-    // file_managed table for fields that don't exist in file_managed but do
-    // exist in mpx_player.
-    foreach ($query_conditions as $key => &$condition) {
-      // Don't process "AND" and "OR" conditions.
-      if (!is_array($condition)) {
-        continue;
-      }
-      // Add file_managed column prefix to avoid query ambiguity PDOs.
-      if (strpos($condition['field'], 'file_managed') !== 0) {
-        $condition['field'] = 'file_managed.' . $condition['field'];
-      }
-      list($table, $field_name) = explode('.', $condition['field']);
-      if ($table == 'file_managed' && !in_array($field_name, $file_managed_schema_field_names) &&
-          in_array($field_name, $mpx_player_schema_field_names)) {
-        $condition['field'] = 'mpx_player.' . $field_name;
       }
     }
   }
@@ -1320,3 +1188,4 @@ function media_theplatform_mpx_representative_image_views_handler_render($type, 
     return NULL;
   }
 }
+

@@ -25,12 +25,11 @@ function media_theplatform_mpx_get_changed_ids($account) {
     '&since=' . $account->last_notification .
     '&size=' . $feed_request_item_limit;
 
-  watchdog('media_theplatform_mpx', 'Retrieving changed media IDs for @account.',
-    array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_INFO);
-
   $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
 
   if (empty($result_data)) {
+    watchdog('media_theplatform_mpx', 'Request for update notifications returned no data for @account.',
+      array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_ERROR);
     return FALSE;
   }
 
@@ -41,10 +40,12 @@ function media_theplatform_mpx_get_changed_ids($account) {
 
   foreach ($result_data as $changed) {
     // Store last notification.
-    if ($changed['id']) {
+    if (!empty($changed['id'])) {
       $last_notification = $changed['id'];
     }
-
+    elseif (is_numeric($changed)) {
+      $last_notification = $changed;
+    }
     // If no method has been returned, there are no changes.
     if (!isset($changed['method'])) {
       watchdog('media_theplatform_mpx', 'Fetching changed media IDs for @account returned no changes.  "method" field value not set.',
@@ -68,7 +69,7 @@ function media_theplatform_mpx_get_changed_ids($account) {
       }
     }
   }
-  
+
   if ($last_notification) {
     media_theplatform_mpx_set_last_notification($account, $last_notification);
   }
@@ -115,10 +116,6 @@ function media_theplatform_mpx_cron_queue_info() {
 function process_media_theplatform_mpx_video_cron_queue_item($item) {
 
   $start_microtime = microtime(TRUE);
-
-  watchdog('media_theplatform_mpx', 'Processing video cron queue item:
-    <br /> <pre>@item</pre>',
-    array('@item' => print_r($item, TRUE)), WATCHDOG_DEBUG);
 
   try {
 
@@ -190,6 +187,12 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
           media_theplatform_mpx_set_mpx_video_inactive($item['delete_id'], 'deleted');
         }
         break;
+
+      default:
+        watchdog('media_theplatform_mpx', 'Video not processed.  Unable to determine queue operation for cron queue item: @item',
+          array(
+            '@item' => str_replace("\n", '\n', print_r($item, TRUE)),
+          ));
     }
   }
   catch (Exception $e) {
@@ -214,11 +217,6 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
  * Helper that retrieves and returns data from an mpx feed URL.
  */
 function _media_theplatform_mpx_process_video_import_feed_data($result_data, $media_to_update = NULL, $account = NULL) {
-
-  watchdog('media_theplatform_mpx', 'Processing video feed data for @account.',
-    array('@account' => is_object($account) && !empty($account->account_id) ? 'account ' . basename($account->account_id) : 'all accounts.'),
-    WATCHDOG_INFO);
-
   // Initalize arrays to store mpxMedia data.
   $queue_items = array();
   $published_ids = array();
@@ -290,10 +288,10 @@ function _media_theplatform_mpx_process_video_import_feed_data($result_data, $me
     $queue->createItem($queue_item);
   }
 
-  watchdog('media_theplatform_mpx', 'Video IDs queued to be processed on cron:
-    <br /> @published_count new mpxMedia queued to be created or updated' . (count($published_ids) ? ':' : '.') . ' @published_ids
-    <br /> @unpublished_count new mpxMedia queued to be unpublished' . (count($unpublished_ids) ? ':' : '.') . ' @unpublished_ids
-    <br /> @deleted_count new mpxMedia queued to be deleted' . (count($deleted_ids) ? ':' : '.') . ' @deleted_ids',
+  watchdog('media_theplatform_mpx', 'Video IDs queued to be processed on cron:'
+    . '  @published_count new mpxMedia queued to be created or updated' . (count($published_ids) ? '(@published_ids)' : '.')
+    . '  @unpublished_count new mpxMedia queued to be unpublished' . (count($unpublished_ids) ? '(@unpublished_ids)' : '.')
+    . '  @deleted_count new mpxMedia queued to be deleted' . (count($deleted_ids) ? '(@deleted_ids)' : '.'),
     array(
       '@published_count' => count($published_ids),
       '@published_ids' => implode(', ', $published_ids),
@@ -311,8 +309,17 @@ function _media_theplatform_mpx_process_video_import_feed_data($result_data, $me
  * Processes a batch import/update.
  */
 function _media_theplatform_mpx_process_batch_video_import($type, $account = NULL) {
-
-  // @todo Add check for valid account object.
+  // This log message may seem redundant, but it's important for detecting if an
+  // ingestion process has begun and is currently in progress.
+  watchdog('media_theplatform_mpx', 'Processing batch video import @method for @account. <br /><br /> Retrieving @limit videos from:
+    <br /><br />  @url.',
+    array(
+      '@method' => $type,
+      '@account' => _media_theplatform_mpx_account_log_string($account),
+      '@limit' => $feed_request_item_limit,
+      '@url' => $url,
+    ),
+    WATCHDOG_NOTICE);
 
   // Get the parts for the batch url and construct it.
   $batch_url = $account->proprocessing_batch_url;
@@ -324,24 +331,27 @@ function _media_theplatform_mpx_process_batch_video_import($type, $account = NUL
   $url = $batch_url . '&range=' . $current_batch_item . '-' . ($current_batch_item + ($feed_request_item_limit - 1));
   $url .= '&token=' . $token;
 
-  // Log what type of operation we're performing.
-  watchdog('media_theplatform_mpx', 'Processing batch video import @method for @account. <br /><br /> Retrieving @limit videos from:
-    <br /><br />  @url.',
-    array(
-      '@method' => $type,
-      '@account' => _media_theplatform_mpx_account_log_string($account),
-      '@limit' => $feed_request_item_limit,
-      '@url' => $url,
-    ),
-    WATCHDOG_NOTICE);
-
   $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
   if (!$result_data) {
+    watchdog('media_theplatform_mpx', 'Aborting batch video import @method.  No video data returned from thePlatform.', 
+      array(
+        '@method' => $type,
+        '@account' => _media_theplatform_mpx_account_log_string($account),
+      ),
+      WATCHDOG_ERROR);
+
     return FALSE;
   }
 
   $processesing_success = _media_theplatform_mpx_process_video_import_feed_data($result_data, NULL, $account);
   if (!$processesing_success) {
+    watchdog('media_theplatform_mpx', 'Aborting batch video import @method for @account.  Error occured while processing video data, refer to previous log messages', 
+      array(
+        '@method' => $type,
+        '@account' => _media_theplatform_mpx_account_log_string($account),
+      ),
+      WATCHDOG_ERROR);
+
     return FALSE;
   }
 
@@ -356,6 +366,7 @@ function _media_theplatform_mpx_process_batch_video_import($type, $account = NUL
     _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_current_item', 0);
     // In case this is the end of the initial import batch, set the last
     // notification id.
+    // HERE
     if (!$account->last_notification) {
       media_theplatform_mpx_set_last_notification($account);
     }
@@ -416,7 +427,8 @@ function _media_theplatform_mpx_get_feed_item_count($url) {
  * Processes a video update.
  */
 function _media_theplatform_mpx_process_video_update($type, $account = NULL) {
-
+  // This log message may seem redundant, but it's important for detecting if an
+  // ingestion process has begun and is currently in progress.
   watchdog('media_theplatform_mpx', 'Beginning video update process @method for @account.',
     array(
       '@method' => $type,
@@ -482,7 +494,7 @@ function _media_theplatform_mpx_process_video_update($type, $account = NULL) {
 
   if ($total_result_count && $total_result_count > $feed_request_item_limit) {
     // Set last notification for the next update.
-    _media_theplatform_mpx_set_field($account->id, 'last_notification', $media_to_update['last_notification']);
+    media_theplatform_mpx_set_last_notification($account, $media_to_update['last_notification']);
     // Set starter batch system variables.
     _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_url', $batch_url);
     _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_item_count', $total_result_count);
@@ -513,7 +525,8 @@ function _media_theplatform_mpx_process_video_update($type, $account = NULL) {
  * Processes a video update.
  */
 function _media_theplatform_mpx_process_video_import($type, $account = NULL) {
-
+  // This log message may seem redundant, but it's important for detecting if an
+  // ingestion process has begun and is currently in progress.
   watchdog('media_theplatform_mpx', 'Running initial video import for @account @method',
     array(
       '@account' => _media_theplatform_mpx_account_log_string($account),
@@ -584,7 +597,8 @@ function _media_theplatform_mpx_process_video_import($type, $account = NULL) {
  *   $data['num_inactives'] - # of videos changed from active to inactive
  */
 function media_theplatform_mpx_import_all_videos($type) {
-
+  // This log message may seem redundant, but it's important for detecting if an
+  // ingestion process has begun and is currently in progress.
   watchdog('media_theplatform_mpx', 'Beginning video import/update process @method for all accounts.', array('@method' => $type), WATCHDOG_NOTICE);
 
   foreach (_media_theplatform_mpx_get_account_data() as $account_data) {
@@ -623,15 +637,6 @@ function media_theplatform_mpx_import_all_videos($type) {
  * Helper that updates a file entity URI for an mpx video.
  */
 function _media_theplatform_mpx_update_file_uri($fid, $new_file_uri, $table = 'file_managed') {
-
-  watchdog('media_theplatform_mpx', 'Changing URI to "@new_uri" for file @fid in the @table table.',
-    array(
-      '@new_uri' => $new_file_uri,
-      '@fid' => $fid,
-      '@table' => $table,
-    ),
-    WATCHDOG_INFO);
-
   $file_update_result = db_update($table)
     ->fields(array('uri' => $new_file_uri))
     ->condition('fid', $fid, '=')
@@ -668,20 +673,16 @@ function _media_theplatform_mpx_update_file_uri($fid, $new_file_uri, $table = 'f
  */
 function media_theplatform_mpx_import_video($video, $account = NULL) {
 
-  watchdog('media_theplatform_mpx', 'Importing/Updating video @id for @account.',
-    array(
-      '@id' => basename($video['id']),
-      '@account' => _media_theplatform_mpx_account_log_string($account),
-    ),
-    WATCHDOG_INFO);
-  watchdog('media_theplatform_mpx', 'Importing/Updating video @id for @account with the following data:
-    <br /> <pre>@data</pre>',
-    array(
-      '@id' => basename($video['id']),
-      '@account' => _media_theplatform_mpx_account_log_string($account),
-      '@data' => print_r($video, TRUE),
-    ),
-    WATCHDOG_DEBUG);
+  if (MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL == WATCHDOG_DEBUG || MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL == WATCHDOG_DEBUG) {
+    watchdog('media_theplatform_mpx', 'Importing/Updating video @id for @account with the following data:
+      <br /> <pre>@data</pre>',
+      array(
+        '@id' => basename($video['id']),
+        '@account' => _media_theplatform_mpx_account_log_string($account),
+        '@data' => print_r($video, TRUE),
+      ),
+      WATCHDOG_DEBUG);
+  }
 
   $op = '';
 
@@ -834,15 +835,6 @@ function _media_theplatform_mpx_create_video_file($video, $account = NULL) {
   }
 
   // Create the file.
-  watchdog('media_theplatform_mpx', 'Creating file with uri "@uri" for video "@title" - @id - and @account.',
-    array(
-      '@uri' => $uri,
-      '@id' => $video['title'],
-      '@id' => $video['id'],
-      '@account' => _media_theplatform_mpx_account_log_string($account),
-    ),
-    WATCHDOG_INFO);
-
   $provider = media_internet_get_provider($uri);
   $file = $provider->save($account);
 
@@ -884,21 +876,13 @@ function _media_theplatform_mpx_create_video_file($video, $account = NULL) {
  *   Returns 'insert' for counters in media_theplatform_mpx_import_all_videos()
  */
 function media_theplatform_mpx_insert_video($video, $fid = NULL, $account = NULL) {
-
-  watchdog('media_theplatform_mpx', 'Creating video @id -- @title -- for @account.',
-    array(
-      '@id' => basename($video['id']),
-      '@title' => $video['title'],
-      '@account' => _media_theplatform_mpx_account_log_string($account),
-    ),
-    WATCHDOG_INFO);
-
   // If file doesn't exist, write it to file_managed.
   if (!$fid) {
     $file = _media_theplatform_mpx_create_video_file($video, $account);
     if (!is_object($file) || empty($file->fid)) {
       return 'failed to insert';
     }
+    $fid = $file->fid;
   }
 
   // Insert record into mpx_video.
@@ -906,7 +890,7 @@ function media_theplatform_mpx_insert_video($video, $fid = NULL, $account = NULL
     'title' => $video['title'],
     'guid' => $video['guid'],
     'description' => $video['description'],
-    'fid' => $file->fid,
+    'fid' => $fid,
     'player_id' => !empty($video['player_id']) ? $video['player_id'] : NULL,
     'parent_account' => $account->id,
     'account' => $account->import_account,
@@ -938,42 +922,32 @@ function media_theplatform_mpx_insert_video($video, $fid = NULL, $account = NULL
 
   _media_theplatform_mpx_enforce_db_field_limits($insert_fields, 'media_theplatform_mpx', 'mpx_video');
 
-  watchdog('media_theplatform_mpx', 'Inserting new video @id - "@title" - associated with file @fid with the following data: <br /><br /> <pre>@data</pre>',
-    array(
-      '@id' => basename($video['id']),
-      '@title' => $video['title'],
-      '@fid' => $file->fid,
-      '@data' => print_r($insert_fields, TRUE),
-    ),
-    WATCHDOG_DEBUG);
-
   $video_id = db_insert('mpx_video')
     ->fields($insert_fields)
     ->execute();
 
-  if ($video_id) {
-    watchdog('media_theplatform_mpx', 'Successfully created new video @id - "@title" - associated with file @fid for @account.',
-      array(
-        '@id' => basename($video['id']),
-        '@title' => $video['title'],
-        '@fid' => $file->fid,
-        '@account' => _media_theplatform_mpx_account_log_string($account),
-      ),
-      WATCHDOG_NOTICE);
-  }
-  else {
+  if (!$video_id) {
     watchdog('media_theplatform_mpx', 'Failed to insert new video @id - "@title" - associated with file @fid for @account into the mpx_video table.',
       array(
         '@id' => basename($video['id']),
         '@title' => $video['title'],
-        '@fid' => $file->fid,
+        '@fid' => $fid,
         '@account' => _media_theplatform_mpx_account_log_string($account),
       ),
       WATCHDOG_ERROR);
   }
 
   // Update the file entity filename with the newly ingested video title.
-  media_theplatform_mpx_update_video_filename($file->fid, $video['title']);
+  media_theplatform_mpx_update_video_filename($fid, $video['title']);
+
+  watchdog('media_theplatform_mpx', 'Successfully created new video @id - "@title" - associated with file @fid for @account.',
+    array(
+      '@id' => basename($video['id']),
+      '@title' => $video['title'],
+      '@fid' => $fid,
+      '@account' => _media_theplatform_mpx_account_log_string($account),
+    ),
+    WATCHDOG_NOTICE);
 
   // Return code to be used by media_theplatform_mpx_import_all_videos().
   return 'insert';
@@ -1012,8 +986,6 @@ function _media_theplatform_mpx_delete_video_images($video) {
 
   $image_path = 'media-mpx/' . $video['guid'] . '.jpg';
 
-  watchdog('media_theplatform_mpx', 'Deleting image with path: public://@path',
-    array('@path' => 'public://' . $image_path), WATCHDOG_INFO);
   if (file_unmanaged_delete('public://' . $image_path)) {
     watchdog('media_theplatform_mpx', 'Successfully deleted image with path: public://@path',
       array('@path' => 'public://' . $image_path), WATCHDOG_NOTICE);
@@ -1023,15 +995,8 @@ function _media_theplatform_mpx_delete_video_images($video) {
       array('@path' => 'public://' . $image_path), WATCHDOG_ERROR);
   }
 
-  watchdog('media_theplatform_mpx', 'Deleting image with path: private://@path',
-    array('@path' => 'private://' . $image_path), WATCHDOG_INFO);
-  if (file_unmanaged_delete('private://' . $image_path)) {
-    watchdog('media_theplatform_mpx', 'Successfully deleted image with path: private://@path',
-      array('@path' => 'private://' . $image_path), WATCHDOG_NOTICE);
-  }
-  else {
-    watchdog('media_theplatform_mpx', 'Failed to delete image with path: private://@path',
-      array('@path' => 'private://' . $image_path), WATCHDOG_ERROR);
+  if (variable_get('file_private_path', FALSE)) {
+    file_unmanaged_delete('private://' . $image_path);
   }
 
   // Delete thumbnail from all the styles.
@@ -1053,15 +1018,6 @@ function _media_theplatform_mpx_delete_video_images($video) {
  */
 function media_theplatform_mpx_update_video($video, $fid = NULL, $account = NULL) {
 
-  watchdog('media_theplatform_mpx', 'Updating video @id - "@title" - associated with file @fid for @account.',
-    array(
-      '@id' => basename($video['id']),
-      '@title' => $video['title'],
-      '@fid' => $fid ? $fid : 'UNAVAILABLE',
-      '@account' => _media_theplatform_mpx_account_log_string($account),
-    ),
-    WATCHDOG_INFO);
-
   // Update mpx_video record.
   $update_fields = array(
     'title' => $video['title'],
@@ -1071,6 +1027,7 @@ function media_theplatform_mpx_update_video($video, $fid = NULL, $account = NULL
     'status' => 1,
     'updated' => REQUEST_TIME,
     'id' => $video['id'],
+    'player_id' => !empty($video['player_id']) ? $video['player_id'] : NULL,
     // Additional default mpx fields.
     'released_file_pids' => $video['released_file_pids'],
     'default_released_file_pid' => $video['default_released_file_pid'],
@@ -1096,17 +1053,6 @@ function media_theplatform_mpx_update_video($video, $fid = NULL, $account = NULL
 
   // Fetch video_id and status from mpx_video table for given $video.
   $mpx_video = media_theplatform_mpx_get_mpx_video_by_field('guid', $video['guid']);
-
-  watchdog('media_theplatform_mpx', 'Updating and publishing @status video @id - "@title" - associated with file fid - @fid - for @account with the following data: <br /><br /> <pre>@data</pre>',
-    array(
-      '@status' => isset($mpx_video) && $mpx_video['status'] == 1 ? 'published' : 'unpublished',
-      '@id' => basename($video['id']),
-      '@title' => $video['title'],
-      '@fid' => $fid ? $fid : 'UNAVAILABLE',
-      '@account' => _media_theplatform_mpx_account_log_string($account),
-      '@data' => print_r($update_fields, TRUE),
-    ),
-    WATCHDOG_DEBUG);
 
   // Construct the update query.
   $update_query = db_update('mpx_video');
@@ -1140,17 +1086,7 @@ function media_theplatform_mpx_update_video($video, $fid = NULL, $account = NULL
       ->execute();
   }
 
-  if ($update_result) {
-    watchdog('media_theplatform_mpx', 'Successfully updated video  @id - "@title" associated with @association for @account .',
-      array(
-        '@id' => basename($video['id']),
-        '@title' => $video['title'],
-        '@association' => $association,
-        '@account' => _media_theplatform_mpx_account_log_string($account),
-      ),
-      WATCHDOG_NOTICE);
-  }
-  else {
+  if (!$update_result) {
     watchdog('media_theplatform_mpx', 'Failed to update video  @id - "@title" associated with file fid - @fid - for @account in the mpx_video table.',
       array(
         '@id' => basename($video['id']),
@@ -1179,6 +1115,15 @@ function media_theplatform_mpx_update_video($video, $fid = NULL, $account = NULL
 
   // Delete thumbnail from files_*/media-mpx directory.
   _media_theplatform_mpx_delete_video_images($video);
+
+  watchdog('media_theplatform', 'Updated video @id - "@title" - associated with file @fid for @account.',
+    array(
+      '@id' => basename($video['id']),
+      '@title' => $video['title'],
+      '@fid' => $fid ? $fid : 'UNAVAILABLE',
+      '@account' => _media_theplatform_mpx_account_log_string($account),
+    ),
+    WATCHDOG_INFO);
 
   // Return code to be used by media_theplatform_mpx_import_all_videos().
   return 'update';
@@ -1296,35 +1241,84 @@ function media_theplatform_mpx_get_thumbnail_url($guid) {
 }
 
 /**
+ * Validates and restores backup last notification sequence ID.
+ */
+function _media_theplatform_mpx_restore_last_notification($account) {
+  $backup_last_notification_value = media_theplatform_mpx_variable_get('backup_last_notification_value');
+
+  if (!$backup_last_notification_value) {
+    watchdog('media_theplatform_mpx', 'Attempt to restore backup last_notification for @account failed - no value exists.',
+      array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_ERROR);
+    
+    return FALSE;
+  }
+
+  // Check if the backup value is still valid.  Last notification  sequence 
+  // IDs are only stored by thePlatform for a week.
+  $token = media_theplatform_mpx_check_token($account->id);
+  $url = 'https://read.data.media.theplatform.com/media/notify?token=' . $token .
+    '&account=' . $account->import_account .
+    '&block=false&filter=Media&clientId=drupal_media_theplatform_mpx_' . $account->account_pid .
+    '&since=' . $backup_last_notification_value .
+    '&size=1';
+  $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
+
+  if (empty($result_data)) {
+    watchdog('media_theplatform_mpx', 'Attempt to validate backup last_notification value "@value" failed.  This might occur if the sequence ID is over a week old.',
+      array(
+        '@value' => $backup_last_notification_value,
+      ),
+      WATCHDOG_ERROR);
+
+    return FALSE;
+  }
+
+  media_theplatform_mpx_set_last_notification($account, $backup_last_notification_value);
+
+  return TRUE;
+}
+
+/**
  * Returns most recent notification sequence number from thePlatform.
  */
 function media_theplatform_mpx_set_last_notification($account, $last_notification = NULL) {
 
-  if (!is_numeric($last_notification)) {
-
+  if (empty($last_notification)) {
     $token = media_theplatform_mpx_check_token($account->id);
     $url = 'https://read.data.media.theplatform.com/media/notify?token=' . $token .
       '&account=' . $account->import_account .
       '&filter=Media&clientId=drupal_media_theplatform_mpx_' . $account->account_pid;
-
-    watchdog('media_theplatform_mpx', 'Resetting mpx last notification timestamp for @account.',
-      array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_INFO);
-
     $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
 
     if (empty($result_data[0]['id'])) {
-      watchdog('media_theplatform_mpx', 'Failed to reset mpx last notification timestamp for @account.  "id" field value not set.',
+      watchdog('media_theplatform_mpx', 'Failed to reset mpx last notification sequence ID for @account.  "id" field value not set.',
         array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_ERROR);
-
-      return FALSE;
     }
-
-    $last_notification = $result_data[0]['id'];
+    else {
+      $last_notification = $result_data[0]['id'];
+      watchdog('media_theplatform_mpx', 'Successfully retrieved mpx last notification sequence ID for @account: @id.', 
+        array(
+          '@id' => $last_notification,
+          '@account' => _media_theplatform_mpx_account_log_string($account),
+        ),
+        WATCHDOG_NOTICE);
+    }
   }
 
-  _media_theplatform_mpx_set_field($account->id, 'last_notification', $last_notification);
+  // If we have a value, save it in the mpx_accounts table and in our backup 
+  // variable.
+  if ($last_notification) {
+    _media_theplatform_mpx_set_field($account->id, 'last_notification', $last_notification);
+    // Save the last notification value in the fallback variable for recovery purposes.
+    media_theplatform_mpx_variable_set('backup_last_notification_value', $last_notification);
 
-  return TRUE;
+    return TRUE;
+  }
+
+  watchdog('media_theplatform_mpx', 'An attempt was made (but was not permitted) to set last_notification to an empty PHP value for @account.',
+    array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_ERROR);
+
+  return FALSE;
 }
 
 /**
@@ -1337,8 +1331,6 @@ function media_theplatform_mpx_set_last_notification($account, $last_notificatio
  *   Valid values: 'unpublished' or 'deleted'.
  */
 function media_theplatform_mpx_set_mpx_video_inactive($id, $op) {
-
-  watchdog('media_theplatform_mpx', 'Disabling video @id.', array('@id' => $id), WATCHDOG_NOTICE);
 
   // Set status to inactive.
   $inactive = db_update('mpx_video')
