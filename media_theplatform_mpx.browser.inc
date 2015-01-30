@@ -34,7 +34,7 @@ function media_theplatform_mpx_form_media_browser($form, &$form_state = array(),
       // Fetch all distinct accounts from mpx_player.
       $accounts = media_theplatform_mpx_get_mpx_player_accounts();
       foreach ($accounts as $account) {
-        $account_label = str_replace('%', '-', $account->account);
+        $account_label = media_theplatform_mpx_clean_account_identifier($account->account);
         $form['player_fid_' . $account_label] = array(
           '#type' => 'select',
           '#title' => t('Render with mpxPlayer:'),
@@ -63,7 +63,7 @@ function media_theplatform_mpx_form_media_browser($form, &$form_state = array(),
 
   foreach ($list as $item) {
     $file = file_load($item->fid);
-    $account_label = str_replace('%', '-', $item->account);
+    $account_label = media_theplatform_mpx_clean_account_identifier($item->account);
     media_browser_build_media_item($file);
     $file->preview = l('<span class="' . $account_label . '">' . $file->preview . '</span>', 'media/browser', array(
       'html' => TRUE,
@@ -122,7 +122,7 @@ function media_theplatform_mpx_form_media_browser_submit($form, &$form_state) {
     $url = parse_url($embed_code);
     $parts = explode('/', $url['path']);
     $video = media_theplatform_mpx_get_mpx_video_by_field('guid', $parts[1]);
-    $account_label = str_replace('%', '-', $video['account']);
+    $account_label = media_theplatform_mpx_clean_account_identifier($video['account']);
 
     // Check if this mpxMedia / mpxPlayer combo exists.
     $key = 'player_fid_' . $account_label;
@@ -164,4 +164,19 @@ function media_theplatform_mpx_form_media_browser_submit($form, &$form_state) {
       'render' => 'media-popup',
       'fid' => $fid,
     )));
+}
+
+/**
+ * Convert an MPX account username into a valid string for CSS or form element.
+ *
+ * This is basically a wrapper around drupal_clean_css_identifier().
+ *
+ * @param string $name
+ *   The account name.
+ *
+ * @return string
+ *   The cleaned up account name.
+ */
+function media_theplatform_mpx_clean_account_identifier($name) {
+  return drupal_clean_css_identifier($name, array_fill_keys(array('-', '%', '.', '/'), '_'));
 }
