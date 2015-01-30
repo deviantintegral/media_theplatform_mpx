@@ -6,12 +6,7 @@ files[] = includes/MediaThePlatformMpxStreamWrapper.inc
 files[] = includes/MediaInternetThePlatformMpxHandler.inc
 files[] = includes/MediaThePlatformMpxPlayerBrowser.inc
 files[] = includes/MediaThePlatformMpxMediaBrowser.inc
+dependencies[] = media
 dependencies[] = media_internet
 dependencies[] = file_entity
 configure = admin/config/media/theplatform
-
-; Information added by drupal.org packaging script on 2012-12-01
-version = "7.x-2.2"
-core = "7.x"
-project = "media_theplatform_mpx"
-datestamp = "1354358777"
