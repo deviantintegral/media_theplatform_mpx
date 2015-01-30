@@ -9,7 +9,7 @@
 
   Drupal.behaviors.mediaMpxBrowser = {
     attach: function (context, settings) {
-    
+
       $('div.mpxplayer_select').hide();
 
       // Container for the files that get passed back to the browser
@@ -19,14 +19,14 @@
       $('ul#media-browser-library-list a').click(function() {
         return false;
       });
-        
+
       // Update hidden value for mpx type.
       $('.players-browser .media-item').bind('click', function () {
         $("input[name='mpx_type']").val('players');
         // Hide player selects on video-browser if we clicked on a mpxPlayer item.
         $('div.mpxplayer_select').hide();
-      });  
-      
+      });
+
       $('.videos-browser .media-item').bind('click', function () {
         $("input[name='mpx_type']").val('videos');
         // Hide all player selects.
@@ -35,9 +35,9 @@
         account = $(this).closest('span').attr('class');
         $('div.'+account).show();
       });
-      
+
       // Catch the click on a media item
-      $('.media-item').bind('click', function () {
+      $('.mpx-browser .media-item').bind('click', function () {
         // Remove all currently selected files
         $('.media-item').removeClass('selected');
         // Set the current item to active
@@ -52,7 +52,7 @@
         Drupal.media.browser.selectMedia(files);
         $("input[name='selected_file']").val(uri);
       });
-            
+
       // Check that file was selected.
       $('.mpx-submit').bind('click', function () {
         if ($("input[name='selected_file']").val() == '') {
@@ -60,7 +60,7 @@
           return false;
         }
       });
-      
+
       // Filter list if mpxmedia_search is used.
       $('#edit-mpxmedia-search').keyup(function() {
         var value = $(this).val();
@@ -70,7 +70,7 @@
           var isMatch = exp.test($('.item-data', this).text());
           $(this).toggle(isMatch);
         });
-      });       
+      });
 
     }
   }
