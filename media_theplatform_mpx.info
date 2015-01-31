@@ -2,6 +2,7 @@ name = Media: ThePlatform mpx
 description = Provides 'ThePlatform mpx' support to the Media module.
 package = "Media"
 core = 7.x
+php = 5.3
 files[] = includes/MediaThePlatformMpxStreamWrapper.inc
 files[] = includes/MediaInternetThePlatformMpxHandler.inc
 files[] = includes/MediaThePlatformMpxPlayerBrowser.inc
