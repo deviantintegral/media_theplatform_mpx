@@ -45,6 +45,7 @@ function media_theplatform_mpx_get_players_from_theplatform($account) {
     return FALSE;
   }
 
+  $players = array();
   $player_ids = array();
   foreach ($result_data['entries'] as $player) {
     $player_ids[] = basename($player['id']);
