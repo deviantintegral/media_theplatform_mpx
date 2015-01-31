@@ -15,6 +15,6 @@
 
 <div class="media-mpx-wrapper" id="media-mpx-wrapper-<?php print $mpx_id; ?>">
   <div id="mpx-<?php print $mpx_id; ?>">
-    <?php print $player_html; ?> 
+    <?php print $player_html; ?>
   </div>
 </div>

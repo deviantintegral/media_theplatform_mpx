@@ -333,7 +333,7 @@ function _media_theplatform_mpx_process_batch_video_import($type, $account = NUL
 
   $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
   if (!$result_data) {
-    watchdog('media_theplatform_mpx', 'Aborting batch video import @method.  No video data returned from thePlatform.', 
+    watchdog('media_theplatform_mpx', 'Aborting batch video import @method.  No video data returned from thePlatform.',
       array(
         '@method' => $type,
         '@account' => _media_theplatform_mpx_account_log_string($account),
@@ -345,7 +345,7 @@ function _media_theplatform_mpx_process_batch_video_import($type, $account = NUL
 
   $processesing_success = _media_theplatform_mpx_process_video_import_feed_data($result_data, NULL, $account);
   if (!$processesing_success) {
-    watchdog('media_theplatform_mpx', 'Aborting batch video import @method for @account.  Error occured while processing video data, refer to previous log messages', 
+    watchdog('media_theplatform_mpx', 'Aborting batch video import @method for @account.  Error occured while processing video data, refer to previous log messages',
       array(
         '@method' => $type,
         '@account' => _media_theplatform_mpx_account_log_string($account),
@@ -1249,11 +1249,11 @@ function _media_theplatform_mpx_restore_last_notification($account) {
   if (!$backup_last_notification_value) {
     watchdog('media_theplatform_mpx', 'Attempt to restore backup last_notification for @account failed - no value exists.',
       array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_ERROR);
-    
+
     return FALSE;
   }
 
-  // Check if the backup value is still valid.  Last notification  sequence 
+  // Check if the backup value is still valid.  Last notification  sequence
   // IDs are only stored by thePlatform for a week.
   $token = media_theplatform_mpx_check_token($account->id);
   $url = 'https://read.data.media.theplatform.com/media/notify?token=' . $token .
@@ -1296,7 +1296,7 @@ function media_theplatform_mpx_set_last_notification($account, $last_notificatio
     }
     else {
       $last_notification = $result_data[0]['id'];
-      watchdog('media_theplatform_mpx', 'Successfully retrieved mpx last notification sequence ID for @account: @id.', 
+      watchdog('media_theplatform_mpx', 'Successfully retrieved mpx last notification sequence ID for @account: @id.',
         array(
           '@id' => $last_notification,
           '@account' => _media_theplatform_mpx_account_log_string($account),
@@ -1305,7 +1305,7 @@ function media_theplatform_mpx_set_last_notification($account, $last_notificatio
     }
   }
 
-  // If we have a value, save it in the mpx_accounts table and in our backup 
+  // If we have a value, save it in the mpx_accounts table and in our backup
   // variable.
   if ($last_notification) {
     _media_theplatform_mpx_set_field($account->id, 'last_notification', $last_notification);

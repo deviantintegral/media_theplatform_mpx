@@ -450,7 +450,7 @@ function media_theplatform_mpx_import_account_form_submit($form, &$form_state) {
 
     $account_data = _media_theplatform_mpx_get_account_data($account_id);
 
-    // If an import account is already set, resetting it will cause an 
+    // If an import account is already set, resetting it will cause an
     // unwanted complete re-ingestion of all videos.
     if (!empty($account_data->import_account)) {
       continue;
