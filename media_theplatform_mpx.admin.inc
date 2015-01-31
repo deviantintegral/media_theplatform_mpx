@@ -572,7 +572,7 @@ function media_theplatform_mpx_check_account_settings($account_id = NULL) {
 
   if (!$account_configured) {
     if (user_access('administer mpx account')) {
-      drupal_set_message(t('Your mpx Account is not configured.') . ' ' . l(t('Configure mpx Account.'), MPX_PATH_ADMIN), 'error');
+      drupal_set_message(t('Your mpx Account is not configured.') . ' ' . l(t('Configure mpx Account.'), 'admin/config/media/theplatform'), 'error');
     }
     else {
       drupal_set_message(t('Your mpx Account is not configured.') . ' ' . t('Please contact your System Administrator.'), 'error');
@@ -765,7 +765,7 @@ function media_theplatform_mpx_get_table_mpx_players() {
     $rows[] = array(
       $player->player_id,
       $default,
-      l($player->title, MPX_PATH_FILE . '/' . $player->fid),
+      l($player->title, 'file/' . $player->fid),
       $player->description,
       // $player->id,
       $player->status,
@@ -788,7 +788,7 @@ function media_theplatform_mpx_page_mpx_videos() {
   if (!media_theplatform_mpx_get_mpx_player_count()) {
     $output .= t('No mpxPlayers have been imported.');
     if (user_access('sync mpx_player')) {
-      $output .= ' ' . l(t('Sync mpxPlayers.'), MPX_PATH_PLAYER);
+      $output .= ' ' . l(t('Sync mpxPlayers.'), 'admin/content/file/mpxplayer');
     }
     else {
       $output .= ' ' . t('Please contact your System Administrator.');
@@ -909,7 +909,7 @@ function media_theplatform_mpx_get_table_mpx_videos() {
     $thumbnail = media_get_thumbnail_preview($file);
     $rows[] = array(
       $video->video_id,
-      l(drupal_render($thumbnail), MPX_PATH_FILE . '/' . $video->fid, array('html' => TRUE, 'attributes' => array('class' => 'mpxmedia'))),
+      l(drupal_render($thumbnail), 'file/' . $video->fid, array('html' => TRUE, 'attributes' => array('class' => 'mpxmedia'))),
       $video->title,
       $video->description,
       // $video->guid,

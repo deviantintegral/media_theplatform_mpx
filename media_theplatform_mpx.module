@@ -15,7 +15,6 @@ include_once ('media_theplatform_mpx.browser.inc');
 include_once ('media_theplatform_mpx.helpers.php');
 include_once ('media_theplatform_mpx.player.php');
 include_once ('media_theplatform_mpx.video.php');
-include_once ('media_theplatform_mpx.version.inc');
 
 /**
  * Searches $item => $key for Media Files and calls MPX add_player_head for all found Files.
@@ -103,26 +102,26 @@ function media_theplatform_mpx_add_player_head($fids) {
  */
 function media_theplatform_mpx_menu() {
   $items = array();
-  $items[MPX_PATH_ADMIN] = array(
+  $items['admin/config/media/theplatform'] = array(
     'title' => 'Media: thePlatform mpx settings',
     'description' => 'Configure thePlatForm mpx integration settings.',
     'page callback' => 'media_theplatform_mpx_page_account',
     'type' => MENU_NORMAL_ITEM,
     'access arguments' => array('administer mpx account'),
   );
-  $items[MPX_PATH_ADMIN . '/settings'] = array(
+  $items['admin/config/media/theplatform/settings'] = array(
     'title' => 'Media: thePlatform mpx settings',
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'access arguments' => array('administer mpx account'),
   );
-  $items[MPX_PATH_PLAYER] = array(
+  $items['admin/content/file/mpxplayer'] = array(
     'title' => 'mpxPlayers',
     'page callback' => 'media_theplatform_mpx_page_mpx_players',
     'type' => MENU_LOCAL_TASK,
     'access callback' => '_media_theplatform_mpx_access',
     'weight' => 30,
   );
-  $items[MPX_PATH_VIDEO] = array(
+  $items['admin/content/file/mpxmedia'] = array(
     'title' => 'mpxMedia',
     'page callback' => 'media_theplatform_mpx_page_mpx_videos',
     'type' => MENU_LOCAL_TASK,
@@ -1185,6 +1184,34 @@ function media_theplatform_mpx_representative_image_views_handler_render($type, 
   }
   else {
     return NULL;
+  }
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function media_theplatform_mpx_form_alter(&$form, &$form_state, $form_id) {
+  // Check if media: single file delete form.
+  if ($form['#id'] == 'file-delete-form') {
+    $file = file_load($form['fid']['#value']);
+    if ($file->filemime == 'player/mpx' && media_theplatform_mpx_get_files_by_player_fid($file->fid)) {
+      drupal_set_message(t('@filename cannot be deleted because it is referenced by other mpxMedia Files.', array('@filename' => $file->filename)), 'error');
+      unset($form['actions']['submit']);
+      unset($form['description']);
+    }
+  }
+  // Check if bulk media delete form.
+  elseif ($form['#id'] == 'file-entity-admin-files' && isset($form['operation']) && $form['operation']['#value'] == 'delete') {
+    foreach ($form['files'] as $key => $data ) {
+      if (is_numeric($key) && isset($data['#value'])) {
+        $file = file_load($data['#value']);
+        if ($file->filemime == 'player/mpx' && media_theplatform_mpx_get_files_by_player_fid($file->fid)) {
+          drupal_set_message(t('@filename cannot be deleted because it is referenced by other mpxMedia Files.', array('@filename' => $file->filename)), 'error');
+          unset($form['actions']['submit']);
+          unset($form['description']);
+        }
+      }
+    }
   }
 }
 

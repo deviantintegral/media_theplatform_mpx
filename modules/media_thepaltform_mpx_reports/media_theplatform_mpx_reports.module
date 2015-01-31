@@ -9,7 +9,7 @@ function media_theplatform_mpx_reports_menu() {
   $items = array();
 
   if (media_theplatform_mpx_variable_get('cron_videos')) {
-    $items[MPX_PATH_ADMIN . '/status'] = array(
+    $items['admin/config/media/theplatform/status'] = array(
       'title' => t('Media: thePlatform MPX Status (BETA)'),
       'description' => t('BETA: Reports current ingestion status.'),
       'page callback' => 'media_theplatform_mpx_reports_page_status',
