@@ -269,12 +269,11 @@ function media_theplatform_mpx_file_delete($file) {
       // If other files exist:
       if ($fid) {
         // Update mpx_video record with the next fid.
-        $update = db_update('mpx_video')
-          ->fields(array(
-            'fid' => $fid,
-          ))
+        db_update('mpx_video')
+          ->fields(array('fid' => $fid))
           ->condition('fid', $file->fid)
           ->execute();
+        entity_get_controller('file')->resetCache(array($fid));
       }
       // Else no other files exist:
       else {
