@@ -118,14 +118,14 @@ function media_theplatform_mpx_menu() {
     'title' => 'mpxPlayers',
     'page callback' => 'media_theplatform_mpx_page_mpx_players',
     'type' => MENU_LOCAL_TASK,
-    'access callback' => '_media_theplatform_mpx_access',
+    'access arguments' => array('administer files'),
     'weight' => 30,
   );
   $items['admin/content/file/mpxmedia'] = array(
     'title' => 'mpxMedia',
     'page callback' => 'media_theplatform_mpx_page_mpx_videos',
     'type' => MENU_LOCAL_TASK,
-    'access callback' => '_media_theplatform_mpx_access',
+    'access arguments' => array('administer files'),
     'weight' => 40,
   );
   return $items;
@@ -410,13 +410,6 @@ function media_theplatform_mpx_permission() {
       'description' => t('Can access Sync mpxMedia form.'),
     ),
   );
-}
-
-/**
- * Access callback for videos / players listing
- */
-function _media_theplatform_mpx_access() {
-  return (user_access('administer media') || user_access('administer files'));
 }
 
 /**
