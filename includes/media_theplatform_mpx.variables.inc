@@ -28,23 +28,30 @@ function _media_theplatform_mpx_encrypt_value($value) {
     return base64_encode($value);
   }
 
-  global $drupal_hash_salt;
-  $key = md5($drupal_hash_salt);
-
   $library = libraries_load('zend_crypt');
-  $key = md5($drupal_hash_salt);
+  $key = md5(drupal_get_hash_salt());
 
   // If library doesn't exist, use a less secure means of encryption/decryption.
   if (!$library['loaded']) {
-    $block = mcrypt_get_block_size('des', 'ecb');
-    $pad = $block - (strlen($str) % $block);
-    $str .= str_repeat(chr($pad), $pad);
-    return mcrypt_encrypt(MCRYPT_DES, $key, $str, MCRYPT_MODE_ECB);
+    $keysize = mcrypt_get_key_size(MCRYPT_DES, MCRYPT_MODE_ECB);
+    $key = drupal_substr($key, 0, $keysize);
+    $block = mcrypt_get_block_size(MCRYPT_DES, MCRYPT_MODE_ECB);
+    $pad = $block - (strlen($value) % $block);
+    $value .= str_repeat(chr($pad), $pad);
+    $return = mcrypt_encrypt(MCRYPT_DES, $key, $value, MCRYPT_MODE_ECB);
+    if (!$return) {
+      trigger_error('Unable to encrypt MPX value.', E_USER_ERROR);
+    }
+    return $return;
   }
 
   $blockCipher = BlockCipher::factory('mcrypt', array('algo' => 'aes'));
   $blockCipher->setKey($key);
-  return $blockCipher->encrypt($value);
+  $return = $blockCipher->encrypt($value);
+  if ($return === FALSE) {
+    trigger_error('Unable to encrypt MPX value.', E_USER_ERROR);
+  }
+  return $return;
 }
 
 /**
@@ -60,22 +67,34 @@ function _media_theplatform_mpx_decrypt_value($value) {
     return base64_decode($value);
   }
 
-  global $drupal_hash_salt;
-
   $library = libraries_load('zend_crypt');
-  $key = md5($drupal_hash_salt);
+  $key = md5(drupal_get_hash_salt());
 
   // If library doesn't exist, use a less secure means of encryption/decryption.
   if (!$library['loaded']) {
-    $str = mcrypt_decrypt(MCRYPT_DES, $key, $str, MCRYPT_MODE_ECB);
-    $block = mcrypt_get_block_size('des', 'ecb');
+    $keysize = mcrypt_get_key_size(MCRYPT_DES, MCRYPT_MODE_ECB);
+    $key = drupal_substr($key, 0, $keysize);
+    $str = mcrypt_decrypt(MCRYPT_DES, $key, $value, MCRYPT_MODE_ECB);
+    if (!$str) {
+      trigger_error('Unable to decrypt MPX value.', E_USER_ERROR);
+      return FALSE;
+    }
+    $block = mcrypt_get_block_size(MCRYPT_DES, MCRYPT_MODE_ECB);
     $pad = ord($str[($len = strlen($str)) - 1]);
-    return substr($str, 0, strlen($str) - $pad);
+    $return = substr($str, 0, strlen($str) - $pad);
+    if ($return === FALSE) {
+      trigger_error('Unable to decrypt MPX value.', E_USER_ERROR);
+    }
+    return $return;
   }
 
   $blockCipher = BlockCipher::factory('mcrypt', array('algo' => 'aes'));
   $blockCipher->setKey($key);
-  return $blockCipher->decrypt($value);
+  $return = $blockCipher->decrypt($value);
+  if ($return === FALSE) {
+    trigger_error('Unable to decrypt MPX value.', E_USER_ERROR);
+  }
+  return $return;
 }
 
 function media_theplatform_mpx_get_encrypted_list() {
