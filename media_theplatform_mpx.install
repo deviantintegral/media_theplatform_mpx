@@ -878,3 +878,18 @@ function media_theplatform_mpx_update_7214() {
   db_add_index('mpx_player', 'guid', array(array('guid', 255)));
   db_add_index('mpx_video', 'guid', array(array('guid', 255)));
 }
+
+/**
+ * Decrypt account username and token values.
+ */
+function media_theplatform_mpx_update_7215() {
+  include_once __DIR__ . '/includes/media_theplatform_mpx.variables.inc';
+  $records = db_query("SELECT id, username, token FROM {mpx_accounts}")->fetchAll();
+  foreach ($records as $record) {
+    $record->username = _media_theplatform_mpx_decrypt_value($record->username);
+    if (!empty($record->token)) {
+      $record->token = _media_theplatform_mpx_decrypt_value($record->token);
+    }
+    drupal_write_record('mpx_accounts', $record, array('id'));
+  }
+}

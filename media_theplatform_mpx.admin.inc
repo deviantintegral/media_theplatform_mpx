@@ -142,7 +142,7 @@ function media_theplatform_mpx_account_list_form($form, &$form_state, $accounts 
         array('@theplatform_account_id' => $account->id)),
       '#description' => t('Prefix your username with "mpx/". e.g. "mpx/admin@example.com".'),
       '#maxlength' => 255,
-      '#default_value' => _media_theplatform_mpx_decrypt_value($account->username),
+      '#default_value' => $account->username,
       '#required' => TRUE,
     );
     $form['account_list'][ $id ]['theplatform_password'] = array(
@@ -256,7 +256,7 @@ function media_theplatform_mpx_signin_form_validate($form, &$form_state) {
   if (!empty($form_state['values']['accounts']['existing'])) {
     foreach ($form_state['values']['accounts']['existing'] as $id => $values) {
       $account_data = _media_theplatform_mpx_get_account_data($id);
-      $existing_username = _media_theplatform_mpx_decrypt_value($account_data->username);
+      $existing_username = $account_data->username;
       $existing_password = _media_theplatform_mpx_decrypt_value($account_data->password);
       if ($values['theplatform_password'] &&
           ($values['theplatform_username'] != $existing_username || $values['theplatform_password'] != $existing_password)) {
@@ -304,7 +304,7 @@ function media_theplatform_mpx_signin_form_submit($form, &$form_state) {
       try {
         $account_id = db_insert('mpx_accounts')
           ->fields(array(
-            'username' => _media_theplatform_mpx_encrypt_value($values['theplatform_username']),
+            'username' => $values['theplatform_username'],
             'password' => _media_theplatform_mpx_encrypt_value($values['theplatform_password']),
           ))
           ->execute();
@@ -337,7 +337,7 @@ function media_theplatform_mpx_account_list_form_validate($form, &$form_state) {
   if (!empty($form_state['values']['account_list'])) {
     foreach ($form_state['values']['account_list'] as $id => $values) {
       $account_data = _media_theplatform_mpx_get_account_data($id);
-      $existing_username = _media_theplatform_mpx_decrypt_value($account_data->username);
+      $existing_username = $account_data->username;
       $existing_password = _media_theplatform_mpx_decrypt_value($account_data->password);
       if ($values['theplatform_password'] &&
         ($values['theplatform_username'] != $existing_username || $values['theplatform_password'] != $existing_password)) {
@@ -381,7 +381,7 @@ function media_theplatform_mpx_account_list_form_submit($form, &$form_state) {
   if (!empty($form_state['values']['account_list'])) {
     foreach ($form_state['values']['account_list'] as $id => $values) {
       $account_data = _media_theplatform_mpx_get_account_data($id);
-      $existing_username = _media_theplatform_mpx_decrypt_value($account_data->username);
+      $existing_username = $account_data->username;
       $existing_password = _media_theplatform_mpx_decrypt_value($account_data->password);
       if ($values['theplatform_password'] &&
           ($values['theplatform_username'] != $existing_username ||
@@ -396,7 +396,7 @@ function media_theplatform_mpx_account_list_form_submit($form, &$form_state) {
         try {
           db_update('mpx_accounts')
             ->fields(array(
-                'username' => _media_theplatform_mpx_encrypt_value($values['theplatform_username']),
+                'username' => $values['theplatform_username'],
                 'password' => _media_theplatform_mpx_encrypt_value($values['theplatform_password']),
               ))
             ->condition('id', $id, '=')
@@ -473,7 +473,7 @@ function media_theplatform_mpx_import_account_form_submit($form, &$form_state) {
     watchdog('media_theplatform_mpx', 'Retrieving import account information for "@import_account".',
       array('@import_account' => $import_account), WATCHDOG_NOTICE);
 
-    $username = _media_theplatform_mpx_decrypt_value($account_data->username);
+    $username = $account_data->username;
     $password = _media_theplatform_mpx_decrypt_value($account_data->password);
     $token_ttl = MEDIA_THEPLATFORM_MPX_TOKEN_IDLE_TIMEOUT;
     $token = _media_theplatform_mpx_get_signin_token($username, $password, $token_ttl);

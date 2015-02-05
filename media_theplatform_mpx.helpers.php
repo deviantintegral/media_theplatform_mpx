@@ -159,7 +159,7 @@ function media_theplatform_mpx_signin($account_id) {
     return FALSE;
   }
 
-  $username = _media_theplatform_mpx_decrypt_value($account_data->username);
+  $username = $account_data->username;
   $password = _media_theplatform_mpx_decrypt_value($account_data->password);
   $mpx_token = _media_theplatform_mpx_get_signin_token($username, $password);
 
@@ -235,7 +235,7 @@ function media_theplatform_mpx_get_accounts_select($account_id, $username = NULL
 
       return array();
     }
-    $username = _media_theplatform_mpx_decrypt_value($account_data->username);
+    $username = $account_data->username;
     $password = _media_theplatform_mpx_decrypt_value($account_data->password);
     $token = _media_theplatform_mpx_get_signin_token($username, $password, $token_idle_timeout);
     if (!$token) {
@@ -346,9 +346,8 @@ function media_theplatform_mpx_check_token($account_id) {
 function _media_theplatform_mpx_expire_all_tokens() {
 
   foreach (_media_theplatform_mpx_get_account_data() as $account_id => $account_data) {
-    $token = _media_theplatform_mpx_decrypt_value($account_data->token);
-    if ($token) {
-      media_theplatform_mpx_expire_token($token, $account_id);
+    if ($account_data->token) {
+      media_theplatform_mpx_expire_token($account_data->token, $account_id);
     }
   }
 }

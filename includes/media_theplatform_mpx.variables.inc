@@ -99,7 +99,7 @@ function _media_theplatform_mpx_decrypt_value($value) {
 }
 
 function media_theplatform_mpx_get_encrypted_list() {
-  return array('password', 'token', 'username');
+  return array('password');
 }
 
 /**
