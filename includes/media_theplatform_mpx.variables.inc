@@ -42,7 +42,7 @@ function _media_theplatform_mpx_encrypt_value($value) {
     if (!$return) {
       trigger_error('Unable to encrypt MPX value.', E_USER_ERROR);
     }
-    return $return;
+    return base64_encode($return);
   }
 
   $blockCipher = BlockCipher::factory('mcrypt', array('algo' => 'aes'));
@@ -72,6 +72,7 @@ function _media_theplatform_mpx_decrypt_value($value) {
 
   // If library doesn't exist, use a less secure means of encryption/decryption.
   if (!$library['loaded']) {
+    $value = base64_decode($value);
     $keysize = mcrypt_get_key_size(MCRYPT_DES, MCRYPT_MODE_ECB);
     $key = drupal_substr($key, 0, $keysize);
     $str = mcrypt_decrypt(MCRYPT_DES, $key, $value, MCRYPT_MODE_ECB);
