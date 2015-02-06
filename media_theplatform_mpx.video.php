@@ -309,6 +309,17 @@ function _media_theplatform_mpx_process_video_import_feed_data($result_data, $me
  * Processes a batch import/update.
  */
 function _media_theplatform_mpx_process_batch_video_import($type, $account = NULL) {
+
+  // Get the parts for the batch url and construct it.
+  $batch_url = $account->proprocessing_batch_url;
+  $batch_item_count = $account->proprocessing_batch_item_count;
+  $current_batch_item = (int) $account->proprocessing_batch_current_item;
+  $feed_request_item_limit = media_theplatform_mpx_variable_get('cron_videos_per_run', 250);
+  $token = media_theplatform_mpx_check_token($account->id);
+
+  $url = $batch_url . '&range=' . $current_batch_item . '-' . ($current_batch_item + ($feed_request_item_limit - 1));
+  $url .= '&token=' . $token;
+
   // This log message may seem redundant, but it's important for detecting if an
   // ingestion process has begun and is currently in progress.
   watchdog('media_theplatform_mpx', 'Processing batch video import @method for @account. <br /><br /> Retrieving @limit videos from:
@@ -320,16 +331,6 @@ function _media_theplatform_mpx_process_batch_video_import($type, $account = NUL
       '@url' => $url,
     ),
     WATCHDOG_NOTICE);
-
-  // Get the parts for the batch url and construct it.
-  $batch_url = $account->proprocessing_batch_url;
-  $batch_item_count = $account->proprocessing_batch_item_count;
-  $current_batch_item = (int) $account->proprocessing_batch_current_item;
-  $feed_request_item_limit = media_theplatform_mpx_variable_get('cron_videos_per_run', 250);
-  $token = media_theplatform_mpx_check_token($account->id);
-
-  $url = $batch_url . '&range=' . $current_batch_item . '-' . ($current_batch_item + ($feed_request_item_limit - 1));
-  $url .= '&token=' . $token;
 
   $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
   if (!$result_data) {
