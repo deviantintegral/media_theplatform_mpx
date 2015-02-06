@@ -27,7 +27,8 @@ function media_theplatform_mpx_media_browser_plugin_info() {
 function media_theplatform_mpx_media_internet_providers() {
   return array(
     'MediaInternetThePlatformMpxHandler' => array(
-      'title' => 'All media from thePlatform mpx must be imported and cannot be added on this tab.',
+      'title' => 'MPX Media',
+      'hidden' => TRUE,
     ),
   );
 }
