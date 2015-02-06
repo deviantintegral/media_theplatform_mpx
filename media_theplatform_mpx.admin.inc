@@ -301,27 +301,16 @@ function media_theplatform_mpx_signin_form_submit($form, &$form_state) {
   // Add new accounts.
   if (!empty($form_state['values']['accounts']['new'])) {
     foreach ($form_state['values']['accounts']['new'] as $key => $values) {
-      try {
-        $account_id = db_insert('mpx_accounts')
-          ->fields(array(
-            'username' => $values['theplatform_username'],
-            'password' => _media_theplatform_mpx_encrypt_value($values['theplatform_password']),
-          ))
-          ->execute();
-        drupal_static_reset(MEDIA_THEPLATFORM_MPX_ACCOUNT_DATA_STATIC_CACHE);
-        media_theplatform_mpx_signin($account_id);
+      $account_id = db_insert('mpx_accounts')
+        ->fields(array(
+          'username' => $values['theplatform_username'],
+          'password' => _media_theplatform_mpx_encrypt_value($values['theplatform_password']),
+        ))
+        ->execute();
+      drupal_static_reset(MEDIA_THEPLATFORM_MPX_ACCOUNT_DATA_STATIC_CACHE);
+      if (media_theplatform_mpx_signin($account_id)) {
         watchdog('media_theplatform_mpx', 'Successfully created account for user "@username".',
           array('@username' => $values['theplatform_username']), WATCHDOG_NOTICE);
-      }
-      catch (Exception $e) {
-
-        watchdog('media_theplatform_mpx', 'FATAL ERROR occurred while creating account @account --  "@message"  -- Exception output: @output.',
-          array(
-            '@account' => _media_theplatform_mpx_account_log_string($account_data),
-            '@message' => $e->getMessage(),
-            '@output' => '<pre>' . print_r($e, TRUE) . '</pre>',
-          ),
-          WATCHDOG_ERROR);
       }
     }
   }
