@@ -5,15 +5,15 @@
  */
 
 // A registry of variable_get defaults.
-include_once ('includes/media_theplatform_mpx.variables.inc');
+include_once __DIR__ . '/includes/media_theplatform_mpx.variables.inc';
 // Hooks and callbacks for integrating with File Entity module for display.
-include_once ('includes/media_theplatform_mpx.formatters.inc');
+include_once __DIR__ . '/includes/media_theplatform_mpx.formatters.inc';
 
 // Helper functions.
-include_once ('media_theplatform_mpx.admin.inc');
-include_once ('media_theplatform_mpx.helpers.php');
-include_once ('media_theplatform_mpx.player.php');
-include_once ('media_theplatform_mpx.video.php');
+include_once __DIR__ . '/media_theplatform_mpx.admin.inc';
+include_once __DIR__ . '/media_theplatform_mpx.helpers.php';
+include_once __DIR__ . '/media_theplatform_mpx.player.php';
+include_once __DIR__ . '/media_theplatform_mpx.video.php';
 
 /**
  * Searches $item => $key for Media Files and calls MPX add_player_head for all found Files.
