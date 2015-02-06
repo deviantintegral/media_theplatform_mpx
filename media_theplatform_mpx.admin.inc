@@ -669,13 +669,12 @@ function media_theplatform_mpx_form_cron_settings_validate(&$form, &$form_state)
  * Page callback to return all mpx_players and forms.
  */
 function media_theplatform_mpx_page_mpx_players() {
-  $output = '';
+  $output = array();
   // Display forms if signin and import_account
   if (media_theplatform_mpx_check_account_settings() && user_access('sync mpx_player')) {
-    $form_player_sync = drupal_get_form('media_theplatform_mpx_form_mpx_player_sync');
-    $output .= render($form_player_sync);
+    $output['sync'] = drupal_get_form('media_theplatform_mpx_form_mpx_player_sync');
   }
-  $output .= media_theplatform_mpx_get_table_mpx_players();
+  $output += media_theplatform_mpx_get_table_mpx_players();
   return $output;
 }
 
@@ -710,8 +709,7 @@ function media_theplatform_mpx_form_mpx_player_sync($form, &$form_state) {
  * Form submit handler for media_theplatform_mpx_form_mpx_player_sync().
  */
 function media_theplatform_mpx_form_mpx_player_sync_submit($form, &$form_state) {
-
-  $import = media_theplatform_mpx_import_all_players('manually');
+  media_theplatform_mpx_import_all_players('manually');
 }
 
 /**
@@ -731,17 +729,17 @@ function media_theplatform_mpx_get_table_mpx_players() {
     array('data' => t('First Imported'), 'field' => 'p.created'),
     array('data' => t('Last Updated'), 'field' => 'p.updated'),
   );
+
   $query = db_select('mpx_player', 'p')
-    ->extend('TableSort');
+    ->extend('TableSort')
+    ->extend('PagerDefault');
   $query->fields('p');
-  $result = $query
-    ->orderByHeader($header)
-    ->execute();
-  $num_rows = $query->countQuery()->execute()->fetchField();
-  if ($num_rows == 0) {
-    return '<div class="message">' . t('No mpxPlayers have been imported.') . '</div>';
-  }
-  foreach ($result as $player) {
+  $query->orderByHeader($header);
+  $query->limit(25);
+  $results = $query->execute();
+
+  $rows = array();
+  foreach ($results as $player) {
     if ($player->fid == media_theplatform_mpx_variable_get('default_player_fid')) {
       $default = '[default]';
     }
@@ -754,12 +752,23 @@ function media_theplatform_mpx_get_table_mpx_players() {
       l($player->title, 'file/' . $player->fid),
       $player->description,
       // $player->id,
-      $player->status,
+      $player->status ? t('Enabled') : t('Disabled'),
       format_date($player->created, 'short'),
       format_date($player->updated, 'short'),
     );
   }
-  return theme('table', array('header' => $header, 'rows' => $rows));
+
+  $output = array();
+  $output['table'] = array(
+    '#theme' => 'table',
+    '#header' => $header,
+    '#rows' => $rows,
+    '#empty' => t('No mpxPlayers have been imported.'),
+  );
+  $output['pager'] = array(
+    '#theme' => 'pager',
+  );
+  return $output;
 }
 
 
@@ -769,23 +778,22 @@ function media_theplatform_mpx_get_table_mpx_players() {
  * Page callback - display all mpx Video media and forms.
  */
 function media_theplatform_mpx_page_mpx_videos() {
-  $output = '';
+  $output = array();
   // If no mpxPlayers, you cant do anything with mpxMedia.
   if (!media_theplatform_mpx_get_mpx_player_count()) {
-    $output .= t('No mpxPlayers have been imported.');
+    $output['#markup'] = t('No mpxPlayers have been imported.');
     if (user_access('sync mpx_player')) {
-      $output .= ' ' . l(t('Sync mpxPlayers.'), 'admin/content/file/mpxplayer');
+      $output['#markup'] .= ' ' . l(t('Sync mpxPlayers.'), 'admin/content/file/mpxplayer');
     }
     else {
-      $output .= ' ' . t('Please contact your System Administrator.');
+      $output['#markup'] .= ' ' . t('Please contact your System Administrator.');
     }
     return $output;
   }
   if (media_theplatform_mpx_check_account_settings() && user_access('sync mpx_video')) {
-    $form_video_sync = drupal_get_form('media_theplatform_mpx_form_mpx_video_sync');
-    $output .= render($form_video_sync);
+    $output['sync'] = drupal_get_form('media_theplatform_mpx_form_mpx_video_sync');
   }
-  $output .= media_theplatform_mpx_get_table_mpx_videos();
+  $output += media_theplatform_mpx_get_table_mpx_videos();
   return $output;
 }
 
@@ -881,16 +889,15 @@ function media_theplatform_mpx_get_table_mpx_videos() {
     array('data' => t('Last Updated'), 'field' => 'v.updated'),
   );
   $query = db_select('mpx_video', 'v')
-    ->extend('TableSort');
+    ->extend('TableSort')
+    ->extend('PagerDefault');
   $query->fields('v');
-  $result = $query
-    ->orderByHeader($header)
-    ->execute();
-  $num_rows = $query->countQuery()->execute()->fetchField();
-  if ($num_rows == 0) {
-    return '<div class="message">' . t('No mpxMedia has been imported.') . '</div>';
-  }
-  foreach ($result as $video) {
+  $query->orderByHeader($header);
+  $query->limit(50);
+  $results = $query->execute();
+
+  $rows = array();
+  foreach ($results as $video) {
     $file = file_load($video->fid);
     $thumbnail = media_get_thumbnail_preview($file);
     $rows[] = array(
@@ -899,10 +906,21 @@ function media_theplatform_mpx_get_table_mpx_videos() {
       $video->title,
       $video->description,
       // $video->guid,
-      $video->status,
+      $video->status ? t('Enabled') : t('Disabled'),
       format_date($video->created, 'short'),
       format_date($video->updated, 'short'),
     );
   }
-  return theme('table', array('header' => $header, 'rows' => $rows));
+
+  $output = array();
+  $output['table'] = array(
+    '#theme' => 'table',
+    '#header' => $header,
+    '#rows' => $rows,
+    '#empty' => t('No mpxMedia has been imported.'),
+  );
+  $output['pager'] = array(
+    '#theme' => 'pager',
+  );
+  return $output;
 }

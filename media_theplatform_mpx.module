@@ -113,6 +113,8 @@ function media_theplatform_mpx_menu() {
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'access arguments' => array('administer mpx account'),
   );
+
+  // @todo Replace these two menu items with Views
   $items['admin/content/file/mpxplayer'] = array(
     'title' => 'mpxPlayers',
     'page callback' => 'media_theplatform_mpx_page_mpx_players',
