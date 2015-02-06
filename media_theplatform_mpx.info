@@ -5,6 +5,7 @@ core = 7.x
 php = 5.3
 files[] = includes/MediaThePlatformMpxStreamWrapper.inc
 files[] = includes/MediaInternetThePlatformMpxHandler.inc
+files[] = includes/MpxToken.php
 dependencies[] = media (2.x)
 dependencies[] = media_internet
 dependencies[] = file_entity (2.x)

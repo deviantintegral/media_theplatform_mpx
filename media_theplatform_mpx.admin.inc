@@ -224,7 +224,7 @@ function media_theplatform_mpx_import_account_form($form, &$form_state, $account
  */
 function media_theplatform_mpx_page_account() {
 
-  $all_account_data = _media_theplatform_mpx_get_account_data();
+  $all_account_data = media_theplatform_mpx_account_load_multiple();
 
   $form_signin = drupal_get_form('media_theplatform_mpx_signin_form', $all_account_data);
   $output = render($form_signin);
@@ -255,13 +255,10 @@ function media_theplatform_mpx_signin_form_validate($form, &$form_state) {
   // Validate any credential changes to existing accounts.
   if (!empty($form_state['values']['accounts']['existing'])) {
     foreach ($form_state['values']['accounts']['existing'] as $id => $values) {
-      $account_data = _media_theplatform_mpx_get_account_data($id);
-      $existing_username = $account_data->username;
-      $existing_password = decrypt($account_data->password);
+      $account_data = media_theplatform_mpx_account_load($id);
       if ($values['theplatform_password'] &&
-          ($values['theplatform_username'] != $existing_username || $values['theplatform_password'] != $existing_password)) {
-        $mpx_token_ttl = MEDIA_THEPLATFORM_MPX_TOKEN_IDLE_TIMEOUT;
-        $mpx_token = _media_theplatform_mpx_get_signin_token($values['theplatform_username'], $values['theplatform_password'], $mpx_token_ttl);
+          ($values['theplatform_username'] != $account_data->username || $values['theplatform_password'] != $account_data->password)) {
+        $mpx_token = MpxToken::fetch($values['theplatform_username'], $values['theplatform_password']);
         if (!$mpx_token) {
           form_set_error('accounts][existing][' . $id . '][theplatform_password',
             t('Login failed for account @account_id', array('@account_id' => basename($account_data->account_id))));
@@ -276,8 +273,7 @@ function media_theplatform_mpx_signin_form_validate($form, &$form_state) {
   // Validate new account credentials.
   if (!empty($form_state['values']['accounts']['new'])) {
     foreach ($form_state['values']['accounts']['new'] as $key => $values) {
-      $mpx_token_ttl = MEDIA_THEPLATFORM_MPX_TOKEN_IDLE_TIMEOUT;
-      $mpx_token = _media_theplatform_mpx_get_signin_token($values['theplatform_username'], $values['theplatform_password'], $mpx_token_ttl);
+      $mpx_token = MpxToken::fetch($values['theplatform_username'], $values['theplatform_password']);
       if (!$mpx_token) {
         form_set_error('accounts][new][' . $key . '][theplatform_password',
           t('Login failed for new account with username @username.', array('@username' => $values['theplatform_username'])));
@@ -307,11 +303,8 @@ function media_theplatform_mpx_signin_form_submit($form, &$form_state) {
           'password' => encrypt($values['theplatform_password']),
         ))
         ->execute();
-      drupal_static_reset(MEDIA_THEPLATFORM_MPX_ACCOUNT_DATA_STATIC_CACHE);
-      if (media_theplatform_mpx_signin($account_id)) {
-        watchdog('media_theplatform_mpx', 'Successfully created account for user "@username".',
-          array('@username' => $values['theplatform_username']), WATCHDOG_NOTICE);
-      }
+      watchdog('media_theplatform_mpx', 'Successfully created account for user "@username".',
+        array('@username' => $values['theplatform_username']), WATCHDOG_NOTICE);
     }
   }
 }
@@ -325,13 +318,10 @@ function media_theplatform_mpx_account_list_form_validate($form, &$form_state) {
   // Validate any credential changes to existing accounts.
   if (!empty($form_state['values']['account_list'])) {
     foreach ($form_state['values']['account_list'] as $id => $values) {
-      $account_data = _media_theplatform_mpx_get_account_data($id);
-      $existing_username = $account_data->username;
-      $existing_password = decrypt($account_data->password);
+      $account_data = media_theplatform_mpx_account_load($id);
       if ($values['theplatform_password'] &&
-        ($values['theplatform_username'] != $existing_username || $values['theplatform_password'] != $existing_password)) {
-        $mpx_token_ttl = MEDIA_THEPLATFORM_MPX_TOKEN_IDLE_TIMEOUT;
-        $mpx_token = _media_theplatform_mpx_get_signin_token($values['theplatform_username'], $values['theplatform_password'], $mpx_token_ttl);
+        ($values['theplatform_username'] != $account_data->username || $values['theplatform_password'] != $account_data->password)) {
+        $mpx_token = MpxToken::fetch($values['theplatform_username'], $values['theplatform_password']);
         if (!$mpx_token) {
           form_set_error('accounts][existing][' . $id . '][theplatform_password',
             t('Login failed for account @account_id', array('@account_id' => basename($account_data->account_id))));
@@ -369,12 +359,10 @@ function media_theplatform_mpx_account_list_form_submit($form, &$form_state) {
   // Process any changes to existing accounts.
   if (!empty($form_state['values']['account_list'])) {
     foreach ($form_state['values']['account_list'] as $id => $values) {
-      $account_data = _media_theplatform_mpx_get_account_data($id);
-      $existing_username = $account_data->username;
-      $existing_password = decrypt($account_data->password);
+      $account_data = media_theplatform_mpx_account_load($id);
       if ($values['theplatform_password'] &&
-          ($values['theplatform_username'] != $existing_username ||
-          $values['theplatform_password'] != $existing_password)) {
+          ($values['theplatform_username'] != $account_data->username ||
+          $values['theplatform_password'] != $account_data->password)) {
 
         // Update the username, password and the rest of the account data.  Users
         // should resave the sub-account to ensure valid data and a valid auth
@@ -390,8 +378,6 @@ function media_theplatform_mpx_account_list_form_submit($form, &$form_state) {
               ))
             ->condition('id', $id, '=')
             ->execute();
-          drupal_static_reset(MEDIA_THEPLATFORM_MPX_ACCOUNT_DATA_STATIC_CACHE);
-          media_theplatform_mpx_signin($id);
           watchdog('media_theplatform_mpx', 'Successfully updated @account.',
             array('@account' => _media_theplatform_mpx_account_log_string($account_data)), WATCHDOG_NOTICE);
         }
@@ -437,7 +423,7 @@ function media_theplatform_mpx_import_account_form_submit($form, &$form_state) {
 
   foreach ($form_state['values']['import_accounts']['settings'] as $account_id => $import_account) {
 
-    $account_data = _media_theplatform_mpx_get_account_data($account_id);
+    $account_data = media_theplatform_mpx_account_load($account_id);
 
     // If an import account is already set, resetting it will cause an
     // unwanted complete re-ingestion of all videos.
@@ -462,15 +448,10 @@ function media_theplatform_mpx_import_account_form_submit($form, &$form_state) {
     watchdog('media_theplatform_mpx', 'Retrieving import account information for "@import_account".',
       array('@import_account' => $import_account), WATCHDOG_NOTICE);
 
-    $username = $account_data->username;
-    $password = decrypt($account_data->password);
-    $token_ttl = MEDIA_THEPLATFORM_MPX_TOKEN_IDLE_TIMEOUT;
-    $token = _media_theplatform_mpx_get_signin_token($username, $password, $token_ttl);
-    $url = 'https://access.auth.theplatform.com/data/Account?schema=1.3.0&form=json&byDisabled=false&byTitle=' . $import_account . '&token=' . $token . '&fields=id,pid';
+    $token = media_theplatform_mpx_token_acquire($account_data);
+    $url = 'https://access.auth.theplatform.com/data/Account?schema=1.3.0&form=json&byDisabled=false&byTitle=' . $import_account . '&token=' . rawurlencode($token) . '&fields=id,pid';
 
     $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
-
-    media_theplatform_mpx_expire_token($token);
 
     if (!isset($result_data['entries'][0]['id']) || !isset($result_data['entries'][0]['placcount$pid'])) {
       watchdog('media_theplatform_mpx', 'Failed to retrieve import account information for "@import_account".  "id" and/or "placcount$pid" field value not set.',
@@ -526,9 +507,6 @@ function media_theplatform_mpx_import_account_form_submit($form, &$form_state) {
     }
   }
 
-  // Reset the account data static cache.
-  drupal_static_reset(MEDIA_THEPLATFORM_MPX_ACCOUNT_DATA_STATIC_CACHE);
-
   // Import all players.
   $import = media_theplatform_mpx_import_all_players('manually');
 
@@ -545,12 +523,10 @@ function media_theplatform_mpx_check_account_settings($account_id = NULL) {
   // check all available accounts that at least one account is configured
   // properly.
   $account_configured = FALSE;
-  $account_data = _media_theplatform_mpx_get_account_data($account_id);
-  if ($account_id) {
-    $account_data = array($account_data);
-  }
-  foreach ($account_data as $account) {
-    if (media_theplatform_mpx_check_token($account->id) && !empty($account->import_account)) {
+  $account_ids = !empty($account_id) ? array($account_id) : NULL;
+  $accounts = media_theplatform_mpx_account_load_multiple($account_ids);
+  foreach ($accounts as $account) {
+    if (media_theplatform_mpx_token_acquire($account) && !empty($account->import_account)) {
       $account_configured = TRUE;
       break;
     }
@@ -813,7 +789,7 @@ function media_theplatform_mpx_form_mpx_video_sync($form, &$form_state) {
     '#tree' => TRUE,
   );
 
-  foreach (_media_theplatform_mpx_get_account_data() as $account) {
+  foreach (media_theplatform_mpx_account_load_multiple() as $account) {
     $player_select = media_theplatform_mpx_get_players_select();
     if (empty($player_select)) {
       continue;
@@ -852,7 +828,7 @@ function media_theplatform_mpx_form_mpx_video_sync_submit($form, &$form_state) {
       ->fetchField();
     if ($currently_stored_default_player != $values['default_player_id']) {
       _media_theplatform_mpx_set_field($account_id, 'default_player', $values['default_player_id']);
-      $account = _media_theplatform_mpx_get_account_data($account_id);
+      $account = media_theplatform_mpx_account_load($account_id);
       $player = media_theplatform_mpx_get_mpx_player_by_player_id($values['default_player_id']);
       watchdog('media_theplatform_mpx', 'Player @pid -- @player -- set as default player for account @account.',
         array(

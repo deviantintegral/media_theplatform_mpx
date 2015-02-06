@@ -136,9 +136,6 @@ function media_theplatform_mpx_menu() {
  * Implements hook_init().
  */
 function media_theplatform_mpx_init() {
-  // Register a shutdown function that expires the outstanding authentication token.
-  drupal_register_shutdown_function('_media_theplatform_mpx_expire_all_tokens');
-
   // Add module CSS.
   drupal_add_css(drupal_get_path('module', 'media_theplatform_mpx') . '/css/media_theplatform_mpx.css', array(
     'group' => CSS_DEFAULT,
@@ -616,11 +613,11 @@ function _test_media_theplatform_mpx_get_media_item_data() {
   $path = 'media$content/plfile$releases/plrelease$url';
   $path = 'media$availableDate';
 
-  $account_data = _media_theplatform_mpx_get_account_data(1);
-  $theplatform_account_id = urlencode($account_data->account_id);
-  $theplatform_token = media_theplatform_mpx_check_token($account_data->id);
+  $account = media_theplatform_mpx_account_load(1);
+  $theplatform_account_id = $account->account_id;
+  $theplatform_token = media_theplatform_mpx_token_acquire($account);
 
-  $json_feed_url = 'https://read.data.media.theplatform.com/media/data/Media?schema=1.4.0&form=json&pretty=true&byOwnerId=' . $theplatform_account_id . '&token=' . $theplatform_token;
+  $json_feed_url = 'https://read.data.media.theplatform.com/media/data/Media?schema=1.4.0&form=json&pretty=true&byOwnerId=' . $theplatform_account_id . '&token=' . rawurlencode($theplatform_token);
   $json_feed_contents = file_get_contents($json_feed_url);
   $feed_data = drupal_json_decode($json_feed_contents);
 
@@ -828,7 +825,7 @@ function media_theplatform_mpx_libraries_info() {
 /**
  * Helper that deletes an mpx account and all of its associated media and data.
  */
-function _media_theplatform_mpx_delete_account($account_id) {
+function _media_theplatform_mpx_delete_account($account_id, $progressive = TRUE) {
   // Turn off player and media sync.
   media_theplatform_mpx_variable_set('account_' . $account_id . '_cron_player_sync', 0);
   media_theplatform_mpx_variable_set('account_' . $account_id . '_cron_video_sync', 0);
@@ -844,6 +841,12 @@ function _media_theplatform_mpx_delete_account($account_id) {
     'finished' => '_media_theplatform_mpx_delete_account_finished',
   );
   batch_set($delete_account_batch);
+
+  // Because we are doing this on the back-end, we set progressive to false.
+  if (!$progressive) {
+    $batch =& batch_get();
+    $batch['progressive'] = $progressive;
+  }
 
   batch_process();
 }
@@ -991,29 +994,22 @@ function _media_theplatform_mpx_delete_account_media($account_id, $type, &$conte
  * Helper that deletes all data for an mpx account after its media are deleted.
  */
 function _media_theplatform_mpx_delete_account_data($account_id) {
-
-  drupal_static_reset(MEDIA_THEPLATFORM_MPX_ACCOUNT_DATA_STATIC_CACHE);
-
-  $token = _media_theplatform_mpx_get_account_value($account_id, 'token');
-  if ($token) {
-    media_theplatform_mpx_expire_token($token);
-  }
+  $account = media_theplatform_mpx_account_load($account_id);
+  MpxToken::release($account);
 
   module_invoke_all('media_theplatform_mpx_delete_account', $account_id);
 
   db_delete('mpx_accounts')->condition('id', $account_id, '=')->execute();
+
+  // Remove variables disabling video and player sync for this account.
+  media_theplatform_mpx_variable_del('account_' . $account_id . '_cron_player_sync');
+  media_theplatform_mpx_variable_del('account_' . $account_id . '_cron_video_sync');
 }
 
 /**
  * Finished callback for when an account has been deleted.
  */
 function _media_theplatform_mpx_delete_account_finished($account_id) {
-
-  // Remove variables disabling video and player sync for this account.
-  media_theplatform_mpx_variable_del('account_' . $account_id . '_cron_player_sync');
-  media_theplatform_mpx_variable_del('account_' . $account_id . '_cron_video_sync');
-
-  drupal_static_reset(MEDIA_THEPLATFORM_MPX_ACCOUNT_DATA_STATIC_CACHE);
   drupal_flush_all_caches();
   drupal_set_message('All caches have been flushed.');
 
@@ -1083,5 +1079,117 @@ function media_theplatform_mpx_form_alter(&$form, &$form_state, $form_id) {
         }
       }
     }
+  }
+}
+
+/**
+ * Get a current authentication token for an account.
+ *
+ * @param object $account
+ *   The mpx account object.
+ * @param int $duration
+ *   The number of seconds for which the token should be valid.
+ * @param bool $force
+ *   Set to TRUE if a fresh authentication token should always be fetched.
+ *
+ * @return MpxToken|bool
+ *   A valid MpxToken object, or FALSE if no token could be acquired.
+ *
+ * @todo Make $duration default to 60 when the default token lifetime is increased.
+ */
+function media_theplatform_mpx_token_acquire($account, $duration = 0, $force = FALSE) {
+  try {
+    return MpxToken::acquire($account, $duration, $force);
+  }
+  catch (Exception $e) {
+    watchdog_exception('media_theplatform_mpx', $e);
+    // @todo Why not just re-throw the exception? If we can't get a valid token it's not worth proceeding in places that call this function.
+    return FALSE;
+  }
+}
+
+/**
+ * Loads an mpx account.
+ *
+ * @param int $id
+ *   The mpx account ID to load.
+ *
+ * @return object|bool
+ *   A loaded mpx account object, or FALSE if the account cannot be loaded.
+ */
+function media_theplatform_mpx_account_load($id) {
+  $accounts = media_theplatform_mpx_account_load_multiple(array($id));
+  return reset($accounts);
+}
+
+/**
+ * Load multiple mpx accounts.
+ *
+ * @param array $ids
+ *   An array of mpx account IDs.
+ *
+ * @return array
+ *   An array of mpx account objects, indexed by account ID.
+ */
+function media_theplatform_mpx_account_load_multiple(array $ids = NULL) {
+  $query = db_select('mpx_accounts', 'mpxa');
+  $query->fields('mpxa');
+  if (!empty($ids)) {
+    $query->condition('mpxa.id', $ids);
+  }
+  $accounts = $query->execute()->fetchAllAssoc('id');
+  foreach ($accounts as $id => $account) {
+    $accounts[$id]->password = decrypt($account->password);
+  }
+  module_invoke_all('media_theplatform_mpx_account_load', $accounts);
+  return $accounts;
+}
+
+/**
+ * Deletes an mpx account.
+ *
+ * @param int $id
+ *   The mpx account ID to delete.
+ */
+function media_theplatform_mpx_account_delete($id) {
+  media_theplatform_mpx_account_delete_multiple(array($id));
+}
+
+/**
+ * Delete multiple mpx accounts.
+ *
+ * @param array $ids
+ *   The mpx account IDs to delete.
+ *
+ * @throws Exception
+ */
+function media_theplatform_mpx_account_delete_multiple(array $ids) {
+  if ($accounts = media_theplatform_mpx_account_load_multiple($ids)) {
+    $transaction = db_transaction();
+    try {
+      foreach ($accounts as $id => $account) {
+        _media_theplatform_mpx_delete_account($id, FALSE);
+      }
+    }
+    catch (Exception $e) {
+      $transaction->rollback();
+      watchdog_exception('media_theplatform_mpx', $e);
+      throw $e;
+    }
+  }
+}
+
+/**
+ * @deprecated
+ *
+ * Use media_theplatform_mpx_account_load() or
+ * media_theplatform_mpx_account_load_multiple() instead.
+ */
+function _media_theplatform_mpx_get_account_data($id = NULL) {
+  if ($id) {
+    return media_theplatform_mpx_account_load($id);
+  }
+  else {
+    return media_theplatform_mpx_account_load_multiple();
   }
 }

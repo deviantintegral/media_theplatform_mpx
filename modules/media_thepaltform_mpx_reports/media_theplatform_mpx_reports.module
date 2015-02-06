@@ -280,7 +280,7 @@ function media_theplatform_mpx_reports_page_status() {
 
     $videos_updated_last_cron_rows = array();
     foreach ($videos_updated_last_cron as $data) {
-      $video_account = _media_theplatform_mpx_get_account_data($data->parent_account);
+      $video_account = media_theplatform_mpx_account_load($data->parent_account);
       $video_file = file_load($data->fid);
       $videos_updated_last_cron_rows[] = array(
         urldecode($video_account->import_account),
@@ -310,7 +310,7 @@ function media_theplatform_mpx_reports_page_status() {
 
     $players_updated_last_cron_rows = array();
     foreach ($players_updated_last_cron as $data) {
-      $player_account = _media_theplatform_mpx_get_account_data($data->parent_account);
+      $player_account = media_theplatform_mpx_account_load($data->parent_account);
       $player_file = file_load($data->fid);
       $players_updated_last_cron_rows[] = array(
         urldecode($player_account->import_account),
@@ -415,7 +415,7 @@ function media_theplatform_mpx_reports_page_status() {
     }
   }
 
-  foreach (_media_theplatform_mpx_get_account_data() as $account_id => $account_data) {
+  foreach (media_theplatform_mpx_account_load_multiple() as $account_id => $account_data) {
 
 
     if (module_exists('devel')) {
@@ -442,9 +442,9 @@ function media_theplatform_mpx_reports_page_status() {
     if ($videos_to_be_queued) {
 
       $videos_to_be_queued_url = $account_data->proprocessing_batch_url;
-      $token = media_theplatform_mpx_check_token($account_id);
+      $token = media_theplatform_mpx_token_acquire($account_data);
       $videos_to_be_queued_url = $videos_to_be_queued_url . '&range=' . (int) $account_data->proprocessing_batch_current_item . '-' . $account_data->proprocessing_batch_item_count;
-      $videos_to_be_queued_url .= '&token=' . $token;
+      $videos_to_be_queued_url .= '&token=' . rawurlencode($token);
       $videos_to_be_queued_url .= '&fields=id,title,guid,updated,plmedia$approved,media$availableDate,media$expirationDate';
 
       $videos_to_be_queued_result = _media_theplatform_mpx_retrieve_feed_data($videos_to_be_queued_url);
@@ -487,8 +487,8 @@ function media_theplatform_mpx_reports_page_status() {
 
     // Once the videos waiting to be queued are added to the cron queue, then
     // video updates will be processed.
-    $notification_token = media_theplatform_mpx_check_token($account_id);
-    $notification_url_base = 'https://read.data.media.theplatform.com/media/notify?token=' . $notification_token
+    $notification_token = media_theplatform_mpx_token_acquire($account_data);
+    $notification_url_base = 'https://read.data.media.theplatform.com/media/notify?token=' . rawurlencode($notification_token)
       . '&account=' . $account_data->import_account
       . '&block=false&filter=Media&clientId=drupal_media_theplatform_mpx_reports_' . $account_data->account_pid
       . '&fields=true';

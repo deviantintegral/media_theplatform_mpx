@@ -16,7 +16,7 @@ function media_theplatform_mpx_get_players_from_theplatform($account) {
   global $user;
 
   // Check for the signIn token and account.
-  $mpx_token = media_theplatform_mpx_check_token($account->id);
+  $mpx_token = media_theplatform_mpx_token_acquire($account);
   $mpx_sub_account = $account->import_account;
 
   if (!$mpx_token) {
@@ -34,7 +34,7 @@ function media_theplatform_mpx_get_players_from_theplatform($account) {
 
   // @todo - do some kind of check to bring back a max # of records?
   // Get the list of players from thePlatform.
-  $player_url = 'https://read.data.player.theplatform.com/player/data/Player?schema=1.3.0&form=json&token=' . $mpx_token . '&account=' . $mpx_sub_account;
+  $player_url = 'https://read.data.player.theplatform.com/player/data/Player?schema=1.3.0&form=json&token=' . rawurlencode($mpx_token) . '&account=' . $mpx_sub_account;
 
   $result_data = _media_theplatform_mpx_retrieve_feed_data($player_url);
 
@@ -175,7 +175,7 @@ function media_theplatform_mpx_import_all_players($type = NULL) {
   $incoming = array();
 
   // Retrieve list of players for all accounts.
-  foreach (_media_theplatform_mpx_get_account_data() as $account_data) {
+  foreach (media_theplatform_mpx_account_load_multiple() as $account_data) {
     // Check if player sync has been turned off for this account.
     if (!media_theplatform_mpx_variable_get('account_' . $account_data->id . '_cron_player_sync', 1)) {
       continue;

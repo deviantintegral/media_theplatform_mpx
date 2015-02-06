@@ -16,10 +16,10 @@
  */
 function media_theplatform_mpx_get_changed_ids($account) {
 
-  $token = media_theplatform_mpx_check_token($account->id);
+  $token = media_theplatform_mpx_token_acquire($account);
   $feed_request_item_limit = media_theplatform_mpx_variable_get('cron_videos_per_run', 250);
 
-  $url = 'https://read.data.media.theplatform.com/media/notify?token=' . $token .
+  $url = 'https://read.data.media.theplatform.com/media/notify?token=' . rawurlencode($token) .
     '&account=' . $account->import_account .
     '&block=false&filter=Media&clientId=drupal_media_theplatform_mpx_' . $account->account_pid .
     '&since=' . $account->last_notification .
@@ -126,7 +126,7 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
         if (!empty($item['video'])) {
           // If an account wasn't stored, it was queued in a previous version of
           // this module.  Assume account 1 in these cases.
-          $item['account'] = !empty($item['account']) ? $item['account'] : _media_theplatform_mpx_get_account_data(1);
+          $item['account'] = !empty($item['account']) ? $item['account'] : media_theplatform_mpx_account_load(1);
           // Check if player sync has been turned off for this account.  If so,
           // do not import/update this video.
           if (!media_theplatform_mpx_variable_get('account_' . $item['account']->id . '_cron_video_sync', 1)) {
@@ -315,10 +315,10 @@ function _media_theplatform_mpx_process_batch_video_import($type, $account = NUL
   $batch_item_count = $account->proprocessing_batch_item_count;
   $current_batch_item = (int) $account->proprocessing_batch_current_item;
   $feed_request_item_limit = media_theplatform_mpx_variable_get('cron_videos_per_run', 250);
-  $token = media_theplatform_mpx_check_token($account->id);
+  $token = media_theplatform_mpx_token_acquire($account);
 
   $url = $batch_url . '&range=' . $current_batch_item . '-' . ($current_batch_item + ($feed_request_item_limit - 1));
-  $url .= '&token=' . $token;
+  $url .= '&token=' . rawurlencode($token);
 
   // This log message may seem redundant, but it's important for detecting if an
   // ingestion process has begun and is currently in progress.
@@ -485,8 +485,8 @@ function _media_theplatform_mpx_process_video_update($type, $account = NULL) {
   // Get the feed url.
   $batch_url = _media_theplatform_mpx_get_video_feed_url($ids, $account);
 
-  $token = media_theplatform_mpx_check_token($account->id);
-  $url = $batch_url . '&token=' . $token;
+  $token = media_theplatform_mpx_token_acquire($account);
+  $url = $batch_url . '&token=' . rawurlencode($token);
 
   // Get the total result count for this update.  If it is greater than the feed
   // request item limit, start a new batch.
@@ -543,8 +543,8 @@ function _media_theplatform_mpx_process_video_import($type, $account = NULL) {
   // Get the feed url.
   $batch_url = _media_theplatform_mpx_get_video_feed_url('all', $account);
 
-  $token = media_theplatform_mpx_check_token($account->id);
-  $url = $batch_url . '&token=' . $token;
+  $token = media_theplatform_mpx_token_acquire($account);
+  $url = $batch_url . '&token=' . rawurlencode($token);
 
   // Get the total result count for this update.  If it is greater than the feed
   // request item limit, start a new batch.
@@ -558,7 +558,7 @@ function _media_theplatform_mpx_process_video_import($type, $account = NULL) {
     _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_current_item', 0);
     // Reload the $account object because it does not have the
     // 'proprocessing_batch_*' variables that were set above.
-    $account = _media_theplatform_mpx_get_account_data($account->id);
+    $account = media_theplatform_mpx_account_load($account->id);
 
     // Perform the first batch operation, not the update.
     return _media_theplatform_mpx_process_batch_video_import($type, $account);
@@ -602,7 +602,7 @@ function media_theplatform_mpx_import_all_videos($type) {
   // ingestion process has begun and is currently in progress.
   watchdog('media_theplatform_mpx', 'Beginning video import/update process @method for all accounts.', array('@method' => $type), WATCHDOG_NOTICE);
 
-  foreach (_media_theplatform_mpx_get_account_data() as $account_data) {
+  foreach (media_theplatform_mpx_account_load_multiple() as $account_data) {
 
     // Check if video sync has been turned off for this account.
     if (!media_theplatform_mpx_variable_get('account_' . $account_data->id . '_cron_video_sync', 1)) {
@@ -610,7 +610,7 @@ function media_theplatform_mpx_import_all_videos($type) {
     }
 
     // Don't do anything if we don't have signIn token or import account.
-    if (!media_theplatform_mpx_check_token($account_data->id) || empty($account_data->import_account) ||
+    if (!media_theplatform_mpx_token_acquire($account_data) || empty($account_data->import_account) ||
         !media_theplatform_mpx_is_valid_player_for_account($account_data->default_player, $account_data)) {
       continue;
     }
@@ -1247,8 +1247,8 @@ function _media_theplatform_mpx_restore_last_notification($account) {
 
   // Check if the backup value is still valid.  Last notification  sequence
   // IDs are only stored by thePlatform for a week.
-  $token = media_theplatform_mpx_check_token($account->id);
-  $url = 'https://read.data.media.theplatform.com/media/notify?token=' . $token .
+  $token = media_theplatform_mpx_token_acquire($account);
+  $url = 'https://read.data.media.theplatform.com/media/notify?token=' . rawurlencode($token) .
     '&account=' . $account->import_account .
     '&block=false&filter=Media&clientId=drupal_media_theplatform_mpx_' . $account->account_pid .
     '&since=' . $backup_last_notification_value .
@@ -1276,8 +1276,8 @@ function _media_theplatform_mpx_restore_last_notification($account) {
 function media_theplatform_mpx_set_last_notification($account, $last_notification = NULL) {
 
   if (empty($last_notification)) {
-    $token = media_theplatform_mpx_check_token($account->id);
-    $url = 'https://read.data.media.theplatform.com/media/notify?token=' . $token .
+    $token = media_theplatform_mpx_token_acquire($account);
+    $url = 'https://read.data.media.theplatform.com/media/notify?token=' . rawurlencode($token) .
       '&account=' . $account->import_account .
       '&filter=Media&clientId=drupal_media_theplatform_mpx_' . $account->account_pid;
     $result_data = _media_theplatform_mpx_retrieve_feed_data($url);

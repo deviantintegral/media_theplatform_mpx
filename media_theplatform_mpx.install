@@ -354,17 +354,6 @@ function media_theplatform_mpx_schema() {
         'size' => 'big',
         'serialize' => TRUE,
       ),
-      'token' => array(
-        'description' => 'thePlatform Authentication Token',
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => FALSE,
-      ),
-      'idle_timeout' => array(
-        'description' => 'Token Expiry Timestamp',
-        'type' => 'int',
-        'not null' => FALSE,
-      ),
       'import_account' => array(
         'description' => 'thePlatform Import Sub-Account',
         'type' => 'varchar',
@@ -414,6 +403,9 @@ function media_theplatform_mpx_schema() {
     'primary key' => array('id'),
   );
 
+  $schema['cache_mpx'] = drupal_get_schema_unprocessed('system', 'cache');
+  $schema['cache_mpx']['description'] = 'Cache table for the media_theplatform_mpx module.';
+
   return $schema;
 }
 
@@ -422,13 +414,12 @@ function media_theplatform_mpx_schema() {
  */
 function media_theplatform_mpx_uninstall() {
   drupal_load('module', 'media_theplatform_mpx');
-  foreach (_media_theplatform_mpx_get_account_data() as $account) {
-    _media_theplatform_mpx_delete_account($account->id);
+  if ($accounts = media_theplatform_mpx_account_load_multiple()) {
+    media_theplatform_mpx_account_delete_multiple(array_keys($accounts));
   }
   foreach (media_theplatform_mpx_variable_default() as $variable => $value) {
     media_theplatform_mpx_variable_del($variable);
   }
-  return array(array('success' => TRUE, 'query' => "Deleted all variables in the Media: mpx namespace."));
 }
 
 /**
@@ -890,5 +881,21 @@ function media_theplatform_mpx_update_7216() {
       ->fields(array('password' => $record->password))
       ->condition('id', $record->id)
       ->execute();
+  }
+}
+
+/**
+ * Use cache to store tokens instead of the mpx_accounts table.
+ */
+function media_theplatform_mpx_update_7217() {
+  if (!db_table_exists('cache_mpx')) {
+    $schema = drupal_get_schema_unprocessed('system', 'cache');
+    $schema['description'] = 'Cache table for the media_theplatform_mpx module.';
+    db_create_table('cache_mpx', $schema);
+  }
+
+  if (db_field_exists('mpx_accounts', 'token')) {
+    db_drop_field('mpx_accounts', 'token');
+    db_drop_field('mpx_accounts', 'idle_timeout');
   }
 }

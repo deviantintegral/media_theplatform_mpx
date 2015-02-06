@@ -98,7 +98,7 @@ function media_theplatform_mpx_drush_command() {
  * Validation for the restore-last-notification command.
  */
 function drush_media_theplatform_mpx_restore_mpx_last_notification_validate($account_id) {
-  $account = _media_theplatform_mpx_get_account_data($account_id);
+  $account = media_theplatform_mpx_account_load($account_id);
 
   if (empty($account)) {
     return _drush_media_theplatform_mpx_print('Account ID is invalid.  Account data was not retrieved.',
@@ -120,7 +120,7 @@ function drush_media_theplatform_mpx_restore_mpx_last_notification_validate($acc
  * where the value may be set to NULL in the database accidentally.
  */
 function drush_media_theplatform_mpx_restore_mpx_last_notification($account_id) {
-  $account = _media_theplatform_mpx_get_account_data($account_id);
+  $account = media_theplatform_mpx_account_load($account_id);
 
   $success = _media_theplatform_mpx_restore_last_notification($account);
 
@@ -145,8 +145,8 @@ function drush_media_theplatform_mpx_ingest_mpx_videos_validate($account_id = 'a
   }
 
   // Return an error if no accounts are configured.
-  $account_data = $account_id == 'all' ? _media_theplatform_mpx_get_account_data()
-    : _media_theplatform_mpx_get_account_data($account_id);
+  $account_data = $account_id == 'all' ? media_theplatform_mpx_account_load_multiple()
+    : media_theplatform_mpx_account_load($account_id);
 
   if (empty($account_data)) {
     return _drush_media_theplatform_mpx_print('There are no mpx accounts configured for this site.  Aborting mpx video ingestion.',
@@ -180,7 +180,7 @@ function drush_media_theplatform_mpx_ingest_mpx_videos_validate($account_id = 'a
           return _drush_media_theplatform_mpx_print('Import account not set for account @id.  Aborting mpx video ingestion for all accounts.',
             array('@id' => $id), 'error');
         }
-        if (!media_theplatform_mpx_check_token($account->id)) {
+        if (!media_theplatform_mpx_token_acquire($account)) {
           return _drush_media_theplatform_mpx_print('MPX authentication token invalid for account @id.  Aborting mpx video ingestion for all accounts.',
             array('@id' => $id), 'error');
         }
@@ -211,7 +211,7 @@ function drush_media_theplatform_mpx_ingest_mpx_videos_validate($account_id = 'a
     return _drush_media_theplatform_mpx_print('Import account not set for account @id.  Aborting mpx video ingestion.',
       array('@id' => $id), 'error');
   }
-  if (!$forced_to_run && !media_theplatform_mpx_check_token($account_data->id)) {
+  if (!$forced_to_run && !media_theplatform_mpx_token_acquire($account_data)) {
     return _drush_media_theplatform_mpx_print('MPX authentication token invalid for account @id.  Aborting mpx video ingestion.',
       array('@id' => $id), 'error');
   }
@@ -268,7 +268,7 @@ function drush_media_theplatform_mpx_ingest_mpx_videos($account_id = 'all') {
   // Announce what this process will be doing, and get the relevant account data.
   if ($account_id == 'all') {
 
-    $account_data = _media_theplatform_mpx_get_account_data();
+    $account_data = media_theplatform_mpx_account_load_multiple();
     _drush_media_theplatform_mpx_print('Ingesting mpx videos for all configured accounts.');
 
     // Invoke the account handler processes that will be doing all of the work.
@@ -276,7 +276,7 @@ function drush_media_theplatform_mpx_ingest_mpx_videos($account_id = 'all') {
   }
   else {
 
-    $account_data = _media_theplatform_mpx_get_account_data($account_id);
+    $account_data = media_theplatform_mpx_account_load($account_id);
     $parent_lock_timeout = MTPM_PARENT_LOCK_TIMEOUT + MTPM_TIMEOUT_DELTA;
     $quit_when_complete = drush_get_option('quit-when-complete');
 
@@ -326,7 +326,7 @@ function _drush_media_theplatform_mpx_print_prefix() {
   }
 
   if ($account_id = drush_get_option('x-account-id')) {
-    $account = _media_theplatform_mpx_get_account_data($account_id);
+    $account = media_theplatform_mpx_account_load($account_id);
     $prefix = dt('Account @id "@name": ',
       array(
         '@id' => $account_id,
@@ -421,7 +421,7 @@ function _drush_media_theplatform_mpx_acquire_parent_process_lock($account_id, $
  */
 function _drush_media_theplatform_mpx_check_notification_sequence_id($account) {
 
-  $token = media_theplatform_mpx_signin($account->id);
+  $token = media_theplatform_mpx_token_acquire($account);
   $url = 'https://read.data.media.theplatform.com/media/notify?token=' . $token
     . '&account=' . $account->import_account
     . '&clientId=drupal_media_theplatform_mpx_reports_' . $account->account_pid
@@ -433,7 +433,6 @@ function _drush_media_theplatform_mpx_check_notification_sequence_id($account) {
   if (isset($response[0]['type']) && $response[0]['type'] == 'Exception') {
 
     _media_theplatform_mpx_set_field($account->id, 'last_notification', NULL);
-    drupal_static_reset(MEDIA_THEPLATFORM_MPX_ACCOUNT_DATA_STATIC_CACHE);
 
     return _drush_media_theplatform_mpx_print('Last notification sequence ID is invalid.  Setting last_notification value to NULL to perform a complete re-ingestion for this account.', array(), 'error');;
   }
@@ -650,7 +649,7 @@ function _drush_media_theplatform_mpx_start_child_process() {
     return _drush_media_theplatform_mpx_print('Unable to determine account ID.  Aborting child process.', array(), 'error');
   }
 
-  $account = _media_theplatform_mpx_get_account_data($account_id);
+  $account = media_theplatform_mpx_account_load($account_id);
 
   $child_lock_name = MEDIA_THEPLATFORM_MPX_VIDEO_INGESTION_LOCK_BASENAME . '_' . $parent_id . '_' . $child_id;
 
@@ -946,7 +945,7 @@ function _drush_media_theplatform_mpx_process_outstanding_video_notifications($a
     . '&filter=Media&size=500';
 
   // Build the URL for the next notication service request.
-  $token = media_theplatform_mpx_check_token($account->id);
+  $token = media_theplatform_mpx_token_acquire($account);
   $url = $base_update_url . '&since=' . $last_notification_id . '&token=' . $token;
 
   $message_variables = array(
@@ -1020,7 +1019,7 @@ function _drush_media_theplatform_mpx_process_outstanding_video_notifications($a
     }
 
     // Build the URL for the next notication service request.
-    $token = media_theplatform_mpx_check_token($account->id);
+    $token = media_theplatform_mpx_token_acquire($account);
     $url = $base_update_url . '&since=' . $last_notification_id . '&token=' . $token;
 
     $message_variables = array(
@@ -1076,7 +1075,7 @@ function _drush_media_theplatform_mpx_process_video_ingestion_as_account_handler
   // reset the last notification value and start a complete video ingestion.
   if (!_drush_media_theplatform_mpx_check_notification_sequence_id($account)) {
     // Retrieve current account data.
-    $account = _media_theplatform_mpx_get_account_data($account->id);
+    $account = media_theplatform_mpx_account_load($account->id);
   }
 
   // If a batch url stored or a last_notification sequence ID is not stored,
@@ -1168,7 +1167,7 @@ function _drush_media_theplatform_mpx_request_video_data($request_queue_item) {
     }
 
     // Retrieve the authentication token for the media data service request.
-    $token = media_theplatform_mpx_check_token($request_account->id);
+    $token = media_theplatform_mpx_token_acquire($request_account);
 
     if (!$token) {
       _drush_media_theplatform_mpx_print('Failed to retrieve authentication token.  Trying again.', array(), 'error');
