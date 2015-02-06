@@ -20,3 +20,27 @@ function media_theplatform_mpx_media_browser_plugin_info() {
 
   return $info;
 }
+
+/**
+ * Implements hook_media_internet_providers().
+ */
+function media_theplatform_mpx_media_internet_providers() {
+  return array(
+    'MediaInternetThePlatformMpxHandler' => array(
+      'title' => 'All media from thePlatform mpx must be imported and cannot be added on this tab.',
+    ),
+  );
+}
+
+/**
+ * Implements hook_media_parse().
+ *
+ * @todo This hook should be deprecated. Refactor Media module to not call it
+ *   any more, since media_internet should be able to automatically route to the
+ *   appropriate handler.
+ */
+function media_theplatform_mpx_media_parse($embed_code) {
+  module_load_include('media_theplatform_mpx', 'inc', 'includes/MediaInternetThePlatformMpxHandler');
+  $handler = new MediaInternetThePlatformMpxHandler($embed_code);
+  return $handler->parse($embed_code);
+}

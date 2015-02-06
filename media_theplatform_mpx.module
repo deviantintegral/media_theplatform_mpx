@@ -163,17 +163,6 @@ function media_theplatform_mpx_theme($existing, $type, $theme, $path) {
 }
 
 /**
- * Implements hook_media_internet_providers().
- */
-function media_theplatform_mpx_media_internet_providers() {
-  return array(
-    'MediaInternetThePlatformMpxHandler' => array(
-      'title' => 'All media from thePlatform mpx must be imported and cannot be added on this tab.',
-    ),
-  );
-}
-
-/**
  * Implements hook_stream_wrappers().
  */
 function media_theplatform_mpx_stream_wrappers() {
@@ -200,20 +189,6 @@ function media_theplatform_mpx_ctools_plugin_api($owner, $api) {
     return array('version' => $api_versions[$owner][$api]);
   }
 }
-
-/**
- * Implements hook_media_parse().
- *
- * @todo This hook should be deprecated. Refactor Media module to not call it
- *   any more, since media_internet should be able to automatically route to the
- *   appropriate handler.
- */
-function media_theplatform_mpx_media_parse($embed_code) {
-  module_load_include('media_theplatform_mpx', 'inc', 'includes/MediaInternetThePlatformMpxHandler');
-  $handler = new MediaInternetThePlatformMpxHandler($embed_code);
-  return $handler->parse($embed_code);
-}
-
 
 /**
  * Implements hook_file_delete().
