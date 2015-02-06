@@ -557,22 +557,13 @@ function media_theplatform_mpx_check_account_settings($account_id = NULL) {
   // properly.
   $account_configured = FALSE;
   $account_data = _media_theplatform_mpx_get_account_data($account_id);
-
   if ($account_id) {
-    if (empty($account_data->token)) {
-      $account_data->token = media_theplatform_mpx_signin($account_id);
-    }
-    $account_configured = !empty($account_data->token) && !empty($account_data->import_account);
+    $account_data = array($account_data);
   }
-  else {
-    foreach ($account_data as $account) {
-      if (empty($account->token)) {
-        $account->token = media_theplatform_mpx_signin($account->id);
-      }
-      if (!empty($account->token) && !empty($account->import_account)) {
-        $account_configured = TRUE;
-        break;
-      }
+  foreach ($account_data as $account) {
+    if (media_theplatform_mpx_check_token($account->id) && !empty($account->import_account)) {
+      $account_configured = TRUE;
+      break;
     }
   }
 
