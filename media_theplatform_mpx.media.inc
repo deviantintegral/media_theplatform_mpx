@@ -6,22 +6,6 @@
  */
 
 /**
- * Implements hook_media_browser_plugin_info().
- */
-function media_theplatform_mpx_media_browser_plugin_info() {
-  $info['theplatform_mpx_mpxplayer'] = array(
-    'title' => t('mpxPlayers'),
-    'class' => 'MediaThePlatformMpxPlayerBrowser',
-  );
-  $info['theplatform_mpx_mpxmedia'] = array(
-    'title' => t('mpxMedia'),
-    'class' => 'MediaThePlatformMpxMediaBrowser',
-  );
-
-  return $info;
-}
-
-/**
  * Implements hook_media_internet_providers().
  */
 function media_theplatform_mpx_media_internet_providers() {

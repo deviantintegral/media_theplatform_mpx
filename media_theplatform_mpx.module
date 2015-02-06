@@ -11,7 +11,6 @@ include_once ('includes/media_theplatform_mpx.formatters.inc');
 
 // Helper functions.
 include_once ('media_theplatform_mpx.admin.inc');
-include_once ('media_theplatform_mpx.browser.inc');
 include_once ('media_theplatform_mpx.helpers.php');
 include_once ('media_theplatform_mpx.player.php');
 include_once ('media_theplatform_mpx.video.php');

@@ -1153,17 +1153,6 @@ function media_theplatform_mpx_get_mpx_video_count() {
   return db_query("SELECT count(video_id) FROM {mpx_video}")->fetchField();
 }
 
-
-/**
- * Returns array of all records in mpx_video table as Objects.
- */
-function media_theplatform_mpx_get_all_mpx_videos() {
-  return db_select('mpx_video', 'v')
-    ->fields('v')
-    ->execute()
-    ->fetchAll();
-}
-
 /**
  * Returns array of all records in mpx_video given a file entity's fid.
  */
