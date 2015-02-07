@@ -17,9 +17,10 @@ define('media_theplatform_mpx_NAMESPACE', 'media_theplatform_mpx__');
 
 /**
  * Returns a truly! encrypted value.
+ *
+ * @deprecated
  */
 function _media_theplatform_mpx_encrypt_value($value) {
-
   if (empty($value)) {
     return NULL;
   }
@@ -56,9 +57,10 @@ function _media_theplatform_mpx_encrypt_value($value) {
 
 /**
  * Returns a decrypted value.
+ *
+ * @deprecated
  */
 function _media_theplatform_mpx_decrypt_value($value) {
-
   if (empty($value)) {
     return NULL;
   }
@@ -98,10 +100,6 @@ function _media_theplatform_mpx_decrypt_value($value) {
   return $return;
 }
 
-function media_theplatform_mpx_get_encrypted_list() {
-  return array('password');
-}
-
 /**
  * Wrapper for variable_get() using the Media: mpx variable registry.
  *
@@ -113,11 +111,7 @@ function media_theplatform_mpx_variable_get($name, $default = NULL) {
   if (!isset($default)) {
     $default = media_theplatform_mpx_variable_default($name);
   }
-  // Namespace all variables.
   $variable_name = media_theplatform_mpx_NAMESPACE . $name;
-  if (in_array($name, media_theplatform_mpx_get_encrypted_list())) {
-    return unserialize(_media_theplatform_mpx_decrypt_value(variable_get($variable_name, $default)));
-  }
   return variable_get($variable_name, $default);
 }
 
@@ -130,17 +124,6 @@ function media_theplatform_mpx_variable_get($name, $default = NULL) {
  */
 function media_theplatform_mpx_variable_set($name, $value) {
   $variable_name = media_theplatform_mpx_NAMESPACE . $name;
-  if (in_array($name, media_theplatform_mpx_get_encrypted_list())) {
-    $value = _media_theplatform_mpx_encrypt_value(serialize($value));
-  }
-
-  watchdog('media_theplatform_mpx', 'Setting system variable @variable to value "@value".',
-    array(
-      '@variable' => $variable_name,
-      '@value' => $value,
-    ),
-    WATCHDOG_DEBUG);
-
   return variable_set($variable_name, $value);
 }
 

@@ -41,8 +41,8 @@ function _media_theplatform_mpx_set_field($id, $field_name, $field_value, $table
     return FALSE;
   }
 
-  if (in_array($field_name, media_theplatform_mpx_get_encrypted_list())) {
-    $field_value = _media_theplatform_mpx_encrypt_value($field_value);
+  if (in_array($field_name, array('password'))) {
+    $field_value = encrypt($field_value);
   }
 
   $result = db_update($table)
@@ -63,8 +63,8 @@ function _media_theplatform_mpx_get_account_value($account_id, $field_name) {
 
   $account_data = _media_theplatform_mpx_get_account_data($account_id);
 
-  if (in_array($field_name, media_theplatform_mpx_get_encrypted_list())) {
-    return _media_theplatform_mpx_decrypt_value($account_data->{$field_name});
+  if (in_array($field_name, array('password'))) {
+    return decrypt($account_data->{$field_name});
   }
 
   return isset($account_data->{$field_name}) ? $account_data->{$field_name} : NULL;
@@ -75,8 +75,8 @@ function _media_theplatform_mpx_get_account_value($account_id, $field_name) {
  */
 function _media_theplatform_mpx_set_account_value($account_id, $field_name, $field_value) {
 
-  if (!is_null($field_value) && in_array($field_name, media_theplatform_mpx_get_encrypted_list())) {
-    $field_value = _media_theplatform_mpx_encrypt_value($field_value);
+  if (!is_null($field_value) && in_array($field_name, array('password'))) {
+    $field_value = encrypt($field_value);
   }
 
   $result = db_update('mpx_accounts')
@@ -135,7 +135,7 @@ function media_theplatform_mpx_signin($account_id) {
   }
 
   $username = $account_data->username;
-  $password = _media_theplatform_mpx_decrypt_value($account_data->password);
+  $password = decrypt($account_data->password);
   $mpx_token = _media_theplatform_mpx_get_signin_token($username, $password);
 
   // If valid response, set token variable.
@@ -211,7 +211,7 @@ function media_theplatform_mpx_get_accounts_select($account_id, $username = NULL
       return array();
     }
     $username = $account_data->username;
-    $password = _media_theplatform_mpx_decrypt_value($account_data->password);
+    $password = decrypt($account_data->password);
     $token = _media_theplatform_mpx_get_signin_token($username, $password, $token_idle_timeout);
     if (!$token) {
       watchdog('media_theplatform_mpx', 'Failed to retrieve all import accounts for @account.  Unable to retrieve authentication token.',

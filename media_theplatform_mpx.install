@@ -349,10 +349,10 @@ function media_theplatform_mpx_schema() {
       ),
       'password' => array(
         'description' => 'thePlatform Account Password',
-        'type' => 'varchar',
-        'length' => 255,
+        'type' => 'blob',
         'not null' => TRUE,
-        'default' => '',
+        'size' => 'big',
+        'serialize' => TRUE,
       ),
       'token' => array(
         'description' => 'thePlatform Authentication Token',
@@ -415,49 +415,6 @@ function media_theplatform_mpx_schema() {
   );
 
   return $schema;
-}
-
-/**
- * Implements hook_requirements().
- */
-function media_theplatform_mpx_requirements($phase) {
-
-  $requirements = array();
-  $t = get_t();
-
-  if ($phase == 'install' || $phase == 'update') {
-    $mcrypt_requirement_level = function_exists('mcrypt_encrypt') ? REQUIREMENT_OK : REQUIREMENT_ERROR;
-    $mcrypt_requirement_description = function_exists('mcrypt_encrypt') ? '' :
-      $t('mcrypt PHP extension must be installed for secure data storage.');
-    $requirements['media_theplatform_mpx_mcrypt_extension'] = array(
-      'title' => $t('mcrypt PHP Extension'),
-      'value' => $mcrypt_requirement_level,
-      'description' => $mcrypt_requirement_description,
-      'severity' => $mcrypt_requirement_description,
-    );
-  }
-  else if ($phase == 'runtime') {
-    $zend_crypt_library = libraries_load('zend_crypt');
-    $zend_crypt_requirement_level = $zend_crypt_library['loaded'] ? REQUIREMENT_OK : REQUIREMENT_ERROR;
-    $zend_crypt_requirement_description = $zend_crypt_library['loaded'] ? '' :
-      $t('Zend Crypt library must be installed for secure data storage.  Refer to library info for retrieving this library.');
-    $requirements['media_theplatform_mpx_zend_crypt_library'] = array(
-      'title' => $t('Zend Crypt Library'),
-      'value' => $t('enabled'),
-      'description' => $zend_crypt_requirement_description,
-      'severity' => $zend_crypt_requirement_level,
-    );
-  }
-
-  return $requirements;
-}
-
-/**
- * Implements hook_install().
- */
-function media_theplatform_mpx_install() {
-
-  return array();
 }
 
 /**
@@ -883,7 +840,9 @@ function media_theplatform_mpx_update_7214() {
  * Decrypt account username and token values.
  */
 function media_theplatform_mpx_update_7215() {
+  // Include functions needed if the module is currently disabled.
   include_once __DIR__ . '/includes/media_theplatform_mpx.variables.inc';
+
   $records = db_query("SELECT id, username, token FROM {mpx_accounts}")->fetchAll();
   foreach ($records as $record) {
     $record->username = _media_theplatform_mpx_decrypt_value($record->username);
@@ -891,5 +850,42 @@ function media_theplatform_mpx_update_7215() {
       $record->token = _media_theplatform_mpx_decrypt_value($record->token);
     }
     drupal_write_record('mpx_accounts', $record, array('id'));
+  }
+}
+
+/**
+ * Switch to the encrypt module.
+ */
+function media_theplatform_mpx_update_7216() {
+  // Include functions needed if the module is currently disabled.
+  include_once __DIR__ . '/includes/media_theplatform_mpx.variables.inc';
+
+  // Enable the encrypt module. We know this will be available since it was
+  // added as a dependency in our info file, and updates cannot be run until
+  // dependencies have been fulfilled.
+  if (!module_exists('encrypt')) {
+    module_enable(array('encrypt'));
+  }
+
+  // Fetch all the accounts before changing the database columns.
+  $records = db_query("SELECT id, username, password FROM {mpx_accounts}")->fetchAll();
+
+  // The password field now stores serialized encrypted data, change to a blob.
+  db_change_field('mpx_accounts', 'password', 'password', array(
+    'description' => 'thePlatform Account Password',
+    'type' => 'blob',
+    'not null' => TRUE,
+    'size' => 'big',
+    'serialize' => TRUE,
+  ));
+
+  // Re-encrypt all the passwords using the Encrypt API.
+  foreach ($records as $record) {
+    $record->password = _media_theplatform_mpx_decrypt_value($record->password);
+    $record->password = encrypt($record->password);
+    db_update('mpx_accounts')
+      ->fields(array('password' => $record->password))
+      ->condition('id', $record->id)
+      ->execute();
   }
 }

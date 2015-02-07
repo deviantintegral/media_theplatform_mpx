@@ -8,5 +8,5 @@ files[] = includes/MediaInternetThePlatformMpxHandler.inc
 dependencies[] = media
 dependencies[] = media_internet
 dependencies[] = file_entity
-dependencies[] = libraries (2.x)
+dependencies[] = encrypt (2.x)
 configure = admin/config/media/theplatform

@@ -824,6 +824,8 @@ function _media_theplatform_mpx_enforce_db_field_limits(&$fields, $module, $tabl
 
 /**
  * Implements hook_libraries_info().
+ *
+ * @todo Remove this.
  */
 function media_theplatform_mpx_libraries_info() {
 
@@ -1108,4 +1110,3 @@ function media_theplatform_mpx_form_alter(&$form, &$form_state, $form_id) {
     }
   }
 }
-
