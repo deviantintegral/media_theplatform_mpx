@@ -23,9 +23,6 @@ function _media_theplatform_mpx_get_account_data($id = NULL) {
     if (db_table_exists('mpx_accounts')) {
       $account_data = db_query('SELECT * FROM {mpx_accounts}')->fetchAllAssoc('id');
     }
-    watchdog('media_theplatform_mpx', 'Retrieving all mpx account data from the database returned the following:
-      <br /> <pre>@data<pre>.',
-      array('@data' => print_r($account_data, TRUE)), WATCHDOG_DEBUG);
   }
 
   if (isset($id)) {
@@ -54,29 +51,7 @@ function _media_theplatform_mpx_set_field($id, $field_name, $field_value, $table
     ->execute();
 
   // Clear account data static cache.
-  if ($result) {
-    watchdog('media_theplatform_mpx', 'Successfully saved field @field_name with value "@field_value" in @table table where @id_field = @id.',
-      array(
-        '@field_name' => $field_name,
-        '@field_value' => $field_value,
-        '@table' => $table,
-        '@id_field' => $id_field,
-        '@id' => $id,
-      ),
-      WATCHDOG_INFO);
-    drupal_static_reset(MEDIA_THEPLATFORM_MPX_ACCOUNT_DATA_STATIC_CACHE);
-  }
-  else {
-    watchdog('media_theplatform_mpx', 'Failed to save field @field_name with value "@field_value" in @table with @id_field @id.',
-      array(
-        '@field_name' => $field_name,
-        '@field_value' => $field_value,
-        '@table' => $table,
-        '@id_field' => $id_field,
-        '@id' => $id,
-      ),
-      WATCHDOG_WARNING);
-  }
+  drupal_static_reset(MEDIA_THEPLATFORM_MPX_ACCOUNT_DATA_STATIC_CACHE);
 
   return $result;
 }

@@ -218,14 +218,6 @@ function media_theplatform_mpx_file_delete($file) {
           ),
           WATCHDOG_ERROR);
       }
-      else {
-        watchdog('media_theplatform_mpx', 'Successfully deleted player @pid associated with file @fid which is being deleted.',
-          array(
-            '@pid' => $player['id'],
-            '@fid' => $file->fid,
-          ),
-          WATCHDOG_NOTICE);
-      }
     }
     // Deleting a Video:
     elseif ($parts['mpx_type'] == 'video') {
@@ -262,14 +254,6 @@ function media_theplatform_mpx_file_delete($file) {
               '@fid' => $file->fid,
             ),
             WATCHDOG_ERROR);
-        }
-        else {
-          watchdog('media_theplatform_mpx', 'Successfully deleted video with GUID "@guid" associated with file @fid which is being deleted.',
-            array(
-              '@guid' => $guid,
-              '@fid' => $file->fid,
-            ),
-            WATCHDOG_NOTICE);
         }
       }
     }
@@ -868,10 +852,6 @@ function media_theplatform_mpx_libraries_info() {
  * Helper that deletes an mpx account and all of its associated media and data.
  */
 function _media_theplatform_mpx_delete_account($account_id) {
-
-  watchdog('media_theplatform_mpx', 'Beginning process of deleting account @id.',
-    array('@id' => $account_id), WATCHDOG_NOTICE);
-
   // Turn off player and media sync.
   media_theplatform_mpx_variable_set('account_' . $account_id . '_cron_player_sync', 0);
   media_theplatform_mpx_variable_set('account_' . $account_id . '_cron_video_sync', 0);
@@ -895,9 +875,6 @@ function _media_theplatform_mpx_delete_account($account_id) {
  * Helper that delets the video cron queue items for a given account.
  */
 function _media_theplatform_mpx_delete_account_video_cron_queue($account_id, &$context) {
-
-  watchdog('media_theplatform_mpx', 'Beginning process of deleting video cron queue items for account @id.',
-    array('@id' => $account_id), WATCHDOG_NOTICE);
 
   // We can't use the Drupal Queue API here. When we release a queue item, we
   // could very well get it right back when claiming an item.
@@ -1018,13 +995,8 @@ function _media_theplatform_mpx_delete_account_media($account_id, $type, &$conte
     ->fetchAllKeyed();
 
   if (empty($mpx_ids)) {
-    $context['message'] = t('All @type_plural have been deleted.', array('@type_plural' => $type_plural));
+    $context['message'] = t('All data from @table has been deleted.', array('@table' => $mpx_table));
     $context['finished'] = 1;
-    watchdog('media_theplatform_mpx', 'Completed process of deleting @type_plural for account @id.',
-      array(
-        '@id' => $account_id,
-        '@type_plural' => $type_plural,
-      ), WATCHDOG_NOTICE);
     return;
   }
 
