@@ -998,32 +998,26 @@ function _media_theplatform_mpx_delete_account_video_cron_queue($account_id, &$c
 function _media_theplatform_mpx_delete_account_media($account_id, $type, &$context) {
 
   $mpx_table = 'mpx_' . $type;
-  $type_plural = $type . 's';
+  $id_key = $type . '_id';
 
-  watchdog('media_theplatform_mpx', 'Beginning process of deleting @type_plural for account @id.',
-    array(
-      '@id' => $account_id,
-      '@type_plural' => $type_plural,
-    ), WATCHDOG_NOTICE);
-
-  if (empty($context['sandbox'])) {
-    $context['sandbox']['range_limit'] = 25;
-    $context['sandbox']['total_deleted'] = 0;
-    $context['sandbox']['total_media'] = db_select($mpx_table)
-      ->fields($mpx_table)
-      ->condition('parent_account', $account_id, '=')
-      ->execute()
-      ->rowCount();
+  if (!isset($context['sandbox']['count'])) {
+    $context['sandbox']['last_id'] = 0;
+    $context['sandbox']['progress'] = 0;
+    $context['sandbox']['count'] = db_select($mpx_table)
+      ->condition('parent_account', $account_id)
+      ->countQuery()->execute()->fetchField();
   }
 
-  $mpx_media = db_select($mpx_table)
-    ->fields($mpx_table, array())
-    ->condition('parent_account', $account_id, '=')
-    ->range(0, $context['sandbox']['range_limit'])
+  $mpx_ids = db_select($mpx_table)
+    ->fields($mpx_table, array($id_key, 'fid'))
+    ->condition('parent_account', $account_id)
+    ->condition($id_key, $context['sandbox']['last_id'], '>')
+    ->orderBy($id_key)
+    ->range(0, 50)
     ->execute()
-    ->fetchAll();
+    ->fetchAllKeyed();
 
-  if (empty($mpx_media)) {
+  if (empty($mpx_ids)) {
     $context['message'] = t('All @type_plural have been deleted.', array('@type_plural' => $type_plural));
     $context['finished'] = 1;
     watchdog('media_theplatform_mpx', 'Completed process of deleting @type_plural for account @id.',
@@ -1034,55 +1028,14 @@ function _media_theplatform_mpx_delete_account_media($account_id, $type, &$conte
     return;
   }
 
-  // Delete each media item retrieved.
-  foreach ($mpx_media as $media_item) {
+  file_delete_multiple($mpx_ids);
+  $context['sandbox']['count'] += count($mpx_ids);
+  $context['sandbox']['last_id'] = max(array_keys($mpx_ids));
 
-    if (empty($media_item->fid)) {
-      watchdog('media_theplatform_mpx', 'No @fid for @type @media_title when deleting all @type_plural for account @account_id.',
-        array(
-          '@fid' => $media_item->fid,
-          '@type' => $type,
-          '@media_title' => $media_item->title,
-          '@type_plural' => $type_plural,
-          '@account_id' => $account_id,
-        ),
-        WATCHDOG_ERROR);
-      continue;
-    }
-
-    $file = file_load($media_item->fid);
-
-    if (!is_object($file)) {
-      watchdog('media_theplatform_mpx', 'Unable to load file @fid for @type @media_title when deleting all @type_plural for account @account_id.',
-        array(
-          '@fid' => $media_item->fid,
-          '@type' => $type,
-          '@media_title' => $media_item->title,
-          '@type_plural' => $type_plural,
-          '@account_id' => $account_id,
-        ),
-        WATCHDOG_ERROR);
-      continue;
-    }
-
-    $form_state = array();
-    $form_state['values'] = array(
-      'fid' => $file->fid,
-      'confirm' => TRUE,
-    );
-    drupal_form_submit('file_entity_delete_form', $form_state, $file);
-
-    $context['sandbox']['total_deleted']++;
-    $context['results'][] = $media_item->title;
+  // Inform batch engine about progress.
+  if ($context['sandbox']['count'] < $context['sandbox']['total']) {
+    $context['finished'] = $context['sandbox']['count'] / $context['sandbox']['total'];
   }
-
-  $context['message'] = t('Deleted @total_deleted of @total_media @type_plural.',
-    array(
-      '@total_deleted' => $context['sandbox']['total_deleted'],
-      '@total_media' => $context['sandbox']['total_media'],
-      '@type_plural' => $type_plural,
-    ));
-  $context['finished'] = 0;
 }
 
 /**
