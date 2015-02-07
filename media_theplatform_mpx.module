@@ -1003,7 +1003,7 @@ function _media_theplatform_mpx_delete_account_media($account_id, $type, &$conte
   if (!isset($context['sandbox']['count'])) {
     $context['sandbox']['last_id'] = 0;
     $context['sandbox']['progress'] = 0;
-    $context['sandbox']['count'] = db_select($mpx_table)
+    $context['sandbox']['total'] = db_select($mpx_table)
       ->condition('parent_account', $account_id)
       ->countQuery()->execute()->fetchField();
   }
@@ -1029,12 +1029,12 @@ function _media_theplatform_mpx_delete_account_media($account_id, $type, &$conte
   }
 
   file_delete_multiple($mpx_ids);
-  $context['sandbox']['count'] += count($mpx_ids);
+  $context['sandbox']['progress'] += count($mpx_ids);
   $context['sandbox']['last_id'] = max(array_keys($mpx_ids));
 
   // Inform batch engine about progress.
-  if ($context['sandbox']['count'] < $context['sandbox']['total']) {
-    $context['finished'] = $context['sandbox']['count'] / $context['sandbox']['total'];
+  if ($context['sandbox']['progress'] < $context['sandbox']['total']) {
+    $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['total'];
   }
 }
 
