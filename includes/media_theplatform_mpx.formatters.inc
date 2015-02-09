@@ -107,9 +107,8 @@ function media_theplatform_mpx_file_default_displays() {
 
   // Default settings for displaying as a video.
   $default_video_settings = array(
-    // Must include media_large for this to work.
-    'media_large' => array(),
-    'media_original' => array(),
+    'default' => array(),
+    'teaser' => array(),
   );
 
   foreach ($default_video_settings as $view_mode => $settings) {
@@ -128,9 +127,9 @@ function media_theplatform_mpx_file_default_displays() {
   // WYSIWYG editor. The higher weight ensures that the video display is used
   // where possible.
   $default_image_styles = array(
-    'media_preview' => 'square_thumbnail',
-    'media_large' => 'large',
-    'media_original' => '',
+    'default' => 'large',
+    'teaser' => 'large',
+    'preview' => 'square_thumbnail',
   );
   foreach ($default_image_styles as $view_mode => $image_style) {
     $display_name = 'video__' . $view_mode . '__media_theplatform_mpx_image';
@@ -138,7 +137,7 @@ function media_theplatform_mpx_file_default_displays() {
       'api_version' => 1,
       'name' => $display_name,
       'status' => 1,
-      'weight' => 2,
+      'weight' => $view_mode === 'preview' ? -50 : 2,
       'settings' => array('image_style' => $image_style),
     );
   }
