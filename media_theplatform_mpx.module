@@ -286,31 +286,6 @@ function media_theplatform_mpx_watchdog_alter(&$log_entry) {
 }
 
 /**
- * Write data from given array $data into the mpx_log table.
- */
-function media_theplatform_mpx_insert_log($data) {
-
-  $message = "Legacy media_theplatform_mpx log message: \n"
-    . "\n uid: @uid \n"
-    . "\n type: @type \n"
-    . "\n type_id: @type_id \n"
-    . "\n action: @action \n"
-    . "\n timestamp: @timestamp \n"
-    . "\n details: @details \n";
-
-  $variables = array(
-    '@uid' => $data['uid'],
-    '@type' => $data['type'],
-    '@type_id' => $data['type_id'],
-    '@action' => $data['action'],
-    '@timestamp' => REQUEST_TIME,
-    '@details' => $data['details'],
-  );
-
-  watchdog('media_theplatform_mpx', $message, $variables, WATCHDOG_DEBUG);
-}
-
-/**
  * Helper that returns a description log string for an account if passed.
  */
 function _media_theplatform_mpx_account_log_string($account = NULL) {
