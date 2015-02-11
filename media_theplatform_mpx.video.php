@@ -29,8 +29,8 @@ function media_theplatform_mpx_get_changed_ids($account) {
 
   if (empty($result_data)) {
     watchdog('media_theplatform_mpx', 'Request for update notifications returned no data for @account.',
-      array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_ERROR);
-    return FALSE;
+      array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_INFO);
+    return array();
   }
 
   // Initalize arrays to store active and deleted ID's.
