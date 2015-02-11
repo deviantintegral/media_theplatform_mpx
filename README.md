@@ -8,7 +8,7 @@ The Media: thePlatform mpx module integrates with the Media module to make your 
 * An administrator account on thePlatform mpx
 * [Media 7.x-2.x](https://www.drupal.org/project/media)
 * [File Entity 7.x-2.x](https://www.drupal.org/project/file_entity)
-* [Libraries API 7.x-2.x](https://www.drupal.org/project/libraries)
+* [Encrypt 7.x-2.x](https://www.drupal.org/project/encrypt)
 
 ### Notes
 
