@@ -101,17 +101,27 @@ function media_theplatform_mpx_add_player_head($fids) {
  */
 function media_theplatform_mpx_menu() {
   $items = array();
+
   $items['admin/config/media/theplatform'] = array(
-    'title' => 'Media: thePlatform mpx settings',
-    'description' => 'Configure thePlatForm mpx integration settings.',
+    'title' => 'Media: thePlatform mpx',
+    'description' => 'Configure thePlatForm mpx integration accounts and settings.',
     'page callback' => 'media_theplatform_mpx_page_account',
-    'type' => MENU_NORMAL_ITEM,
     'access arguments' => array('administer mpx account'),
+    'file' => 'media_theplatform_mpx.admin.inc',
   );
-  $items['admin/config/media/theplatform/settings'] = array(
-    'title' => 'Media: thePlatform mpx settings',
+  $items['admin/config/media/theplatform/accounts'] = array(
+    'title' => 'Accounts',
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'access arguments' => array('administer mpx account'),
+    'file' => 'media_theplatform_mpx.admin.inc',
+  );
+  $items['admin/config/media/theplatform/settings'] = array(
+    'title' => 'Settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('media_theplatform_mpx_settings_form'),
+    'type' => MENU_LOCAL_TASK,
+    'access arguments' => array('administer mpx account'),
+    'file' => 'media_theplatform_mpx.admin.inc',
   );
 
   // @todo Replace these two menu items with Views
@@ -121,6 +131,7 @@ function media_theplatform_mpx_menu() {
     'type' => MENU_LOCAL_TASK,
     'access arguments' => array('administer files'),
     'weight' => 30,
+    'file' => 'media_theplatform_mpx.admin.inc',
   );
   $items['admin/content/file/mpxmedia'] = array(
     'title' => 'mpxMedia',
@@ -128,6 +139,7 @@ function media_theplatform_mpx_menu() {
     'type' => MENU_LOCAL_TASK,
     'access arguments' => array('administer files'),
     'weight' => 40,
+    'file' => 'media_theplatform_mpx.admin.inc',
   );
   return $items;
 }

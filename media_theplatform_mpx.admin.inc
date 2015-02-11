@@ -5,6 +5,101 @@
  * MPX Functions for forms.
  */
 
+/**
+ * Form builder
+ *
+ * @ingroup forms
+ */
+function media_theplatform_mpx_settings_form($form, &$form_state) {
+  $form['cron'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Cron'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+  $form['cron']['media_theplatform_mpx__cron_players'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Sync mpxPlayers on Cron'),
+    '#default_value' => variable_get('media_theplatform_mpx__cron_players', 1),
+  );
+  $form['cron']['media_theplatform_mpx__cron_videos'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Sync mpxMedia on Cron'),
+    '#default_value' => variable_get('media_theplatform_mpx__cron_videos', 1),
+  );
+  $form['cron']['media_theplatform_mpx__cron_videos_per_run'] = array(
+    '#type' => 'numberfield',
+    '#title' => t('Media Processing Limit'),
+    '#description' => t('The number of videos to pull from the media feed per cron run. Maximum of 500.'),
+    '#default_value' => variable_get('media_theplatform_mpx__cron_videos_per_run', 250),
+    '#min' => 0,
+    '#max' => 500,
+  );
+  $form['cron']['media_theplatform_mpx__cron_videos_timeout'] = array(
+    '#type' => 'numberfield',
+    '#title' => t('Media Feed Request Timeout'),
+    '#description' => t('The amount in seconds to wait for a response from a media feed request.'),
+    '#default_value' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
+    '#min' => 1,
+  );
+  $form['cron']['media_theplatform_mpx__cron_queue_processing_time'] = array(
+    '#type' => 'numberfield',
+    '#title' => t('Cron Queue Processing Time'),
+    '#description' => t('The amount of time, in seconds, to allot to the cron queue for processing during each cron run.'),
+    '#default_value' => variable_get('media_theplatform_mpx__cron_queue_processing_time', 10),
+    '#min' => 1,
+  );
+
+  $form['logging'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Logging'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['logging']['media_theplatform_mpx__output_message_watchdog_severity'] = array(
+    '#type' => 'select',
+    '#title' => t('Display MPX Debug Message Level'),
+    '#options' => array(
+      WATCHDOG_NOTICE => t('Basic'),
+      WATCHDOG_INFO => t('Advanced'),
+      WATCHDOG_DEBUG => t('Extremely Verbose'),
+    ),
+    '#description' => t('Determines how much information is reported to the user after MPX operations.
+<br />Basic - minimal information provided about player, video and setting changes
+<br />Advanced - provides feedback on all calls to thePlatform, database inserts/updates and file system writes
+<br />Extremely Verbose - outputs all data received from thePlatform and all data inserted/updated in the database.'),
+    '#default_value' => MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL,
+  );
+  $form['logging']['media_theplatform_mpx__watchdog_severity'] = array(
+    '#type' => 'select',
+    '#title' => t('MPX Debug Logging Level'),
+    '#options' => array(
+      WATCHDOG_NOTICE => t('Basic'),
+      WATCHDOG_INFO => t('Advanced'),
+      WATCHDOG_DEBUG => t('Extremely Verbose'),
+    ),
+    '#description' => t('Determines how much information is saved in logs during MPX operations.'),
+    '#default_value' => MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL,
+  );
+
+  $form['advanced'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Advanced'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['advanced']['media_theplatform_mpx__token_ttl'] = array(
+    '#type' => 'numberfield',
+    '#title' => t('Authentication Token TTL'),
+    '#description' => t('The amount of time in seconds an authentication token remains valid.  Increasing this value may help if requests to thePlatform are failing due to invalid authentication tokens.  Use the smallest value possible.  Min: 3 seconds - Max: 180 seconds (3 minutes)'),
+    '#default_value' => media_theplatform_mpx_variable_get('token_ttl', 3),
+    '#min' => 3,
+    '#max' => 180,
+  );
+
+  return system_settings_form($form);
+}
+
 /********* thePlatform signIn / Account ***********************/
 
 
@@ -238,10 +333,6 @@ function media_theplatform_mpx_page_account() {
     // Add the import account form.
     $import_account_form = drupal_get_form('media_theplatform_mpx_import_account_form', $all_account_data);
     $output .= render($import_account_form);
-
-    // Add the cron form if accounts exist.
-    $cron_form = drupal_get_form('media_theplatform_mpx_form_cron_settings');
-    $output .= render($cron_form);
   }
 
   return $output;
@@ -544,100 +635,6 @@ function media_theplatform_mpx_check_account_settings($account_id = NULL) {
 
   return TRUE;
 }
-
-/**
- * System settings form constructor for Cron settings.
- *
- * @ingroup forms
- */
-function media_theplatform_mpx_form_cron_settings() {
-
-  $form['cron'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('Cron Settings'),
-    '#collapsible' => FALSE,
-    '#collapsed' => FALSE,
-  );
-  $form['cron'][media_theplatform_mpx_NAMESPACE . 'cron_players'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Sync mpxPlayers on Cron'),
-    '#default_value' => media_theplatform_mpx_variable_get('cron_players'),
-  );
-  $form['cron'][media_theplatform_mpx_NAMESPACE . 'cron_videos'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Sync mpxMedia on Cron'),
-    '#default_value' => media_theplatform_mpx_variable_get('cron_videos'),
-  );
-  $form['cron'][media_theplatform_mpx_NAMESPACE . 'cron_videos_per_run'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Media Processing Limit'),
-    '#description' => t('The number of videos to pull from the media feed per cron run.'),
-    '#default_value' => media_theplatform_mpx_variable_get('cron_videos_per_run', 250),
-  );
-  $form['cron'][media_theplatform_mpx_NAMESPACE . 'cron_videos_timeout'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Media Feed Request Timeout'),
-    '#description' => t('The amount in seconds to wait for a response from a media feed request.'),
-    '#default_value' => media_theplatform_mpx_variable_get('cron_videos_timeout', 180),
-  );
-  $form['cron'][media_theplatform_mpx_NAMESPACE . 'cron_queue_processing_time'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Cron Queue Processing Time'),
-    '#description' => t('The amount of time to allot to the cron queue for processing during each cron run.'),
-    '#default_value' => media_theplatform_mpx_variable_get('cron_queue_processing_time', 10),
-  );
-  $form['cron'][media_theplatform_mpx_NAMESPACE . 'output_message_watchdog_severity'] = array(
-    '#type' => 'select',
-    '#title' => t('Display MPX Debug Message Level'),
-    '#options' => array(
-      WATCHDOG_NOTICE => t('Basic'),
-      WATCHDOG_INFO => t('Advanced'),
-      WATCHDOG_DEBUG => t('Extremely Verbose'),
-    ),
-    '#description' => t('Determines how much information is reported to the user after MPX operations.
-<br />Basic - minimal information provided about player, video and setting changes
-<br />Advanced - provides feedback on all calls to thePlatform, database inserts/updates and file system writes
-<br />Extremely Verbose - outputs all data received from thePlatform and all data inserted/updated in the database.'),
-    '#default_value' => MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL,
-  );
-  $form['cron'][media_theplatform_mpx_NAMESPACE . 'watchdog_severity'] = array(
-    '#type' => 'select',
-    '#title' => t('MPX Debug Logging Level'),
-    '#options' => array(
-      WATCHDOG_NOTICE => t('Basic'),
-      WATCHDOG_INFO => t('Advanced'),
-      WATCHDOG_DEBUG => t('Extremely Verbose'),
-    ),
-    '#description' => t('Determines how much information is saved in logs during MPX operations.'),
-    '#default_value' => MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL,
-  );
-  $form['cron'][media_theplatform_mpx_NAMESPACE . 'token_ttl'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Authentication Token TTL'),
-    '#description' => t('The amount of time in seconds an authentication token remains valid.  Increasing this value may help if requests to thePlatform are failing due to invalid authentication tokens.  Use the smallest value possible.  Min: 3 seconds - Max: 180 seconds (3 minutes)'),
-    '#default_value' => media_theplatform_mpx_variable_get('token_ttl', 3),
-  );
-
-  return system_settings_form($form);
-}
-
-/**
- * Form validation handler for the media_theplatform_mpx_form_cron_settings form.
- */
-function media_theplatform_mpx_form_cron_settings_validate(&$form, &$form_state) {
-
-  if ($form_state['values'][media_theplatform_mpx_NAMESPACE . 'cron_videos_per_run'] > 500) {
-    form_set_error(media_theplatform_mpx_NAMESPACE . 'cron_videos_per_run', t('The maximum number of media items to process on cron is 500.'));
-  }
-
-  if ($form_state['values'][media_theplatform_mpx_NAMESPACE . 'token_ttl'] < 3) {
-    form_set_error(media_theplatform_mpx_NAMESPACE . 'token_ttl', t('The minimum TTL for authentication tokens is 3 seconds.'));
-  }
-  if ($form_state['values'][media_theplatform_mpx_NAMESPACE . 'token_ttl'] > 180) {
-    form_set_error(media_theplatform_mpx_NAMESPACE . 'token_ttl', t('The maximum TTL for authentication tokens is 180 seconds (3 minutes).'));
-  }
-}
-
 
 /******************* mpxPlayers *****************************/
 

@@ -9,6 +9,7 @@ The Media: thePlatform mpx module integrates with the Media module to make your 
 * [Media 7.x-2.x](https://www.drupal.org/project/media)
 * [File Entity 7.x-2.x](https://www.drupal.org/project/file_entity)
 * [Encrypt 7.x-2.x](https://www.drupal.org/project/encrypt)
+* [Elements](https://www.drupal.org/project/elements)
 
 ### Notes
 
