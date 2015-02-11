@@ -228,12 +228,12 @@ class MpxToken {
     )));
     $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
     if (!empty($result_data)) {
+      watchdog('media_theplatform_mpx', 'Expired mpx authentication token @token for @account.', array('@token' => $this->value, '@account' => $this->username), WATCHDOG_INFO);
       $this->value = NULL;
       $this->expire = NULL;
-      watchdog('media_theplatform_mpx', 'Expired mpx authentication token %token for @account.', array('%token' => $this->value, '@account' => $this->username), WATCHDOG_DEBUG);
     }
     else {
-      throw new Exception("Failed to expire mpx authenitcation token {$this->value} for {$this->username}");
+      throw new Exception("Failed to expire mpx authentication token {$this->value} for {$this->username}");
     }
   }
 
