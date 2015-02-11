@@ -955,25 +955,23 @@ function media_theplatform_mpx_insert_video($video, $fid = NULL, $account = NULL
 }
 
 /**
- * Updates File $fid with given $video_title and $player_title.
+ * Updates File $fid with given $video_title.
+ *
+ * @todo Replace this with EntityHelper::updateBaseTableValues()?
  */
-function media_theplatform_mpx_update_video_filename($fid, $video_title, $player_title = NULL) {
-
-  // Update file_managed and file_managed_revisions filename with title of video.
-  $file_managed_updated = db_update('file_managed')
-    ->fields(array(
-      'filename' => substr($video_title, 0, 255),
-    ))
-    ->condition('fid', $fid, '=')
-    ->execute();
-  $file_managed_revisions_updated = db_update('file_managed_revisions')
-    ->fields(array(
-      'filename' => substr($video_title, 0, 255),
-    ))
-    ->condition('fid', $fid, '=')
-    ->execute();
-
-  return ($file_managed_updated && $file_managed_revisions_updated);
+function media_theplatform_mpx_update_video_filename($fid, $video_title) {
+  $success = TRUE;
+  $tables = array('file_managed');
+  if (db_table_exists('file_managed_revisions')) {
+    $tables[] = 'file_managed_revisions';
+  }
+  foreach ($tables as $table_name) {
+    $success &= (bool) db_update($table_name)
+      ->fields(array('filename' => substr($video_title, 0, 255)))
+      ->condition('fid', $fid)
+      ->execute();
+  }
+  return $success;
 }
 
 /**
@@ -1103,7 +1101,11 @@ function media_theplatform_mpx_update_video($video, $fid = NULL, $account = NULL
     media_theplatform_mpx_update_video_filename($fid, $video['title']);
   }
   else {
-    foreach (array('file_managed', 'file_managed_revisions') as $table_name) {
+    $tables = array('file_managed');
+    if (db_table_exists('file_managed_revisions')) {
+      $tables[] = 'file_managed_revisions';
+    }
+    foreach ($tables as $table_name) {
       $filename_update_query = db_update($table_name)
         ->fields(array('filename' => substr($video['title'], 0, 255)))
         ->condition('uri', 'mpx://m/' . $video['guid'] . '/%', 'LIKE');

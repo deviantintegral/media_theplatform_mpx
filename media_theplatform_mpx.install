@@ -763,8 +763,11 @@ function media_theplatform_mpx_update_7209() {
 function media_theplatform_mpx_update_7210(&$sandbox) {
   // db_update() doesn't allow for multiple tables, so we fall back to
   // db_query().
-  $tables = array('file_managed', 'file_managed_revisions');
-  foreach($tables as $table) {
+  $tables = array('file_managed');
+  if (db_table_exists('file_managed_revisions')) {
+    $tables[] = 'file_managed_revisions';
+  }
+  foreach ($tables as $table) {
     db_query("UPDATE " . $table . " f, mpx_accounts m SET f.uri = CONCAT(f.uri, '/a/', SUBSTRING(m.account_id, 50)) WHERE f.type = CONCAT('mpx_video_', m.id);");
   }
 }
