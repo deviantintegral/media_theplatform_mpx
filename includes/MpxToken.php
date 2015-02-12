@@ -116,8 +116,7 @@ class MpxToken {
    * @param object $account
    *   The mpx account object.
    * @param int $duration
-   *   The number of seconds for which the token should be valid. Default is 60
-   *   seconds.
+   *   The number of seconds for which the token should be valid.
    * @param bool $force
    *   Set to TRUE if a fresh authentication token should always be fetched.
    *
@@ -126,7 +125,7 @@ class MpxToken {
    *
    * @throws Exception
    */
-  public static function acquire($account, $duration = 60, $force = FALSE) {
+  public static function acquire($account, $duration = NULL, $force = FALSE) {
     $token = static::load($account);
 
     if ($force || !$token || !$token->isValid($duration)) {
@@ -136,7 +135,12 @@ class MpxToken {
         $token->delete();
       }
 
-      // @todo Should we pass $duration through to MpxToken::fetch()?
+      // Log an error if the requested duration is larger than the token TTL.
+      if ($duration && ($ttl = variable_get('media_theplatform_mpx__token_ttl')) && $duration > $ttl) {
+        watchdog('media_theplatform_mpx', 'MpxToken::acquire() called with $duration @duration greater than the token TTL @ttl.', array('@duration' => $duration, '@ttl' => $ttl));
+        $duration = $ttl;
+      }
+
       $token = static::fetch($account->username, $account->password);
       // @todo Validate if the new token also valid for $duration.
       $token->save();
@@ -165,14 +169,19 @@ class MpxToken {
    */
   public static function fetch($username, $password, $duration = NULL) {
     if (!isset($duration)) {
-      $duration = variable_get('media_theplatform_mpx__token_ttl', 3);
+      $duration = variable_get('media_theplatform_mpx__token_ttl');
     }
 
-    $url = url("https://identity.auth.theplatform.com/idm/web/Authentication/signIn", array('query' => array(
+    $query = array(
       'schema' => '1.0',
       'form' => 'json',
-      '_idleTimeout' => $duration * 1000,
-    )));
+    );
+    if (!empty($duration)) {
+      // API expects this value in milliseconds, not seconds.
+      $query['_duration'] = $duration * 1000;
+      $query['_idleTimeout'] = $duration * 1000;
+    }
+    $url = url("https://identity.auth.theplatform.com/idm/web/Authentication/signIn", array('query' => $query));
     $options = array(
       'method' => 'POST',
       'data' => http_build_query(array(
@@ -185,12 +194,13 @@ class MpxToken {
     $time = time();
     $result_data = _media_theplatform_mpx_retrieve_feed_data($url, TRUE, $options);
     if (!empty($result_data['signInResponse']['token'])) {
+      $lifetime = floor(min($result_data['signInResponse']['duration'], $result_data['signInResponse']['idleTimeout']) / 1000);
       $token = new MpxToken(
         $username,
         $result_data['signInResponse']['token'],
-        $time + (min($result_data['signInResponse']['duration'], $result_data['signInResponse']['idleTimeout']) / 1000)
+        $time + $lifetime
       );
-      watchdog('media_theplatform_mpx', 'Fetched new mpx token %token for @username that expires on @date.', array('@username' => $username, '%token' => $token->value, '@date' => format_date($token->expire)), WATCHDOG_INFO);
+      watchdog('media_theplatform_mpx', 'Fetched new mpx token @token for @username that expires on @date (in @duration).', array('@username' => $username, '@token' => $token->value, '@date' => format_date($token->expire), '@duration' => format_interval($lifetime)), WATCHDOG_INFO);
       return $token;
     }
     else {

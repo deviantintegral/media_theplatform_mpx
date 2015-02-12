@@ -90,11 +90,12 @@ function media_theplatform_mpx_settings_form($form, &$form_state) {
   );
   $form['advanced']['media_theplatform_mpx__token_ttl'] = array(
     '#type' => 'numberfield',
-    '#title' => t('Authentication Token TTL'),
-    '#description' => t('The amount of time in seconds an authentication token remains valid.  Increasing this value may help if requests to thePlatform are failing due to invalid authentication tokens.  Use the smallest value possible.  Min: 3 seconds - Max: 180 seconds (3 minutes)'),
-    '#default_value' => variable_get('media_theplatform_mpx__token_ttl', 3),
+    '#title' => t('Override authentication token lifetime'),
+    '#description' => t('Leave blank to use the default token lifetime. Minimum: 3 seconds. Maximum: 2 weeks (1209600 seconds).'),
+    '#default_value' => variable_get('media_theplatform_mpx__token_ttl'),
+    '#field_suffix' => t('seconds'),
     '#min' => 3,
-    '#max' => 180,
+    '#max' => 1209600, // Two weeks
   );
 
   return system_settings_form($form);

@@ -1102,10 +1102,8 @@ function media_theplatform_mpx_form_alter(&$form, &$form_state, $form_id) {
  *
  * @return MpxToken|bool
  *   A valid MpxToken object, or FALSE if no token could be acquired.
- *
- * @todo Make $duration default to 60 when the default token lifetime is increased.
  */
-function media_theplatform_mpx_token_acquire($account, $duration = 0, $force = FALSE) {
+function media_theplatform_mpx_token_acquire($account, $duration = NULL, $force = FALSE) {
   try {
     return MpxToken::acquire($account, $duration, $force);
   }
