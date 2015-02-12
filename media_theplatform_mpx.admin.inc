@@ -124,9 +124,7 @@ function media_theplatform_mpx_signin_form($form, &$form_state, $accounts = arra
   // If token exists already, collapse this form.
   if (!empty($accounts)) {
     $collapsed = TRUE;
-    $action_label = t('Save');
-    $title = t('Add Accounts');
-    $description = t('Enter the credentials from the new thePlatform.com account and then click "Save."');
+    $title = t('Add MPX Account');
   }
 
   $form['accounts'] = array(
@@ -140,62 +138,24 @@ function media_theplatform_mpx_signin_form($form, &$form_state, $accounts = arra
     '#tree' => TRUE,
   );
 
-  $add_account_action_label = t('Add New Account');
-  $added_accounts = !empty($form_state['values']['accounts']['new']) ?
-    $form_state['values']['accounts']['new'] : array();
-
-  if (isset($form_state['values']['op']) && $form_state['values']['op'] == $add_account_action_label) {
-    $form['accounts']['#collapsed'] = FALSE;
-  }
-  $added_accounts[] = array('theplatform_username' => '', 'theplatform_password' => '');
-
-  // If there are no added account, lets add one so there can be something to
-  // fill out.
-  if (empty($added_accounts) && empty($accounts)) {
-    $added_accounts[] = array('theplatform_username' => '', 'theplatform_password' => '');
-  }
-
-  foreach ($added_accounts as $key => $account) {
-    if ($key > 0) {
-      $form['accounts']['new'][ $key ]['separator'] = array(
-        '#type' => 'item',
-        '#markup' => '<hr>',
-      );
-    }
-
-    $form['accounts']['new'][ $key ]['theplatform_username'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Username for New Account'),
-      '#description' => t('Prefix your username with "mpx/". e.g. "mpx/admin@example.com".'),
-      '#maxlength' => 255,
-      '#required' => TRUE,
-      '#default_value' => $account['theplatform_username'],
-    );
-    $form['accounts']['new'][$key]['theplatform_password'] = array(
-      '#type' => 'password',
-      '#title' => t('Password for New Account'),
-      '#maxlength' => 255,
-      '#required' => TRUE,
-    );
-  }
+  $form['accounts']['theplatform_username'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Username for New Account'),
+    '#description' => t('Prefix your username with "mpx/". e.g. "mpx/admin@example.com".'),
+    '#maxlength' => 255,
+    '#required' => TRUE,
+  );
+  $form['accounts']['theplatform_password'] = array(
+    '#type' => 'password',
+    '#title' => t('Password for New Account'),
+    '#maxlength' => 255,
+    '#required' => TRUE,
+  );
 
   $form['accounts']['actions']['submit'] = array(
     '#type' => 'submit',
-    '#value' => $action_label,
+    '#value' => t('Add Account'),
   );
-
-  // Only show the Add New Account button if we're already logged in.
-  if (!empty($accounts)) {
-    $form['accounts']['add_account'] = array(
-      '#type' => 'button',
-      '#value' => $add_account_action_label,
-      '#href' => '',
-      '#ajax' => array(
-        'callback' => 'media_theplatform_mpx_signin_form_add_account',
-        'wrapper' => 'media-theplatform-mpx-accounts-form-container',
-      ),
-    );
-  }
 
   return $form;
 }
@@ -343,39 +303,20 @@ function media_theplatform_mpx_page_account() {
  */
 function media_theplatform_mpx_signin_form_validate($form, &$form_state) {
 
-  // Validate any credential changes to existing accounts.
-  if (!empty($form_state['values']['accounts']['existing'])) {
-    foreach ($form_state['values']['accounts']['existing'] as $id => $values) {
-      $account_data = media_theplatform_mpx_account_load($id);
-      if ($values['theplatform_password'] &&
-          ($values['theplatform_username'] != $account_data->username || $values['theplatform_password'] != $account_data->password)) {
-        $mpx_token = MpxToken::fetch($values['theplatform_username'], $values['theplatform_password']);
-        if (!$mpx_token) {
-          form_set_error('accounts][existing][' . $id . '][theplatform_password',
-            t('Login failed for account @account_id', array('@account_id' => basename($account_data->account_id))));
-        }
-        else {
-          drupal_set_message(t('Login successful for account @account_id', array('@account_id' => basename($account_data->account_id))));
-        }
-      }
-    }
-  }
-
+  $values = $form_state['values']['accounts'];
   // Validate new account credentials.
-  if (!empty($form_state['values']['accounts']['new'])) {
-    foreach ($form_state['values']['accounts']['new'] as $key => $values) {
-      $mpx_token = MpxToken::fetch($values['theplatform_username'], $values['theplatform_password']);
-      if (!$mpx_token) {
-        form_set_error('accounts][new][' . $key . '][theplatform_password',
-          t('Login failed for new account with username @username.', array('@username' => $values['theplatform_username'])));
-      }
-      else {
-        drupal_set_message(t('Login successful for new account with username @username.',
-          array('@username' => $values['theplatform_username'])));
-        $sub_account_list = media_theplatform_mpx_get_accounts_select(NULL, NULL, NULL, $mpx_token);
-        if (empty($sub_account_list)) {
-          form_set_error('accounts][new][' . $key . '][theplatform_username', t('There are no more sub-accounts for this account.'));
-        }
+  if (!empty($form_state['values']['accounts'])) {
+    $mpx_token = MpxToken::fetch($values['theplatform_username'], $values['theplatform_password']);
+    if (!$mpx_token) {
+      form_set_error('accounts][theplatform_password',
+        t('Login failed for new account with username @username.', array('@username' => $values['theplatform_username'])));
+    }
+    else {
+      drupal_set_message(t('Login successful for new account with username @username.',
+        array('@username' => $values['theplatform_username'])));
+      $sub_account_list = media_theplatform_mpx_get_accounts_select(NULL, NULL, NULL, $mpx_token);
+      if (empty($sub_account_list)) {
+        form_set_error('accounts][theplatform_username', t('There are no more sub-accounts for this account.'));
       }
     }
   }
@@ -386,17 +327,16 @@ function media_theplatform_mpx_signin_form_validate($form, &$form_state) {
  */
 function media_theplatform_mpx_signin_form_submit($form, &$form_state) {
   // Add new accounts.
-  if (!empty($form_state['values']['accounts']['new'])) {
-    foreach ($form_state['values']['accounts']['new'] as $key => $values) {
-      $account_id = db_insert('mpx_accounts')
-        ->fields(array(
-          'username' => $values['theplatform_username'],
-          'password' => encrypt($values['theplatform_password']),
-        ))
-        ->execute();
-      watchdog('media_theplatform_mpx', 'Successfully created account for user "@username".',
-        array('@username' => $values['theplatform_username']), WATCHDOG_NOTICE);
-    }
+  $values = $form_state['values']['accounts'];
+  if (!empty($form_state['values']['accounts'])) {
+    $account_id = db_insert('mpx_accounts')
+      ->fields(array(
+        'username' => $values['theplatform_username'],
+        'password' => encrypt($values['theplatform_password']),
+      ))
+      ->execute();
+    watchdog('media_theplatform_mpx', 'Successfully created account for user "@username".',
+      array('@username' => $values['theplatform_username']), WATCHDOG_NOTICE);
   }
 }
 
