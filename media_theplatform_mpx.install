@@ -414,12 +414,42 @@ function media_theplatform_mpx_schema() {
  */
 function media_theplatform_mpx_uninstall() {
   drupal_load('module', 'media_theplatform_mpx');
+
+  // Remove accounts.
   if ($accounts = media_theplatform_mpx_account_load_multiple()) {
     media_theplatform_mpx_account_delete_multiple(array_keys($accounts));
   }
-  foreach (media_theplatform_mpx_variable_default() as $variable => $value) {
-    media_theplatform_mpx_variable_del($variable);
-  }
+
+  // Remove variables.
+  variable_del('media_theplatform_mpx__cron_players');
+  variable_del('media_theplatform_mpx__cron_videos');
+  variable_del('media_theplatform_mpx__cron_videos_per_run');
+  variable_del('media_theplatform_mpx__cron_videos_timeout');
+  variable_del('media_theplatform_mpx__cron_queue_processing_time');
+  variable_del('media_theplatform_mpx__output_message_watchdog_severity');
+  variable_del('media_theplatform_mpx__watchdog_severity');
+  variable_del('media_theplatform_mpx__token_ttl');
+
+  variable_del('media_theplatform_mpx__cron_next_to_last');
+  variable_del('media_theplatform_mpx__running_total_videos_processed');
+  variable_del('media_theplatform_mpx__running_total_video_processing_time');
+  variable_del('media_theplatform_mpx__backup_last_notification_value');
+  variable_del('media_theplatform_mpx__default_player_fid');
+
+  variable_del('media_theplatform_mpx__drush_video_ingestion_request_item_limit');
+  variable_del('media_theplatform_mpx__drush_video_notification_ingestion_request_item_limit');
+  variable_del('media_theplatform_mpx__drush_video_ingestion_notification_timeout');
+  variable_del('media_theplatform_mpx__drush_video_ingestion_request_timeout');
+
+  // Deprecated variables.
+  variable_del('media_theplatform_mpx__username');
+  variable_del('media_theplatform_mpx__password');
+  variable_del('media_theplatform_mpx__token');
+  variable_del('media_theplatform_mpx__date_idletimeout');
+  variable_del('media_theplatform_mpx__import_account');
+  variable_del('media_theplatform_mpx__account_id');
+  variable_del('media_theplatform_mpx__account_pid');
+  variable_del('media_theplatform_mpx__last_notification');
 }
 
 /**
@@ -452,14 +482,14 @@ function media_theplatform_mpx_update_7201() {
     drupal_static_reset('libraries_info');
   }
 
-  if ($username = variable_get(media_theplatform_mpx_NAMESPACE . 'username', NULL)) {
-    media_theplatform_mpx_variable_set('username', base64_decode($username));
+  if ($username = variable_get('media_theplatform_mpx__username', NULL)) {
+    variable_set('media_theplatform_mpx__username', base64_decode($username));
   }
-  if ($password = variable_get(media_theplatform_mpx_NAMESPACE . 'password', NULL)) {
-    media_theplatform_mpx_variable_set('password', base64_decode($password));
+  if ($password = variable_get('media_theplatform_mpx__password', NULL)) {
+    variable_set('media_theplatform_mpx__password', base64_decode($password));
   }
-  if ($token = variable_get(media_theplatform_mpx_NAMESPACE . 'token', NULL)) {
-    media_theplatform_mpx_variable_set('token', base64_decode($token));
+  if ($token = variable_get('media_theplatform_mpx__token', NULL)) {
+    variable_set('media_theplatform_mpx__token', base64_decode($token));
   }
 }
 
@@ -835,7 +865,7 @@ function media_theplatform_mpx_update_7214() {
  */
 function media_theplatform_mpx_update_7215() {
   // Include functions needed if the module is currently disabled.
-  include_once __DIR__ . '/includes/media_theplatform_mpx.variables.inc';
+  drupal_load('module', 'media_theplatform_mpx');
 
   $records = db_query("SELECT id, username, token FROM {mpx_accounts}")->fetchAll();
   foreach ($records as $record) {
@@ -852,7 +882,7 @@ function media_theplatform_mpx_update_7215() {
  */
 function media_theplatform_mpx_update_7216() {
   // Include functions needed if the module is currently disabled.
-  include_once __DIR__ . '/includes/media_theplatform_mpx.variables.inc';
+  drupal_load('module', 'media_theplatform_mpx');
 
   // Enable the encrypt module. We know this will be available since it was
   // added as a dependency in our info file, and updates cannot be run until

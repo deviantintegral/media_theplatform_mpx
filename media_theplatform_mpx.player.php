@@ -177,7 +177,7 @@ function media_theplatform_mpx_import_all_players($type = NULL) {
   // Retrieve list of players for all accounts.
   foreach (media_theplatform_mpx_account_load_multiple() as $account_data) {
     // Check if player sync has been turned off for this account.
-    if (!media_theplatform_mpx_variable_get('account_' . $account_data->id . '_cron_player_sync', 1)) {
+    if (!variable_get('media_theplatform_mpx__account_' . $account_data->id . '_cron_player_sync', 1)) {
       continue;
     }
     $account_players = media_theplatform_mpx_get_players_from_theplatform($account_data);

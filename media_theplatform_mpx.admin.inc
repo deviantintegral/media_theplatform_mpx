@@ -68,7 +68,7 @@ function media_theplatform_mpx_settings_form($form, &$form_state) {
 <br />Basic - minimal information provided about player, video and setting changes
 <br />Advanced - provides feedback on all calls to thePlatform, database inserts/updates and file system writes
 <br />Extremely Verbose - outputs all data received from thePlatform and all data inserted/updated in the database.'),
-    '#default_value' => MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL,
+    '#default_value' => variable_get('media_theplatform_mpx__output_message_watchdog_severity', WATCHDOG_INFO),
   );
   $form['logging']['media_theplatform_mpx__watchdog_severity'] = array(
     '#type' => 'select',
@@ -79,7 +79,7 @@ function media_theplatform_mpx_settings_form($form, &$form_state) {
       WATCHDOG_DEBUG => t('Extremely Verbose'),
     ),
     '#description' => t('Determines how much information is saved in logs during MPX operations.'),
-    '#default_value' => MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL,
+    '#default_value' => variable_get('media_theplatform_mpx__watchdog_severity', WATCHDOG_INFO),
   );
 
   $form['advanced'] = array(
@@ -92,7 +92,7 @@ function media_theplatform_mpx_settings_form($form, &$form_state) {
     '#type' => 'numberfield',
     '#title' => t('Authentication Token TTL'),
     '#description' => t('The amount of time in seconds an authentication token remains valid.  Increasing this value may help if requests to thePlatform are failing due to invalid authentication tokens.  Use the smallest value possible.  Min: 3 seconds - Max: 180 seconds (3 minutes)'),
-    '#default_value' => media_theplatform_mpx_variable_get('token_ttl', 3),
+    '#default_value' => variable_get('media_theplatform_mpx__token_ttl', 3),
     '#min' => 3,
     '#max' => 180,
   );
@@ -653,7 +653,7 @@ function media_theplatform_mpx_get_table_mpx_players() {
 
   $rows = array();
   foreach ($results as $player) {
-    if ($player->fid == media_theplatform_mpx_variable_get('default_player_fid')) {
+    if ($player->fid == variable_get('media_theplatform_mpx__default_player_fid')) {
       $default = '[default]';
     }
     else {

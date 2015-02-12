@@ -30,7 +30,7 @@ class MediaThePlatformMpxStreamWrapper extends MediaReadOnlyStreamWrapper {
       // Use mpxMedia's GUID as the mpx_id for output HTML.
       $params['mpx_id'] = $parts[1];
       // The fid of mpxPlayer to render this mpxMedia with or the default.
-      $params['player_fid'] = isset($parts[3]) ? $parts[3] : media_theplatform_mpx_variable_get('default_player_fid');
+      $params['player_fid'] = isset($parts[3]) ? $parts[3] : variable_get('media_theplatform_mpx__default_player_fid');
       // The account id of the video.
       $params['account_id'] = $parts[5];
     }

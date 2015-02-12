@@ -8,7 +8,7 @@ function media_theplatform_mpx_reports_menu() {
 
   $items = array();
 
-  if (media_theplatform_mpx_variable_get('cron_videos')) {
+  if (variable_get('media_theplatform_mpx__cron_videos', 1)) {
     $items['admin/config/media/theplatform/status'] = array(
       'title' => t('Media: thePlatform MPX Status (BETA)'),
       'description' => t('BETA: Reports current ingestion status.'),
@@ -221,7 +221,7 @@ function media_theplatform_mpx_reports_page_status() {
 
   drupal_add_library('system', 'drupal.collapse');
 
-  $feed_request_item_limit = media_theplatform_mpx_variable_get('cron_videos_per_run', 250);
+  $feed_request_item_limit = variable_get('media_theplatform_mpx__cron_videos_per_run', 250);
 
   $build = array();
   $build['#cache'] = FALSE;
@@ -260,7 +260,7 @@ function media_theplatform_mpx_reports_page_status() {
     '#value' => t('&nbsp;&nbsp;&nbsp;&nbsp; View all players !link.', array('!link' => l(t('here'), 'admin/content/file/mpxplayer'))),
   );
 
-  $cron_next_to_last = media_theplatform_mpx_variable_get('cron_next_to_last', 0);
+  $cron_next_to_last = variable_get('media_theplatform_mpx__cron_next_to_last', 0);
   $cron_last = variable_get('cron_last', 0);
 
   if ($cron_next_to_last && $cron_last) {
@@ -376,13 +376,13 @@ function media_theplatform_mpx_reports_page_status() {
       );
     }
 
-    $current_total_videos_processed = media_theplatform_mpx_variable_get('running_total_videos_processed', 0);
-    $current_total_video_processing_time = media_theplatform_mpx_variable_get('running_total_video_processing_time', 0);
+    $current_total_videos_processed = variable_get('media_theplatform_mpx__running_total_videos_processed', 0);
+    $current_total_video_processing_time = variable_get('media_theplatform_mpx__running_total_video_processing_time', 0);
 
     if ($current_total_videos_processed && $current_total_video_processing_time) {
 
       $avg_video_processed_per_second = ($current_total_videos_processed / $current_total_video_processing_time);
-      $cron_queue_time_limit = media_theplatform_mpx_variable_get('cron_queue_processing_time', 10);
+      $cron_queue_time_limit = variable_get('media_theplatform_mpx__cron_queue_processing_time', 10);
       $videos_processed_per_cron_run = floor($cron_queue_time_limit * $avg_video_processed_per_second);
       $total_queue_cron_runs = ceil(count($cron_queue_table_rows) / $videos_processed_per_cron_run);
 

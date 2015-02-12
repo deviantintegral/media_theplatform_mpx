@@ -17,7 +17,7 @@
 function media_theplatform_mpx_get_changed_ids($account) {
 
   $token = media_theplatform_mpx_token_acquire($account);
-  $feed_request_item_limit = media_theplatform_mpx_variable_get('cron_videos_per_run', 250);
+  $feed_request_item_limit = variable_get('media_theplatform_mpx__cron_videos_per_run', 250);
 
   $url = 'https://read.data.media.theplatform.com/media/notify?token=' . rawurlencode($token) .
     '&account=' . $account->import_account .
@@ -104,7 +104,7 @@ function media_theplatform_mpx_cron_queue_info() {
 
   $queues['media_theplatform_mpx_video_cron_queue'] = array(
     'worker callback' => 'process_media_theplatform_mpx_video_cron_queue_item',
-    'time' => media_theplatform_mpx_variable_get('cron_queue_processing_time', 10),
+    'time' => variable_get('media_theplatform_mpx__cron_queue_processing_time', 10),
   );
 
   return $queues;
@@ -129,7 +129,7 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
           $item['account'] = !empty($item['account']) ? $item['account'] : media_theplatform_mpx_account_load(1);
           // Check if player sync has been turned off for this account.  If so,
           // do not import/update this video.
-          if (!media_theplatform_mpx_variable_get('account_' . $item['account']->id . '_cron_video_sync', 1)) {
+          if (!variable_get('media_theplatform_mpx__account_' . $item['account']->id . '_cron_video_sync', 1)) {
             return;
           }
           $video = $item['video'];
@@ -206,11 +206,11 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
   }
 
   // @todo: Do this per account?  By type of operation?
-  $current_total_videos_processed = media_theplatform_mpx_variable_get('running_total_videos_processed', 0);
-  $current_total_video_processing_time = media_theplatform_mpx_variable_get('running_total_video_processing_time', 0);
+  $current_total_videos_processed = variable_get('media_theplatform_mpx__running_total_videos_processed', 0);
+  $current_total_video_processing_time = variable_get('media_theplatform_mpx__running_total_video_processing_time', 0);
   $processing_time = microtime(TRUE) - $start_microtime;
-  media_theplatform_mpx_variable_set('running_total_videos_processed', 1 + $current_total_videos_processed);
-  media_theplatform_mpx_variable_set('running_total_video_processing_time', $current_total_video_processing_time + $processing_time);
+  variable_set('media_theplatform_mpx__running_total_videos_processed', 1 + $current_total_videos_processed);
+  variable_set('media_theplatform_mpx__running_total_video_processing_time', $current_total_video_processing_time + $processing_time);
 }
 
 /**
@@ -314,7 +314,7 @@ function _media_theplatform_mpx_process_batch_video_import($type, $account = NUL
   $batch_url = $account->proprocessing_batch_url;
   $batch_item_count = $account->proprocessing_batch_item_count;
   $current_batch_item = (int) $account->proprocessing_batch_current_item;
-  $feed_request_item_limit = media_theplatform_mpx_variable_get('cron_videos_per_run', 250);
+  $feed_request_item_limit = variable_get('media_theplatform_mpx__cron_videos_per_run', 250);
   $token = media_theplatform_mpx_token_acquire($account);
 
   $url = $batch_url . '&range=' . $current_batch_item . '-' . ($current_batch_item + ($feed_request_item_limit - 1));
@@ -405,7 +405,7 @@ function _media_theplatform_mpx_get_video_feed_url($ids = NULL, $account = NULL)
 function _media_theplatform_mpx_get_feed_item_count($url) {
 
   $count_url = $url . '&count=true&fields=guid&range=1-1';
-  $feed_request_timeout = media_theplatform_mpx_variable_get('cron_videos_timeout', 180);
+  $feed_request_timeout = variable_get('media_theplatform_mpx__cron_videos_timeout', 180);
 
   watchdog('media_theplatform_mpx', 'Retrieving total feed item count.', array(), WATCHDOG_INFO);
 
@@ -491,7 +491,7 @@ function _media_theplatform_mpx_process_video_update($type, $account = NULL) {
   // Get the total result count for this update.  If it is greater than the feed
   // request item limit, start a new batch.
   $total_result_count = count(explode(',', $ids));
-  $feed_request_item_limit = media_theplatform_mpx_variable_get('cron_videos_per_run', 250);
+  $feed_request_item_limit = variable_get('media_theplatform_mpx__cron_videos_per_run', 250);
 
   if ($total_result_count && $total_result_count > $feed_request_item_limit) {
     // Set last notification for the next update.
@@ -549,7 +549,7 @@ function _media_theplatform_mpx_process_video_import($type, $account = NULL) {
   // Get the total result count for this update.  If it is greater than the feed
   // request item limit, start a new batch.
   $total_result_count = _media_theplatform_mpx_get_feed_item_count($url);
-  $feed_request_item_limit = media_theplatform_mpx_variable_get('cron_videos_per_run', 250);
+  $feed_request_item_limit = variable_get('media_theplatform_mpx__cron_videos_per_run', 250);
 
   if ($total_result_count && $total_result_count > $feed_request_item_limit) {
     // Set starter batch system variables.
@@ -605,7 +605,7 @@ function media_theplatform_mpx_import_all_videos($type) {
   foreach (media_theplatform_mpx_account_load_multiple() as $account_data) {
 
     // Check if video sync has been turned off for this account.
-    if (!media_theplatform_mpx_variable_get('account_' . $account_data->id . '_cron_video_sync', 1)) {
+    if (!variable_get('media_theplatform_mpx__account_' . $account_data->id . '_cron_video_sync', 1)) {
       continue;
     }
 
@@ -1236,7 +1236,7 @@ function media_theplatform_mpx_get_thumbnail_url($guid) {
  * Validates and restores backup last notification sequence ID.
  */
 function _media_theplatform_mpx_restore_last_notification($account) {
-  $backup_last_notification_value = media_theplatform_mpx_variable_get('backup_last_notification_value');
+  $backup_last_notification_value = variable_get('media_theplatform_mpx__backup_last_notification_value');
 
   if (!$backup_last_notification_value) {
     watchdog('media_theplatform_mpx', 'Attempt to restore backup last_notification for @account failed - no value exists.',
@@ -1302,7 +1302,7 @@ function media_theplatform_mpx_set_last_notification($account, $last_notificatio
   if ($last_notification) {
     _media_theplatform_mpx_set_field($account->id, 'last_notification', $last_notification);
     // Save the last notification value in the fallback variable for recovery purposes.
-    media_theplatform_mpx_variable_set('backup_last_notification_value', $last_notification);
+    variable_set('media_theplatform_mpx__backup_last_notification_value', $last_notification);
 
     return TRUE;
   }

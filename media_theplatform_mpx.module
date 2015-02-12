@@ -4,8 +4,6 @@
  * Functions for media_theplatform_mpx.module.
  */
 
-// A registry of variable_get defaults.
-include_once __DIR__ . '/includes/media_theplatform_mpx.variables.inc';
 // Hooks and callbacks for integrating with File Entity module for display.
 include_once __DIR__ . '/includes/media_theplatform_mpx.formatters.inc';
 
@@ -324,14 +322,14 @@ function media_theplatform_mpx_cron() {
   // last cron run.
   //   i.e. updated time > cron_next_to_last && updated time < cron_last
   if ($cron_last = variable_get('cron_last', 0)) {
-    media_theplatform_mpx_variable_set('cron_next_to_last', $cron_last);
+    variable_set('media_theplatform_mpx__cron_next_to_last', $cron_last);
   }
 
-  if (media_theplatform_mpx_variable_get('cron_players')) {
+  if (variable_get('media_theplatform_mpx__cron_players', 1)) {
     media_theplatform_mpx_import_all_players('via cron');
   }
 
-  if (media_theplatform_mpx_variable_get('cron_videos')) {
+  if (variable_get('media_theplatform_mpx__cron_videos', 1)) {
     media_theplatform_mpx_import_all_videos('via cron');
   }
 }
@@ -411,7 +409,7 @@ function _media_theplatform_mpx_convert_shorthand_to_bytes($shorthand) {
 function _media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TRUE, $options = array()) {
 
   // Fetch the actual feed data.
-  $feed_request_timeout = media_theplatform_mpx_variable_get('cron_videos_timeout', 180);
+  $feed_request_timeout = variable_get('media_theplatform_mpx__cron_videos_timeout', 180);
 
   $options += array('timeout' => $feed_request_timeout);
 
@@ -837,8 +835,8 @@ function media_theplatform_mpx_libraries_info() {
  */
 function _media_theplatform_mpx_delete_account($account_id, $progressive = TRUE) {
   // Turn off player and media sync.
-  media_theplatform_mpx_variable_set('account_' . $account_id . '_cron_player_sync', 0);
-  media_theplatform_mpx_variable_set('account_' . $account_id . '_cron_video_sync', 0);
+  variable_set('media_theplatform_mpx__account_' . $account_id . '_cron_player_sync', 0);
+  variable_set('media_theplatform_mpx__account_' . $account_id . '_cron_video_sync', 0);
 
   $delete_account_batch = array(
     'title' => t('Deleting MPX Account @id' , array('@id' => $account_id)),
@@ -1012,8 +1010,8 @@ function _media_theplatform_mpx_delete_account_data($account_id) {
   db_delete('mpx_accounts')->condition('id', $account_id, '=')->execute();
 
   // Remove variables disabling video and player sync for this account.
-  media_theplatform_mpx_variable_del('account_' . $account_id . '_cron_player_sync');
-  media_theplatform_mpx_variable_del('account_' . $account_id . '_cron_video_sync');
+  variable_del('media_theplatform_mpx__account_' . $account_id . '_cron_player_sync');
+  variable_del('media_theplatform_mpx__account_' . $account_id . '_cron_video_sync');
 }
 
 /**
@@ -1202,4 +1200,107 @@ function _media_theplatform_mpx_get_account_data($id = NULL) {
   else {
     return media_theplatform_mpx_account_load_multiple();
   }
+}
+
+/**
+ * @deprecated
+ *
+ * Use variable_get() instead.
+ */
+function media_theplatform_mpx_variable_get($name, $default = NULL) {
+  return variable_get('media_theplatform_mpx__' . $name, $default);
+}
+
+/**
+ * @deprecated
+ *
+ * Use variable_set() instead.
+ */
+function media_theplatform_mpx_variable_set($name, $value) {
+  variable_set('media_theplatform_mpx__' . $name, $value);
+}
+
+/**
+ * @deprecated
+ *
+ * Use encrypt() instead.
+ */
+function _media_theplatform_mpx_encrypt_value($value) {
+  if (empty($value)) {
+    return NULL;
+  }
+
+  if (!extension_loaded('mcrypt')) {
+    return base64_encode($value);
+  }
+
+  $library = libraries_load('zend_crypt');
+  $key = md5(drupal_get_hash_salt());
+
+  // If library doesn't exist, use a less secure means of encryption/decryption.
+  if (!$library['loaded']) {
+    $keysize = mcrypt_get_key_size(MCRYPT_DES, MCRYPT_MODE_ECB);
+    $key = drupal_substr($key, 0, $keysize);
+    $block = mcrypt_get_block_size(MCRYPT_DES, MCRYPT_MODE_ECB);
+    $pad = $block - (strlen($value) % $block);
+    $value .= str_repeat(chr($pad), $pad);
+    $return = mcrypt_encrypt(MCRYPT_DES, $key, $value, MCRYPT_MODE_ECB);
+    if (!$return) {
+      trigger_error('Unable to encrypt MPX value.', E_USER_ERROR);
+    }
+    return base64_encode($return);
+  }
+
+  $blockCipher = Zend\Crypt\BlockCipher::factory('mcrypt', array('algo' => 'aes'));
+  $blockCipher->setKey($key);
+  $return = $blockCipher->encrypt($value);
+  if ($return === FALSE) {
+    trigger_error('Unable to encrypt MPX value.', E_USER_ERROR);
+  }
+  return $return;
+}
+
+/**
+ * @deprecated
+ *
+ * Use decrypt() instead.
+ */
+function _media_theplatform_mpx_decrypt_value($value) {
+  if (empty($value)) {
+    return NULL;
+  }
+
+  if (!extension_loaded('mcrypt')) {
+    return base64_decode($value);
+  }
+
+  $library = libraries_load('zend_crypt');
+  $key = md5(drupal_get_hash_salt());
+
+  // If library doesn't exist, use a less secure means of encryption/decryption.
+  if (!$library['loaded']) {
+    $value = base64_decode($value);
+    $keysize = mcrypt_get_key_size(MCRYPT_DES, MCRYPT_MODE_ECB);
+    $key = drupal_substr($key, 0, $keysize);
+    $str = mcrypt_decrypt(MCRYPT_DES, $key, $value, MCRYPT_MODE_ECB);
+    if (!$str) {
+      trigger_error('Unable to decrypt MPX value.', E_USER_ERROR);
+      return FALSE;
+    }
+    $block = mcrypt_get_block_size(MCRYPT_DES, MCRYPT_MODE_ECB);
+    $pad = ord($str[($len = strlen($str)) - 1]);
+    $return = substr($str, 0, strlen($str) - $pad);
+    if ($return === FALSE) {
+      trigger_error('Unable to decrypt MPX value.', E_USER_ERROR);
+    }
+    return $return;
+  }
+
+  $blockCipher = Zend\Crypt\BlockCipher::factory('mcrypt', array('algo' => 'aes'));
+  $blockCipher->setKey($key);
+  $return = $blockCipher->decrypt($value);
+  if ($return === FALSE) {
+    trigger_error('Unable to decrypt MPX value.', E_USER_ERROR);
+  }
+  return $return;
 }

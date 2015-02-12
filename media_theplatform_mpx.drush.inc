@@ -105,7 +105,7 @@ function drush_media_theplatform_mpx_restore_mpx_last_notification_validate($acc
       array(), 'error');
   }
 
-  $backup_last_notification_value = media_theplatform_mpx_variable_get('backup_last_notification_value');
+  $backup_last_notification_value = variable_get('media_theplatform_mpx__backup_last_notification_value');
 
   if (!$backup_last_notification_value) {
     return _drush_media_theplatform_mpx_print('Backup last notification value does not exist.',
@@ -154,7 +154,7 @@ function drush_media_theplatform_mpx_ingest_mpx_videos_validate($account_id = 'a
   }
 
   // Do not run CLI ingestion if cron video ingestion is enabled.
-  if (!$forced_to_run && media_theplatform_mpx_variable_get('cron_videos')) {
+  if (!$forced_to_run && variable_get('media_theplatform_mpx__cron_videos', 1)) {
     return _drush_media_theplatform_mpx_print('MPX cron video ingestion is enabled.  Aborting drush mpx video ingestion.',
       array(), 'error');
   }
@@ -504,7 +504,7 @@ function _drush_media_theplatform_mpx_invoke_account_handler_processes($account_
     // static $conf variable.
     $cron_ingestion_enabled = db_select('variable', 'v')
       ->fields('v', array('value'))
-      ->condition('name', media_theplatform_mpx_NAMESPACE . 'cron_videos', '=')
+      ->condition('name', 'media_theplatform_mpx__cron_videos', '=')
       ->execute()
       ->fetchField();
     $cron_ingestion_enabled = unserialize($cron_ingestion_enabled);
@@ -536,7 +536,7 @@ function _drush_media_theplatform_mpx_invoke_retriever_and_worker_processes($acc
   global $process_metadata;
 
   if (!$request_item_limit) {
-    $request_item_limit = media_theplatform_mpx_variable_get('drush_video_ingestion_request_item_limit', 100);
+    $request_item_limit = variable_get('media_theplatform_mpx__drush_video_ingestion_request_item_limit', 100);
   }
 
   // Ensure the batch and cron queues exist, and initialize them.
@@ -716,7 +716,7 @@ function _drush_media_theplatform_mpx_check_process_health($lock_timeout = MTPM_
   // static $conf variable.
   $cron_ingestion_enabled = db_select('variable', 'v')
     ->fields('v', array('value'))
-    ->condition('name', media_theplatform_mpx_NAMESPACE . 'cron_videos', '=')
+    ->condition('name', 'media_theplatform_mpx__cron_videos', '=')
     ->execute()
     ->fetchField();
   $cron_ingestion_enabled = unserialize($cron_ingestion_enabled);
@@ -797,7 +797,7 @@ function _drush_media_theplatform_mpx_process_complete_video_ingestion($account)
     // The default 100 item limit was found to be the most performant. The
     // wait/reward is less ideal when requesting more or less video data at
     // a time.  Though this could be different for non-test environments.
-    $request_item_limit = media_theplatform_mpx_variable_get('drush_video_ingestion_request_item_limit', 100);
+    $request_item_limit = variable_get('media_theplatform_mpx__drush_video_ingestion_request_item_limit', 100);
     $request_count = $account->proprocessing_batch_item_count;
     $current_batch_item = (int) $account->proprocessing_batch_current_item;
 
@@ -877,7 +877,7 @@ function _drush_media_theplatform_mpx_process_notification_data($notification_da
 
   // Queue the updated video request items for the retriever process.
   if (!empty($updated_video_ids)) {
-    $request_item_limit = media_theplatform_mpx_variable_get('drush_video_notification_ingestion_request_item_limit', 100);
+    $request_item_limit = variable_get('media_theplatform_mpx__drush_video_notification_ingestion_request_item_limit', 100);
     for ($i = 0; $i < count($updated_video_ids); $i += $request_item_limit) {
       $request_video_ids = array_slice($updated_video_ids, $i, $request_item_limit);
       $request_ids = implode(',', $request_video_ids);
@@ -954,7 +954,7 @@ function _drush_media_theplatform_mpx_process_outstanding_video_notifications($a
   );
   _drush_media_theplatform_mpx_print('@action video change notification data from: !url', $message_variables);
 
-  $default_request_timeout = media_theplatform_mpx_variable_get('drush_video_ingestion_notification_timeout', 15.0);
+  $default_request_timeout = variable_get('media_theplatform_mpx__drush_video_ingestion_notification_timeout', 15.0);
 
   $request_options = array(
     'timeout' => $default_request_timeout,
@@ -1129,7 +1129,7 @@ function _drush_media_theplatform_mpx_process_video_ingestion_as_account_handler
  */
 function _drush_media_theplatform_mpx_request_video_data($request_queue_item) {
 
-  $request_timeout = media_theplatform_mpx_variable_get('drush_video_ingestion_request_timeout', MTPM_REQUEST_TIMEOUT);
+  $request_timeout = variable_get('media_theplatform_mpx__drush_video_ingestion_request_timeout', MTPM_REQUEST_TIMEOUT);
 
   $request_url = $request_queue_item->data['request_url'];
   $request_account = $request_queue_item->data['account'];
@@ -1390,7 +1390,7 @@ function _drush_media_theplatform_mpx_process_video_ingestion_as_worker($account
   $memory_limit_in_bytes = _media_theplatform_mpx_convert_shorthand_to_bytes($memory_limit);
   $request_queue = DrupalQueue::get('media_theplatform_mpx_video_request_queue_' . $account->id);
   $cron_queue = DrupalQueue::get('media_theplatform_mpx_video_cron_queue');
-  $request_item_limit = media_theplatform_mpx_variable_get('drush_video_ingestion_request_item_limit', 100);
+  $request_item_limit = variable_get('media_theplatform_mpx__drush_video_ingestion_request_item_limit', 100);
 
   while ($request_queue->numberOfItems() || $cron_queue->numberOfItems()) {
 
@@ -1826,7 +1826,7 @@ function _drush_media_theplatform_mpx_http_request($url, array $options = array(
 function _drush_media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TRUE, $options = array()) {
 
   // Fetch the actual feed data.
-  $feed_request_timeout = media_theplatform_mpx_variable_get('cron_videos_timeout', 180);
+  $feed_request_timeout = variable_get('media_theplatform_mpx__cron_videos_timeout', 180);
 
   $options += array('timeout' => $feed_request_timeout);
 

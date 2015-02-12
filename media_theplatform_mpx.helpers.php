@@ -6,8 +6,8 @@
  */
 
 
-define('MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL', media_theplatform_mpx_variable_get('watchdog_severity', WATCHDOG_INFO));
-define('MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL', media_theplatform_mpx_variable_get('output_message_watchdog_severity', WATCHDOG_INFO));
+define('MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL', variable_get('media_theplatform_mpx__watchdog_severity', WATCHDOG_INFO));
+define('MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL', variable_get('media_theplatform_mpx__output_message_watchdog_severity', WATCHDOG_INFO));
 
 /**
  * Stores a field value for a specified field and table by specified ID field and value.
