@@ -1152,6 +1152,46 @@ function media_theplatform_mpx_account_load_multiple(array $ids = NULL) {
 }
 
 /**
+ * Save an mpx account.
+ *
+ * @param object $account
+ *   An mpx account object to save.
+ *
+ * @throws Exception
+ */
+function media_theplatform_mpx_account_save($account) {
+  $transaction = db_transaction();
+  try {
+    if (!empty($account->password)) {
+      $account->password = encrypt($account->password);
+    }
+    else {
+      // Avoid overwriting an existing password with a blank password.
+      unset($account->password);
+    }
+
+    $account->is_new = empty($account->id);
+    module_invoke_all('media_theplatform_mpx_account_presave', $account);
+
+    if ($account->is_new) {
+      drupal_write_record('mpx_accounts', $account);
+      module_invoke_all('media_theplatform_mpx_account_insert', $account);
+    }
+    else {
+      drupal_write_record('mpx_accounts', $account, array('id'));
+      module_invoke_all('media_theplatform_mpx_account_update', $account);
+    }
+
+    unset($account->is_new);
+  }
+  catch (Exception $e) {
+    $transaction->rollback();
+    watchdog_exception('media_theplatform_mpx', $e);
+    throw $e;
+  }
+}
+
+/**
  * Deletes an mpx account.
  *
  * @param int $id
@@ -1174,6 +1214,7 @@ function media_theplatform_mpx_account_delete_multiple(array $ids) {
     $transaction = db_transaction();
     try {
       foreach ($accounts as $id => $account) {
+        module_invoke_all('media_theplatform_mpx_account_delete', $account);
         _media_theplatform_mpx_delete_account($id, FALSE);
       }
     }

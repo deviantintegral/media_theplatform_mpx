@@ -200,11 +200,11 @@ class MpxToken {
         $result_data['signInResponse']['token'],
         $time + $lifetime
       );
-      watchdog('media_theplatform_mpx', 'Fetched new mpx token @token for @username that expires on @date (in @duration).', array('@username' => $username, '@token' => $token->value, '@date' => format_date($token->expire), '@duration' => format_interval($lifetime)), WATCHDOG_INFO);
+      watchdog('media_theplatform_mpx', 'Fetched new mpx token @token for account @username that expires on @date (in @duration).', array('@token' => $token->value, '@username' => $username, '@date' => format_date($token->expire), '@duration' => format_interval($lifetime)), WATCHDOG_INFO);
       return $token;
     }
     else {
-      throw new Exception("Failed to fetch new token for {$username}");
+      throw new Exception("Failed to fetch new mpx token for account {$username}");
     }
   }
 
@@ -238,12 +238,12 @@ class MpxToken {
     )));
     $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
     if (!empty($result_data)) {
-      watchdog('media_theplatform_mpx', 'Expired mpx authentication token @token for @account.', array('@token' => $this->value, '@account' => $this->username), WATCHDOG_INFO);
+      watchdog('media_theplatform_mpx', 'Expired mpx authentication token @token for account @account.', array('@token' => $this->value, '@account' => $this->username), WATCHDOG_INFO);
       $this->value = NULL;
       $this->expire = NULL;
     }
     else {
-      throw new Exception("Failed to expire mpx authentication token {$this->value} for {$this->username}");
+      throw new Exception("Failed to expire mpx authentication token {$this->value} for account {$this->username}");
     }
   }
 

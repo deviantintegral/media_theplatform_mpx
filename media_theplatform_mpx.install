@@ -352,7 +352,6 @@ function media_theplatform_mpx_schema() {
         'type' => 'blob',
         'not null' => TRUE,
         'size' => 'big',
-        'serialize' => TRUE,
       ),
       'import_account' => array(
         'description' => 'thePlatform Import Sub-Account',

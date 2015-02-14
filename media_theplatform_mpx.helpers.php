@@ -63,35 +63,30 @@ function media_theplatform_mpx_get_accounts_select($account_id, $username = NULL
     $for = 'token "' . $token . '"';
   }
 
-  if (empty($token) && empty($account_id) && $username && $password) {
-    $token = MpxToken::fetch($username, $password);
-    if (!$token) {
-      watchdog('media_theplatform_mpx', 'Failed to retrieve all import accounts because username and password are not valid.',
+  try {
+    if (empty($token) && empty($account_id) && $username && $password) {
+      $token = MpxToken::fetch($username, $password);
+    }
+    elseif (empty($token) && !empty($account_id)) {
+      $account_data = media_theplatform_mpx_account_load($account_id);
+      if (empty($account_data)) {
+        watchdog('media_theplatform_mpx', 'Failed to retrieve all import accounts.  Account data unavailable for account @id.',
+          array('@id' => $account_id), WATCHDOG_ERROR);
+
+        return array();
+      }
+      $token = MpxToken::acquire($account_data);
+    }
+    elseif (empty($token)) {
+      watchdog('media_theplatform_mpx', 'Failed to retrieve all import accounts because a account ID, token or username and password were not available.',
         array(), WATCHDOG_ERROR);
 
       return array();
     }
   }
-  elseif (empty($token) && !empty($account_id)) {
-    $account_data = media_theplatform_mpx_account_load($account_id);
-    if (empty($account_data)) {
-      watchdog('media_theplatform_mpx', 'Failed to retrieve all import accounts.  Account data unavailable for account @id.',
-        array('@id' => $account_id), WATCHDOG_ERROR);
-
-      return array();
-    }
-    $token = MpxToken::acquire($account_data);
-    if (!$token) {
-      watchdog('media_theplatform_mpx', 'Failed to retrieve all import accounts for @account.  Unable to retrieve authentication token.',
-        array('@account' => _media_theplatform_mpx_account_log_string($account_data)), WATCHDOG_ERROR);
-
-      return array();
-    }
-  }
-  elseif (empty($token)) {
-    watchdog('media_theplatform_mpx', 'Failed to retrieve all import accounts because a account ID, token or username and password were not available.',
-      array(), WATCHDOG_ERROR);
-
+  catch (Exception $e) {
+    drupal_set_message($e->getMessage(), 'error');
+    watchdog_exception('media_theplatform_mpx', $e);
     return array();
   }
 
