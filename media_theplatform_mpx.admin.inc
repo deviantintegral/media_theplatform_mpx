@@ -728,7 +728,7 @@ function media_theplatform_mpx_form_mpx_video_sync($form, &$form_state) {
   );
 
   foreach (media_theplatform_mpx_account_load_multiple() as $account) {
-    $player_select = media_theplatform_mpx_get_players_select();
+    $player_select = media_theplatform_mpx_get_players_select($account);
     if (empty($player_select)) {
       continue;
     }
