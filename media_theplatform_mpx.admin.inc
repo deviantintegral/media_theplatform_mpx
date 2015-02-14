@@ -241,14 +241,14 @@ function media_theplatform_mpx_import_account_form($form, &$form_state, $account
   foreach ($accounts as $account_id => $account) {
     $sub_account_list = array();
     if (!empty($account->import_account)) {
-      $sub_account_list = array($account->import_account => rawurldecode($account->import_account));
+      $sub_account_list = array($account->import_account => $account->import_account);
     }
     else {
       $sub_account_list = media_theplatform_mpx_get_accounts_select($account_id);
     }
     // If current account doesn't exist, error msg.
     if ($account->import_account && !array_key_exists($account->import_account, $sub_account_list)) {
-      $error_message .= '<div class="message">' . t('The current Import Account (:name) was not found in thePlatform; it may have been disabled or deleted.  Please select a new Account to use as the Import Account.', array(':name' => rawurldecode($account->import_account))) . '</div>';
+      $error_message .= '<div class="message">' . t('The current Import Account (:name) was not found in thePlatform; it may have been disabled or deleted.  Please select a new Account to use as the Import Account.', array(':name' => $account->import_account)) . '</div>';
     }
     $form['import_accounts']['settings'][$account->id] = array(
       '#type' => 'select',
@@ -481,7 +481,7 @@ function media_theplatform_mpx_import_account_form_submit($form, &$form_state) {
       array('@import_account' => $import_account), WATCHDOG_NOTICE);
 
     $token = media_theplatform_mpx_token_acquire($account_data);
-    $url = 'https://access.auth.theplatform.com/data/Account?schema=1.3.0&form=json&byDisabled=false&byTitle=' . $import_account . '&token=' . rawurlencode($token) . '&fields=id,pid';
+    $url = 'https://access.auth.theplatform.com/data/Account?schema=1.3.0&form=json&byDisabled=false&byTitle=' . rawurlencode($import_account) . '&token=' . rawurlencode($token) . '&fields=id,pid';
 
     $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
 
@@ -735,7 +735,7 @@ function media_theplatform_mpx_form_mpx_video_sync($form, &$form_state) {
     $form['video_sync']['settings'][ $account->id ]['default_player_id'] = array(
       '#type' => 'select',
       '#title' => t('Import new mpxMedia for account @account with mpxPlayer:',
-        array('@account' => '"' . urldecode($account->import_account) . '" (' . basename($account->account_id) . ')')),
+        array('@account' => '"' . $account->import_account . '" (' . basename($account->account_id) . ')')),
       '#options' => $player_select,
       '#empty_option' => t('- Select -'),
       '#required' => TRUE,

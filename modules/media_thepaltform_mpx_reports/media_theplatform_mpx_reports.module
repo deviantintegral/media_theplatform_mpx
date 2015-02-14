@@ -283,7 +283,7 @@ function media_theplatform_mpx_reports_page_status() {
       $video_account = media_theplatform_mpx_account_load($data->parent_account);
       $video_file = file_load($data->fid);
       $videos_updated_last_cron_rows[] = array(
-        urldecode($video_account->import_account),
+        $video_account->import_account,
         $data->id,
         $data->title,
         $data->guid,
@@ -313,7 +313,7 @@ function media_theplatform_mpx_reports_page_status() {
       $player_account = media_theplatform_mpx_account_load($data->parent_account);
       $player_file = file_load($data->fid);
       $players_updated_last_cron_rows[] = array(
-        urldecode($player_account->import_account),
+        $player_account->import_account,
         $data->id,
         $data->title,
         $data->guid,
@@ -365,7 +365,7 @@ function media_theplatform_mpx_reports_page_status() {
       $cron_queue_table_rows[] = array(
         $data->item_id,
         $item_data['queue_operation'] == 'publish' ? t('Publish / Update') : ucwords($item_data['queue_operation']),
-        urldecode($item_data['account']->import_account),
+        $item_data['account']->import_account,
         basename($item_data['video']['id']),
         $item_data['video']['title'],
         $item_data['video']['guid'],
@@ -460,7 +460,7 @@ function media_theplatform_mpx_reports_page_status() {
         $videos_to_be_queued_table_rows = array();
         foreach ($videos_to_be_queued_result['entries'] as $data) {
           $videos_to_be_queued_table_rows[] = array(
-            urldecode($account_data->import_account),
+            $account_data->import_account,
             basename($data['id']),
             $data['title'],
             $data['guid'],
@@ -489,7 +489,7 @@ function media_theplatform_mpx_reports_page_status() {
     // video updates will be processed.
     $notification_token = media_theplatform_mpx_token_acquire($account_data);
     $notification_url_base = 'https://read.data.media.theplatform.com/media/notify?token=' . rawurlencode($notification_token)
-      . '&account=' . $account_data->import_account
+      . '&account=' . rawurlencode($account_data->import_account)
       . '&block=false&filter=Media&clientId=drupal_media_theplatform_mpx_reports_' . $account_data->account_pid
       . '&fields=true';
     $notification_url = $notification_url_base . '&since=' . $account_data->last_notification;

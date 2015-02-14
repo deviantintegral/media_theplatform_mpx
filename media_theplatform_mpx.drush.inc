@@ -281,7 +281,7 @@ function drush_media_theplatform_mpx_ingest_mpx_videos($account_id = 'all') {
     $quit_when_complete = drush_get_option('quit-when-complete');
 
     _drush_media_theplatform_mpx_print('Ingesting mpx videos for account @id "@name".',
-      array('@id' => $account_id, '@name' => urldecode($account_data->import_account)));
+      array('@id' => $account_id, '@name' => $account_data->import_account));
 
     do {
 
@@ -330,7 +330,7 @@ function _drush_media_theplatform_mpx_print_prefix() {
     $prefix = dt('Account @id "@name": ',
       array(
         '@id' => $account_id,
-        '@name' => urldecode($account->import_account),
+        '@name' => $account->import_account,
       ))
       . $prefix;
   }
@@ -423,7 +423,7 @@ function _drush_media_theplatform_mpx_check_notification_sequence_id($account) {
 
   $token = media_theplatform_mpx_token_acquire($account);
   $url = 'https://read.data.media.theplatform.com/media/notify?token=' . $token
-    . '&account=' . $account->import_account
+    . '&account=' . rawurlencode($account->import_account)
     . '&clientId=drupal_media_theplatform_mpx_reports_' . $account->account_pid
     . '&since=' . $account->last_notification
     . '&block=false&filter=Media';
@@ -939,7 +939,7 @@ function _drush_media_theplatform_mpx_process_outstanding_video_notifications($a
 
   // Build the notification service request base URL.
   $last_notification_id = $account->last_notification;
-  $base_update_url = 'https://read.data.media.theplatform.com/media/notify?account=' . $account->import_account
+  $base_update_url = 'https://read.data.media.theplatform.com/media/notify?account=' . rawurlencode($account->import_account)
     . '&clientId=drupal_drush_media_theplatform_mpx_' . $account->account_pid
     . '&block=' . ($blocking ? 'true' : 'false')
     . '&filter=Media&size=500';

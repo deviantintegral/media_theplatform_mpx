@@ -298,10 +298,10 @@ function media_theplatform_mpx_watchdog_alter(&$log_entry) {
 function _media_theplatform_mpx_account_log_string($account = NULL) {
 
   if (is_object($account) && !empty($account->account_id) && !empty($account->import_account)) {
-    return 'account "' . urldecode($account->import_account) . '" (' . basename($account->account_id) .')';
+    return 'account "' . $account->import_account . '" (' . basename($account->account_id) .')';
   }
   elseif (is_object($account) && !empty($account->import_account)) {
-    return 'account "' . urldecode($account->import_account) . '"';
+    return 'account "' . $account->import_account . '"';
   }
   elseif (is_object($account) && !empty($account->account_id)) {
     return 'account "' . urldecode($account->account_id) . '"';

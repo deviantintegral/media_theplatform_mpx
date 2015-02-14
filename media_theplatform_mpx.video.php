@@ -20,7 +20,7 @@ function media_theplatform_mpx_get_changed_ids($account) {
   $feed_request_item_limit = variable_get('media_theplatform_mpx__cron_videos_per_run', 250);
 
   $url = 'https://read.data.media.theplatform.com/media/notify?token=' . rawurlencode($token) .
-    '&account=' . $account->import_account .
+    '&account=' . rawurlencode($account->import_account) .
     '&block=false&filter=Media&clientId=drupal_media_theplatform_mpx_' . $account->account_pid .
     '&since=' . $account->last_notification .
     '&size=' . $feed_request_item_limit;
@@ -1249,7 +1249,7 @@ function _media_theplatform_mpx_restore_last_notification($account) {
   // IDs are only stored by thePlatform for a week.
   $token = media_theplatform_mpx_token_acquire($account);
   $url = 'https://read.data.media.theplatform.com/media/notify?token=' . rawurlencode($token) .
-    '&account=' . $account->import_account .
+    '&account=' . rawurlencode($account->import_account) .
     '&block=false&filter=Media&clientId=drupal_media_theplatform_mpx_' . $account->account_pid .
     '&since=' . $backup_last_notification_value .
     '&size=1';
@@ -1278,7 +1278,7 @@ function media_theplatform_mpx_set_last_notification($account, $last_notificatio
   if (empty($last_notification)) {
     $token = media_theplatform_mpx_token_acquire($account);
     $url = 'https://read.data.media.theplatform.com/media/notify?token=' . rawurlencode($token) .
-      '&account=' . $account->import_account .
+      '&account=' . rawurlencode($account->import_account) .
       '&filter=Media&clientId=drupal_media_theplatform_mpx_' . $account->account_pid;
     $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
 

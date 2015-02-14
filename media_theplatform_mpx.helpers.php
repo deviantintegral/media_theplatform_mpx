@@ -108,23 +108,18 @@ function media_theplatform_mpx_get_accounts_select($account_id, $username = NULL
   }
 
   $sub_accounts = array();
-  $account_ids = array();
-
   foreach ($result_data['entries'] as $entry) {
     $title = $entry['title'];
-    $key = rawurlencode($title);
-    $sub_accounts[$key] = $title;
-    $account_ids[] = $entry['id'];
+    $sub_accounts[$title] = $title;
   }
 
-  $query = db_select('mpx_accounts', 'a')
-    ->fields('a', array('import_account'));
+  $query = db_select('mpx_accounts', 'mpxa')
+    ->fields('mpxa', array('import_account'));
   if (!empty($account_id)) {
-    $query->condition('id', $account_id, '!=');
+    $query->condition('id', $account_id, '<>');
   }
-  $existing_sub_accounts = $query->execute();
-  while ($field = $existing_sub_accounts->fetchField()) {
-    unset($sub_accounts[ $field ]);
+  if ($existing_sub_accounts = $query->execute()->fetchCol()) {
+    $sub_accounts = array_diff($sub_accounts, $existing_sub_accounts);
   }
 
   // Sort accounts alphabetically.

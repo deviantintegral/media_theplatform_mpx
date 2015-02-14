@@ -928,3 +928,29 @@ function media_theplatform_mpx_update_7217() {
     db_drop_field('mpx_accounts', 'idle_timeout');
   }
 }
+
+/**
+ * Convert mpx_accounts.import_account to not be URL-encoded.
+ */
+function media_theplatform_mpx_update_7218() {
+  $accounts = db_query("SELECT import_account FROM {mpx_accounts}")->fetchAllKeyed(0, 0);
+  $accounts = array_map('rawurldecode', array_filter($accounts));
+
+  foreach ($accounts as $old => $new) {
+    if ($old === $new) {
+      continue;
+    }
+    db_update('mpx_accounts')
+      ->fields(array('import_account' => $new))
+      ->condition('import_account', $old)
+      ->execute();
+    db_update('mpx_player')
+      ->fields(array('account' => $new))
+      ->condition('account', $old)
+      ->execute();
+    db_update('mpx_video')
+      ->fields(array('account' => $new))
+      ->condition('account', $old)
+      ->execute();
+  }
+}
