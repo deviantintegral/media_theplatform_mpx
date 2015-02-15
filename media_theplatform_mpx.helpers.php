@@ -10,6 +10,8 @@ define('MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL', variable_get('media_theplatform_mp
 define('MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL', variable_get('media_theplatform_mpx__output_message_watchdog_severity', WATCHDOG_INFO));
 
 /**
+ * @deprecated
+ *
  * Stores a field value for a specified field and table by specified ID field and value.
  */
 function _media_theplatform_mpx_set_field($id, $field_name, $field_value, $table = 'mpx_accounts', $id_field = 'id') {
@@ -31,6 +33,8 @@ function _media_theplatform_mpx_set_field($id, $field_name, $field_value, $table
 }
 
 /**
+ * @deprecated
+ *
  * Sets a field value for a specified account.
  */
 function _media_theplatform_mpx_set_account_value($account_id, $field_name, $field_value) {
@@ -48,6 +52,8 @@ function _media_theplatform_mpx_set_account_value($account_id, $field_name, $fie
 }
 
 /**
+ * @deprecated
+ *
  * Returns array of all accounts specified thePlatform account.
  */
 function media_theplatform_mpx_get_accounts_select($account_id, $username = NULL, $password = NULL, MpxToken $token = NULL) {
@@ -75,7 +81,7 @@ function media_theplatform_mpx_get_accounts_select($account_id, $username = NULL
 
         return array();
       }
-      $token = MpxToken::acquire($account_data);
+      $token = media_theplatform_mpx_token_acquire($account_data);
     }
     elseif (empty($token)) {
       watchdog('media_theplatform_mpx', 'Failed to retrieve all import accounts because a account ID, token or username and password were not available.',

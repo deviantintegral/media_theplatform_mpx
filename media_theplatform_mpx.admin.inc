@@ -6,7 +6,319 @@
  */
 
 /**
- * Form builder
+ * Page callback: Display a list of mpx accounts.
+ *
+ * @return array
+ *   A render array.
+ */
+function media_theplatform_mpx_account_list() {
+  $header = array(
+    array('data' => t('ID'), 'field' => 'id'),
+    array('data' => t('Username'), 'field' => 'username', 'sort' => 'ASC'),
+    array('data' => t('Import account'), 'field' => 'import_account'),
+    array('data' => t('Default player')),
+    //array('data' => t('Players'), 'field' => 'player_count'),
+    //array('data' => t('Videos'), 'field' => 'video_count'),
+    array('data' => t('API token')),
+    array('data' => t('Operations')),
+  );
+  $query = db_select('mpx_accounts', 'mpxa')
+    ->extend('TableSort')
+    ->extend('PagerDefault');
+  $query->fields('mpxa', array('id'));
+  $query->orderByHeader($header);
+  $query->limit(25);
+  $results = $query->execute()->fetchAllAssoc('id');
+  $accounts = media_theplatform_mpx_account_load_multiple(array_keys($results));
+
+  $rows = array();
+  foreach ($results as $id => $result) {
+    $account = $accounts[$id];
+    $row = array('data' => array());
+    $row['data'][] = $id;
+    $row['data'][] = check_plain($account->username);
+
+    if (!empty($account->import_account)) {
+      $row['data'][] = check_plain($account->import_account);
+    }
+    else {
+      $row['data'][] = l(t('Not configured'), 'admin/config/media/theplatform/accounts/' . $id . '/edit');
+      $row['class'][] = 'error';
+    }
+
+    if (!empty($account->default_player)) {
+      if ($player = media_theplatform_mpx_get_mpx_player_by_player_id($account->default_player)) {
+        $row['data'][] = check_plain($player['title']);
+      }
+      else {
+        $row['data'][] = t('Unable to load (file @fid)', array('@fid' => $account->default_player));
+        $row['class'][] = 'error';
+      }
+    }
+    elseif (media_theplatform_mpx_get_players_select($account)) {
+      $row['data'][] = l(t('Not configured'), 'admin/config/media/theplatform/accounts/' . $id . '/edit');
+      $row['class'][] = 'error';
+    }
+    else {
+      $row['data'][] = l(t('Players not imported'), 'admin/content/file/mpxplayer');
+      $row['class'][] = 'error';
+    }
+
+    if ($token = media_theplatform_mpx_token_acquire($account)) {
+      $row['data'][] = t('Expires in !interval', array('!interval' => format_interval($token->expire - REQUEST_TIME)));
+    }
+    else {
+      $row['data'][] = t('Not available');
+      $row['class'][] = 'warning';
+    }
+
+    $operations = array();
+    $operations['edit'] = array(
+      'title' => t('Edit'),
+      'href' => 'admin/config/media/theplatform/accounts/' . $id . '/edit',
+    );
+    $operations['delete'] = array(
+      'title' => t('Delete'),
+      'href' => 'admin/config/media/theplatform/accounts/' . $id . '/delete',
+    );
+    $row['data'][] = array('data' => array(
+      '#theme' => 'links',
+      '#links' => $operations,
+      '#attributes' => array(
+        'class' => array('links', 'inline'),
+      ),
+    ));
+    $rows[] = $row;
+  }
+
+  $output = array();
+  $output['table'] = array(
+    '#theme' => 'table',
+    '#header' => $header,
+    '#rows' => $rows,
+    '#empty' => t('No mpx accounts available.'),
+  );
+  $output['pager'] = array(
+    '#theme' => 'pager',
+  );
+  return $output;
+}
+
+/**
+ * Form constructor for the add mpx account form.
+ *
+ * @see media_theplatform_mpx_account_add_form_validate()
+ * @see media_theplatform_mpx_account_add_form_submit()
+ *
+ * @ingroup forms
+ */
+function media_theplatform_mpx_account_add_form($form, &$form_state) {
+  drupal_set_title(t('Add mpx account'));
+
+  $form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Username'),
+    '#description' => t('The username should be prefixed with <em>mpx/</em>. It is best to use an account that has the <em>Admin (Read-Only)</em> role in thePlatform.'),
+    '#placeholder' => 'mpx/username@example.com',
+    '#required' => TRUE,
+    '#size' => 40,
+  );
+
+  $form['password'] = array(
+    '#type' => 'password',
+    '#title' => t('Password'),
+    '#required' => TRUE,
+    '#size' => 40,
+    '#element_validate' => array('media_theplatform_mpx_account_validate_password'),
+  );
+
+  $form['actions'] = array('#type' => 'actions');
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Continue and edit'),
+  );
+  $form['actions']['cancel'] = array(
+    '#type' => 'link',
+    '#title' => t('Cancel'),
+    '#href' => 'admin/config/media/theplatform/accounts',
+  );
+
+  return $form;
+}
+
+/**
+ * Render API callback: Validates the mpx username and password.
+ *
+ * This function is assigned as an #element_validate callback in
+ * media_theplatform_mpx_account_add_form() and
+ * media_theplatform_mpx_account_edit_form().
+ */
+function media_theplatform_mpx_account_validate_password(&$element, &$form_state) {
+  if (!empty($element['#value']) && !form_get_errors()) {
+    try {
+      $token = MpxToken::fetch($form_state['values']['username'], $element['#value']);
+      $token->expire();
+    }
+    catch (MpxTokenException $e) {
+      form_error($element, t('Unable to validate mpx account credentials.') . ' ' . $e->getMessage());
+    }
+  }
+}
+
+/**
+ * Form validation handler for media_theplatform_mpx_account_add_form().
+ *
+ * @see media_theplatform_mpx_account_add_form_submit()
+ */
+function media_theplatform_mpx_account_add_form_validate($form, &$form_state) {
+  if (!empty($form_state['values']['username']) && !empty($form_state['values']['password']) && !form_get_errors()) {
+    $account = (object) $form_state['values'];
+    // Check if an unused import account can be selected.
+    if (!media_theplatform_mpx_account_get_import_account_options($account)) {
+      form_set_error('', t('The mpx account @account does not have any available or unused import accounts.', array('@account' => $account->username)));
+    }
+  }
+}
+
+/**
+ * Form submission handler for media_theplatform_mpx_account_add_form().
+ *
+ * @see media_theplatform_mpx_account_add_form_validate()
+ */
+function media_theplatform_mpx_account_add_form_submit($form, &$form_state) {
+  form_state_values_clean($form_state);
+  $account = (object) $form_state['values'];
+  media_theplatform_mpx_account_save($account);
+  drupal_set_message(t('The mpx account @account has been created.', array('@account' => $account->username)));
+  watchdog('media_theplatform_mpx', 'Created mpx account @account.', array('@account' => $account->username), WATCHDOG_INFO);
+  // Redirect to the edit form to select import account and default player.
+  $form_state['redirect'] = 'admin/config/media/theplatform/accounts/' . $account->id . '/edit';
+}
+
+/**
+ * Form constructor for the edit mpx account form.
+ *
+ * @see media_theplatform_mpx_account_edit_form_validate()
+ * @see media_theplatform_mpx_account_edit_form_submit()
+ *
+ * @ingroup forms
+ */
+function media_theplatform_mpx_account_edit_form($form, &$form_state, $account) {
+  $form['username_display'] = array(
+    '#type' => 'item',
+    '#title' => t('Username'),
+    '#markup' => $account->username,
+  );
+
+  $form['password'] = array(
+    '#type' => 'password',
+    '#title' => t('Password'),
+    '#description' => t('For updating the password on your account, otherwise leave blank.'),
+    '#size' => 30,
+    '#element_validate' => array('media_theplatform_mpx_account_validate_password'),
+  );
+
+  $import_account_options = media_theplatform_mpx_account_get_import_account_options($account);
+  if (!empty($account->import_account)) {
+    $form['import_account_display'] = array(
+      '#type' => 'item',
+      '#title' => t('Import account'),
+      '#markup' => $account->import_account,
+    );
+    if (!isset($import_account_options[$account->import_account])) {
+      $form['import_account_display']['#markup'] .= '<div class="messages error">' . t('The import account does not appear to exist.', array('@name' => $account->import_account)) . '</div>';
+    }
+  }
+  else {
+    $form['import_account'] = array(
+      '#type' => 'select',
+      '#title' => t('Import account'),
+      '#description' => t('This can only be set once.'),
+      '#options' => $import_account_options,
+      '#empty_option' => t('- Select -'),
+      '#default_value' => $account->import_account,
+      '#required' => TRUE,
+    );
+  }
+
+  $default_player_options = media_theplatform_mpx_get_players_select($account);
+  $form['default_player'] = array(
+    '#type' => 'select',
+    '#title' => t('Default player'),
+    '#options' => $default_player_options,
+    '#empty_option' => t('- Select -'),
+    '#default_value' => $account->default_player,
+    '#required' => TRUE,
+    '#access' => !empty($default_player_options),
+  );
+
+  foreach (get_object_vars($account) as $key => $value) {
+    if (!isset($form[$key])) {
+      $form[$key] = array(
+        '#type' => 'value',
+        '#value' => $value,
+      );
+    }
+  }
+
+  $form['actions'] = array('#type' => 'actions');
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+  );
+  $form['actions']['cancel'] = array(
+    '#type' => 'link',
+    '#title' => t('Cancel'),
+    '#href' => 'admin/config/media/theplatform/accounts',
+  );
+
+  return $form;
+}
+
+/**
+ * Form submission handler for media_theplatform_mpx_account_edit_form().
+ *
+ * @see media_theplatform_mpx_account_edit_form_validate()
+ */
+function media_theplatform_mpx_account_edit_form_submit($form, &$form_state) {
+  form_state_values_clean($form_state);
+  $account = (object) $form_state['values'];
+  media_theplatform_mpx_account_save($account);
+  drupal_set_message(t('The mpx account %account has been saved.', array('%account' => $account->username)));
+  watchdog('media_theplatform_mpx', 'Updated mpx account @account.', array('@account' => $account->username), WATCHDOG_INFO);
+  $form_state['redirect'] = 'admin/config/media/theplatform/accounts';
+}
+
+/**
+ * Form constructor for the edit mpx account form.
+ *
+ * @see media_theplatform_mpx_account_delete_form_submit()
+ *
+ * @ingroup forms
+ */
+function media_theplatform_mpx_account_delete_form($form, &$form_state, $account) {
+  return confirm_form(
+    $form,
+    t('Are you sure you want to delete the mpx account %account?', array('%account' => $account->username)),
+    'admin/config/media/theplatform/accounts',
+    t('This only deletes data from the local Drupal install, not from the actual mpx account on thePlatform. This action cannot be undone.')
+  );
+}
+
+/**
+ * Form submission handler for media_theplatform_mpx_account_delete_form().
+ */
+function media_theplatform_mpx_account_delete_form_submit($form, &$form_state) {
+  $account = $form_state['build_info']['args'][0];
+  _media_theplatform_mpx_delete_account($account->id);
+  //media_theplatform_mpx_account_delete($account->id);
+  //drupal_set_message(t('The mpx account %account has been deleted.', array('%account' => $account->username)));
+  watchdog('media_theplatform_mpx', 'Deleted mpx account @account.', array('@account' => $account->username), WATCHDOG_INFO);
+  $form_state['redirect'] = 'admin/config/media/theplatform/accounts';
+}
+
+/**
+ * Form constructor for the mpx settings form.
  *
  * @ingroup forms
  */
@@ -101,452 +413,9 @@ function media_theplatform_mpx_settings_form($form, &$form_state) {
   return system_settings_form($form);
 }
 
-/********* thePlatform signIn / Account ***********************/
-
-
 /**
- * AJAX callback for adding accounts in the signin form.
- */
-function media_theplatform_mpx_signin_form_add_account($form, $form_state) {
-  return $form['accounts'];
-}
-
-/**
- * Form constructor for thePlatform username/password.
+ * @deprecated
  *
- * @ingroup forms
- */
-function media_theplatform_mpx_signin_form($form, &$form_state, $accounts = array()) {
-  $collapsed = FALSE;
-  $action_label = t('Connect to MPX');
-  $title = t('mpx Login');
-  $description = t('Enter your administrator login for thePlatform.com.');
-
-  // If token exists already, collapse this form.
-  if (!empty($accounts)) {
-    $collapsed = TRUE;
-    $title = t('Add MPX Account');
-  }
-
-  $form['accounts'] = array(
-    '#type' => 'fieldset',
-    '#title' => $title,
-    '#description' => $description,
-    '#collapsible' => $collapsed,
-    '#collapsed' => $collapsed,
-    '#prefix' => '<div id="media-theplatform-mpx-accounts-form-container">',
-    '#suffix' => '</div>',
-    '#tree' => TRUE,
-  );
-
-  $form['accounts']['theplatform_username'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Username for New Account'),
-    '#description' => t('Prefix your username with "mpx/". e.g. "mpx/admin@example.com".'),
-    '#maxlength' => 255,
-    '#required' => TRUE,
-  );
-  $form['accounts']['theplatform_password'] = array(
-    '#type' => 'password',
-    '#title' => t('Password for New Account'),
-    '#maxlength' => 255,
-    '#required' => TRUE,
-  );
-
-  $form['accounts']['actions']['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Add Account'),
-  );
-
-  return $form;
-}
-
-/**
- * Form constructor for thePlatform that lists the current accounts.
- *
- * @ingroup forms
- */
-function media_theplatform_mpx_account_list_form($form, &$form_state, $accounts = array()) {
-  if (isset($form_state['storage']['confirm']) && !empty($form_state['storage']['delete_account'])) {
-    $question = t('Are you sure you want to delete account @id?', array('@id' => $form_state['storage']['delete_account']));
-    $path = 'admin/config/media/theplatform';
-    $description = t('You are about to delete account @id and all of its assets.  This action cannot be undone.', array('@id' => $form_state['storage']['delete_account']));
-    return confirm_form($form, $question, $path, $description, t('Delete'), t('Cancel'));
-  }
-
-  $form['account_list'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('Account List'),
-    '#collapsible' => TRUE,
-    '#collapsed' => TRUE,
-    '#tree' => TRUE,
-  );
-
-  $accounts_index = 0;
-  foreach ($accounts as $id => $account) {
-    if ($accounts_index > 0) {
-      $form['account_list'][ $id ]['separator'] = array(
-        '#type' => 'item',
-        '#markup' => '<hr>',
-      );
-    }
-    $accounts_index++;
-
-    $form['account_list'][ $id ]['theplatform_username'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Username for Account @theplatform_account_id:',
-        array('@theplatform_account_id' => $account->id)),
-      '#description' => t('Prefix your username with "mpx/". e.g. "mpx/admin@example.com".'),
-      '#maxlength' => 255,
-      '#default_value' => $account->username,
-      '#required' => TRUE,
-    );
-    $form['account_list'][ $id ]['theplatform_password'] = array(
-      '#type' => 'password',
-      '#title' => t('Password for Account @theplatform_account_id:',
-        array('@theplatform_account_id' => $account->id)),
-      '#maxlength' => 255,
-    );
-    $form['account_list'][ $id ]['update_account'] = array(
-      '#type' => 'submit',
-      '#value' => t('Update Account @id', array('@id' => $id)),
-    );
-    $form['account_list'][ $id ]['delete_account'] = array(
-      '#type' => 'submit',
-      '#value' => t('Delete Account @id', array('@id' => $id)),
-      '#suffix' => '<br />',
-    );
-  }
-
-  return $form;
-}
-
-/**
- * Form constructor for selecting Import Account.
- *
- * @ingroup forms
- */
-function media_theplatform_mpx_import_account_form($form, &$form_state, $accounts = array()) {
-
-  $form['import_accounts'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('Import Accounts'),
-    '#description' => t('Set the account from which to import mpxPlayers and Feeds from.'),
-    '#collapsible' => FALSE,
-    '#collapsed' => FALSE,
-    '#tree' => TRUE,
-  );
-
-  $error_message = '';
-  foreach ($accounts as $account_id => $account) {
-    $sub_account_list = array();
-    if (!empty($account->import_account)) {
-      $sub_account_list = array($account->import_account => $account->import_account);
-    }
-    else {
-      $sub_account_list = media_theplatform_mpx_get_accounts_select($account_id);
-    }
-    // If current account doesn't exist, error msg.
-    if ($account->import_account && !array_key_exists($account->import_account, $sub_account_list)) {
-      $error_message .= '<div class="message">' . t('The current Import Account (:name) was not found in thePlatform; it may have been disabled or deleted.  Please select a new Account to use as the Import Account.', array(':name' => $account->import_account)) . '</div>';
-    }
-    $form['import_accounts']['settings'][$account->id] = array(
-      '#type' => 'select',
-      '#title' => t('Select Import Account for Account @theplatform_account_id:',
-        array('@theplatform_account_id' => $account->id)),
-      '#options' => $sub_account_list,
-      '#required' => TRUE,
-      '#empty_option' => t('- Select -'),
-      '#default_value' => !empty($account->import_account) ? $account->import_account : '',
-      '#disabled' => !empty($account->import_account),
-    );
-  }
-
-  if ($error_message) {
-    drupal_set_message($error_message, 'error');
-  }
-
-  $form['import_accounts']['actions'] = array('#type' => 'actions');
-  $form['import_accounts']['actions']['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Set Import Account'),
-  );
-
-  return $form;
-}
-
-/**
- * Page callback to return signin / account forms.
- */
-function media_theplatform_mpx_page_account() {
-
-  $all_account_data = media_theplatform_mpx_account_load_multiple();
-
-  $form_signin = drupal_get_form('media_theplatform_mpx_signin_form', $all_account_data);
-  $output = render($form_signin);
-
-  if (!empty($all_account_data)) {
-
-    // Add the account list.
-    $account_list_form = drupal_get_form('media_theplatform_mpx_account_list_form', $all_account_data);
-    $output .= render($account_list_form);
-
-    // Add the import account form.
-    $import_account_form = drupal_get_form('media_theplatform_mpx_import_account_form', $all_account_data);
-    $output .= render($import_account_form);
-  }
-
-  return $output;
-}
-
-/**
- * Form validation handler for media_theplatform_mpx_signin_form().
- */
-function media_theplatform_mpx_signin_form_validate($form, &$form_state) {
-
-  $values = $form_state['values']['accounts'];
-  // Validate new account credentials.
-  if (!empty($form_state['values']['accounts'])) {
-    $mpx_token = MpxToken::fetch($values['theplatform_username'], $values['theplatform_password']);
-    if (!$mpx_token) {
-      form_set_error('accounts][theplatform_password',
-        t('Login failed for new account with username @username.', array('@username' => $values['theplatform_username'])));
-    }
-    else {
-      drupal_set_message(t('Login successful for new account with username @username.',
-        array('@username' => $values['theplatform_username'])));
-      $sub_account_list = media_theplatform_mpx_get_accounts_select(NULL, NULL, NULL, $mpx_token);
-      if (empty($sub_account_list)) {
-        form_set_error('accounts][theplatform_username', t('There are no more sub-accounts for this account.'));
-      }
-    }
-  }
-}
-
-/**
- * Form submit handler for media_theplatform_mpx_signin_form().
- */
-function media_theplatform_mpx_signin_form_submit($form, &$form_state) {
-  // Add new accounts.
-  $values = $form_state['values']['accounts'];
-  if (!empty($form_state['values']['accounts'])) {
-    $account_id = db_insert('mpx_accounts')
-      ->fields(array(
-        'username' => $values['theplatform_username'],
-        'password' => encrypt($values['theplatform_password']),
-      ))
-      ->execute();
-    watchdog('media_theplatform_mpx', 'Successfully created account for user "@username".',
-      array('@username' => $values['theplatform_username']), WATCHDOG_NOTICE);
-  }
-}
-
-/**
- * Form validation handler for media_theplatform_mpx_account_list_form().
- *
- * @see media_theplatform_mpx_account_list_form()
- */
-function media_theplatform_mpx_account_list_form_validate($form, &$form_state) {
-  // Validate any credential changes to existing accounts.
-  if (!empty($form_state['values']['account_list'])) {
-    foreach ($form_state['values']['account_list'] as $id => $values) {
-      $account_data = media_theplatform_mpx_account_load($id);
-      if ($values['theplatform_password'] &&
-        ($values['theplatform_username'] != $account_data->username || $values['theplatform_password'] != $account_data->password)) {
-        $mpx_token = MpxToken::fetch($values['theplatform_username'], $values['theplatform_password']);
-        if (!$mpx_token) {
-          form_set_error('accounts][existing][' . $id . '][theplatform_password',
-            t('Login failed for account @account_id', array('@account_id' => basename($account_data->account_id))));
-        }
-        else {
-          drupal_set_message(t('Login successful for account @account_id', array('@account_id' => basename($account_data->account_id))));
-        }
-      }
-    }
-  }
-}
-
-/**
- * Form submit handler for media_theplatform_mpx_account_list_form().
- */
-function media_theplatform_mpx_account_list_form_submit($form, &$form_state) {
-  // Prepare for an account deletion if a "Delete Account X" button was clicked.
-  if (!empty($form_state['values']['account_list'])) {
-    foreach ($form_state['values']['account_list'] as $id => $values) {
-      if ($form_state['clicked_button']['#value'] == t('Delete Account @id', array('@id' => $id))) {
-        $form_state['storage']['confirm'] = TRUE;
-        $form_state['storage']['delete_account'] = $id;
-        $form_state['rebuild'] = TRUE;
-        return;
-      }
-    }
-  }
-
-  // Delete an account after the user has confirmed the action.
-  if (!empty($form_state['storage']['delete_account'])) {
-    _media_theplatform_mpx_delete_account($form_state['storage']['delete_account']);
-    return;
-  }
-
-  // Process any changes to existing accounts.
-  if (!empty($form_state['values']['account_list'])) {
-    foreach ($form_state['values']['account_list'] as $id => $values) {
-      $account_data = media_theplatform_mpx_account_load($id);
-      if ($values['theplatform_password'] &&
-          ($values['theplatform_username'] != $account_data->username ||
-          $values['theplatform_password'] != $account_data->password)) {
-
-        // Update the username, password and the rest of the account data.  Users
-        // should resave the sub-account to ensure valid data and a valid auth
-        // token.
-        watchdog('media_theplatform_mpx', 'Updating username and password for @account in the mpx_accounts table.',
-          array('@account' => _media_theplatform_mpx_account_log_string($account_data)), WATCHDOG_INFO);
-
-        try {
-          db_update('mpx_accounts')
-            ->fields(array(
-                'username' => $values['theplatform_username'],
-                'password' => encrypt($values['theplatform_password']),
-              ))
-            ->condition('id', $id, '=')
-            ->execute();
-          watchdog('media_theplatform_mpx', 'Successfully updated @account.',
-            array('@account' => _media_theplatform_mpx_account_log_string($account_data)), WATCHDOG_NOTICE);
-        }
-        catch (Exception $e) {
-
-          watchdog('media_theplatform_mpx', 'FATAL ERROR occurred while updating account @account --  "@message"  -- Exception output: @output.',
-            array(
-              '@account' => _media_theplatform_mpx_account_log_string($account_data),
-              '@message' => $e->getMessage(),
-              '@output' => '<pre>' . print_r($e, TRUE) . '</pre>',
-            ),
-            WATCHDOG_ERROR);
-        }
-      }
-    }
-  }
-}
-
-/**
- * Form validation handler for media_theplatform_mpx_form_account_theplatform().
- */
-function media_theplatform_mpx_import_account_form_validate($form, &$form_state) {
-
-  $selected_import_accounts = array();
-
-  foreach ($form_state['values']['import_accounts']['settings'] as $account_id => $import_account) {
-    if (in_array($import_account, $selected_import_accounts)) {
-      form_set_error('import_accounts][settings][' . $account_id,
-        t('The same import account cannot be selected for multiple accounts.'));
-    }
-    else {
-      $selected_import_accounts[] = $import_account;
-    }
-  }
-}
-
-/**
- * Form submit handler for media_theplatform_mpx_form_account_theplatform().
- */
-function media_theplatform_mpx_import_account_form_submit($form, &$form_state) {
-
-  global $user;
-
-  foreach ($form_state['values']['import_accounts']['settings'] as $account_id => $import_account) {
-
-    $account_data = media_theplatform_mpx_account_load($account_id);
-
-    // If an import account is already set, resetting it will cause an
-    // unwanted complete re-ingestion of all videos.
-    if (!empty($account_data->import_account)) {
-      continue;
-    }
-
-    watchdog('media_theplatform_mpx', 'Setting import account "@import_account" for @account.',
-      array(
-        '@import_account' => $import_account,
-        '@account' => _media_theplatform_mpx_account_log_string($account_data),
-      ),
-      WATCHDOG_NOTICE);
-
-    if (!$account_data) {
-      watchdog('media_theplatform_mpx', 'Failed to set import account for @account.  Account data could not be retrieved from the database.',
-        array('@account' => _media_theplatform_mpx_account_log_string($account_data)), WATCHDOG_ERROR);
-      continue;
-    }
-
-    // Query MPX to get the id and account$pid for the selected account.
-    watchdog('media_theplatform_mpx', 'Retrieving import account information for "@import_account".',
-      array('@import_account' => $import_account), WATCHDOG_NOTICE);
-
-    $token = media_theplatform_mpx_token_acquire($account_data);
-    $url = 'https://access.auth.theplatform.com/data/Account?schema=1.3.0&form=json&byDisabled=false&byTitle=' . rawurlencode($import_account) . '&token=' . rawurlencode($token) . '&fields=id,pid';
-
-    $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
-
-    if (!isset($result_data['entries'][0]['id']) || !isset($result_data['entries'][0]['placcount$pid'])) {
-      watchdog('media_theplatform_mpx', 'Failed to retrieve import account information for "@import_account".  "id" and/or "placcount$pid" field value not set.',
-        array('@import_account' => $import_account), WATCHDOG_ERROR);
-
-      return FALSE;
-    }
-
-    $mpx_account_id = preg_replace('|^http://|', 'https://', $result_data['entries'][0]['id']);
-    $mpx_account_pid = $result_data['entries'][0]['placcount$pid'];
-
-    watchdog('media_theplatform_mpx', 'Updating
-      <br /> import_account = @import_account,
-      <br /> account_id = @account_id,
-      <br /> account_pid = @account_pid,
-      <br /> last_notification = NULL
-<br />in mpx_accounts table for @account.',
-      array(
-        '@import_account' => $import_account,
-        '@account_id' => $mpx_account_id,
-        '@account_pid' => $mpx_account_pid,
-        '@account' => _media_theplatform_mpx_account_log_string($account_data),
-      ),
-      WATCHDOG_INFO);
-
-    // Save the new import account data for this account. Reset last
-    // notification, since a newly set import account will need a
-    // complete video ingestion.
-    try {
-
-      db_update('mpx_accounts')
-        ->fields(array(
-            'import_account' => $import_account,
-            'account_id' => $mpx_account_id,
-            'account_pid' => $mpx_account_pid,
-            'last_notification' => NULL,
-          ))
-        ->condition('id', $account_id, '=')
-        ->execute();
-
-      watchdog('media_theplatform_mpx', 'Updated import account data for @account successfully.',
-        array('@account' => _media_theplatform_mpx_account_log_string($account_data)), WATCHDOG_NOTICE);
-    }
-    catch (Exception $e) {
-
-      watchdog('media_theplatform_mpx', 'EXCEPTION THROWN occurred while updating import account data for @account. --  "@message"  -- Exception output: @output.',
-        array(
-          '@account' => _media_theplatform_mpx_account_log_string($account_data),
-          '@message' => $e->getMessage(),
-          '@output' => '<pre>' . print_r($e, TRUE) . '</pre>',
-        ),
-        WATCHDOG_ERROR);
-    }
-  }
-
-  // Import all players.
-  $import = media_theplatform_mpx_import_all_players('manually');
-
-  drupal_set_message(t('Proceed to !link to set a default MPX player and complete the MPX configuration process.',
-    array('!link' => l('the MPX video library page', 'admin/content/file/mpxmedia'))));
-}
-
-/**
  * Returns TRUE if token and import_account set.  If not, drupal_set_message and returns FALSE.
  */
 function media_theplatform_mpx_check_account_settings($account_id = NULL) {

@@ -103,13 +103,33 @@ function media_theplatform_mpx_menu() {
   $items['admin/config/media/theplatform'] = array(
     'title' => 'Media: thePlatform mpx',
     'description' => 'Configure thePlatForm mpx integration accounts and settings.',
-    'page callback' => 'media_theplatform_mpx_page_account',
+    'page callback' => 'media_theplatform_mpx_account_list',
     'access arguments' => array('administer mpx account'),
     'file' => 'media_theplatform_mpx.admin.inc',
   );
   $items['admin/config/media/theplatform/accounts'] = array(
     'title' => 'Accounts',
     'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+  $items['admin/config/media/theplatform/accounts/add'] = array(
+    'title' => 'Add mpx account',
+    'type' => MENU_LOCAL_ACTION,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('media_theplatform_mpx_account_add_form'),
+    'access arguments' => array('administer mpx account'),
+    'file' => 'media_theplatform_mpx.admin.inc',
+  );
+  $items['admin/config/media/theplatform/accounts/%media_theplatform_mpx_account/edit'] = array(
+    'title' => 'Edit mpx account',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('media_theplatform_mpx_account_edit_form', 5),
+    'access arguments' => array('administer mpx account'),
+    'file' => 'media_theplatform_mpx.admin.inc',
+  );
+  $items['admin/config/media/theplatform/accounts/%media_theplatform_mpx_account/delete'] = array(
+    'title' => 'Delete mpx account',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('media_theplatform_mpx_account_delete_form', 5),
     'access arguments' => array('administer mpx account'),
     'file' => 'media_theplatform_mpx.admin.inc',
   );
@@ -854,9 +874,8 @@ function _media_theplatform_mpx_delete_account($account_id, $progressive = TRUE)
   if (!$progressive) {
     $batch =& batch_get();
     $batch['progressive'] = $progressive;
+    batch_process();
   }
-
-  batch_process();
 }
 
 /**
@@ -1003,11 +1022,15 @@ function _media_theplatform_mpx_delete_account_media($account_id, $type, &$conte
  */
 function _media_theplatform_mpx_delete_account_data($account_id) {
   $account = media_theplatform_mpx_account_load($account_id);
-  MpxToken::release($account);
+  module_invoke_all('media_theplatform_mpx_account_delete', $account);
 
-  module_invoke_all('media_theplatform_mpx_delete_account', $account_id);
+  // Only release the account's token if no other mpx accounts have the same
+  // username.
+  if (!db_query("SELECT 1 FROM {mpx_accounts} WHERE username = :username AND id <> :id", array(':username' => $account->username, ':id' => $account_id))->fetchField()) {
+    MpxToken::release($account);
+  }
 
-  db_delete('mpx_accounts')->condition('id', $account_id, '=')->execute();
+  db_delete('mpx_accounts')->condition('id', $account_id)->execute();
 
   // Remove variables disabling video and player sync for this account.
   variable_del('media_theplatform_mpx__account_' . $account_id . '_cron_player_sync');
@@ -1019,8 +1042,6 @@ function _media_theplatform_mpx_delete_account_data($account_id) {
  */
 function _media_theplatform_mpx_delete_account_finished($account_id) {
   drupal_flush_all_caches();
-  drupal_set_message('All caches have been flushed.');
-
   watchdog('media_theplatform_mpx', 'Completed process of deleting account @id.',
     array('@id' => $account_id), WATCHDOG_NOTICE);
 }
@@ -1100,8 +1121,10 @@ function media_theplatform_mpx_form_alter(&$form, &$form_state, $form_id) {
  * @param bool $force
  *   Set to TRUE if a fresh authentication token should always be fetched.
  *
- * @return MpxToken|bool
- *   A valid MpxToken object, or FALSE if no token could be acquired.
+ * @return MpxToken
+ *   A valid MpxToken object.
+ *
+ * @throws Exception
  */
 function media_theplatform_mpx_token_acquire($account, $duration = NULL, $force = FALSE) {
   try {
@@ -1109,8 +1132,7 @@ function media_theplatform_mpx_token_acquire($account, $duration = NULL, $force 
   }
   catch (Exception $e) {
     watchdog_exception('media_theplatform_mpx', $e);
-    // @todo Why not just re-throw the exception? If we can't get a valid token it's not worth proceeding in places that call this function.
-    return FALSE;
+    throw $e;
   }
 }
 
@@ -1162,6 +1184,25 @@ function media_theplatform_mpx_account_load_multiple(array $ids = NULL) {
 function media_theplatform_mpx_account_save($account) {
   $transaction = db_transaction();
   try {
+    $account->is_new = empty($account->id);
+
+    if (!$account->is_new) {
+      $account->original = media_theplatform_mpx_account_load($account->id);
+    }
+
+    // Fetch the account_id and account_pid values.
+    if (!empty($account->import_account) && empty($account->account_id) && empty($account->account_pid)) {
+      if ($import_account = media_theplatform_mpx_account_fetch_import_account($account)) {
+        $account->account_id = preg_replace('|^http://|', 'https://', $import_account['id']);
+        $account->account_pid = $import_account['pid'];
+      }
+      else {
+        throw new Exception("Unable to fetch data about import account {$account->import_account} on mpx account {$account->username}");
+      }
+    }
+
+    module_invoke_all('media_theplatform_mpx_account_presave', $account);
+
     if (!empty($account->password)) {
       $account->password = encrypt($account->password);
     }
@@ -1169,9 +1210,6 @@ function media_theplatform_mpx_account_save($account) {
       // Avoid overwriting an existing password with a blank password.
       unset($account->password);
     }
-
-    $account->is_new = empty($account->id);
-    module_invoke_all('media_theplatform_mpx_account_presave', $account);
 
     if ($account->is_new) {
       drupal_write_record('mpx_accounts', $account);
@@ -1187,6 +1225,9 @@ function media_theplatform_mpx_account_save($account) {
   catch (Exception $e) {
     $transaction->rollback();
     watchdog_exception('media_theplatform_mpx', $e);
+    // If an error happened and we were unable to save the account, ensure
+    // the cached token is released.
+    MpxToken::release($account);
     throw $e;
   }
 }
@@ -1214,7 +1255,7 @@ function media_theplatform_mpx_account_delete_multiple(array $ids) {
     $transaction = db_transaction();
     try {
       foreach ($accounts as $id => $account) {
-        module_invoke_all('media_theplatform_mpx_account_delete', $account);
+        // @todo Make account deletion use some kind of queue so it can be run without a batch process.
         _media_theplatform_mpx_delete_account($id, FALSE);
       }
     }
@@ -1224,6 +1265,107 @@ function media_theplatform_mpx_account_delete_multiple(array $ids) {
       throw $e;
     }
   }
+}
+
+/**
+ * Fetch data about an mpx import account.
+ *
+ * @param object $account
+ *   An mpx account.
+ * @param string $import_account
+ *   An optional import account title. Otherwise $account->import_account will
+ *   be used.
+ *
+ * @return array|bool
+ *   An array of data about the import account if available, otherwise FALSE.
+ */
+function media_theplatform_mpx_account_fetch_import_account($account, $import_account = NULL) {
+  if (!isset($import_account)) {
+    $import_account = $account->import_account;
+  }
+
+  $token = media_theplatform_mpx_token_acquire($account);
+  $url = 'https://access.auth.theplatform.com/data/Account?' . drupal_http_build_query(array(
+    'schema' => '1.3',
+    'form' => 'cjson',
+    'byDisabled'=> 'false',
+    'byTitle' => $import_account,
+    'token' => $token,
+    'fields' => 'id,guid,title,pid',
+  ));
+  $results = _media_theplatform_mpx_retrieve_feed_data($url);
+  return !empty($results['entries'][0]) ? $results['entries'][0] : FALSE;
+}
+
+/**
+ * Fetch data about all the import accounts for an mpx account.
+ *
+ * @param object $account
+ *   An mpx account.
+ *
+ * @return array
+ *   An array of arrays of data of the import accounts.
+ */
+function media_theplatform_mpx_account_fetch_import_accounts($account) {
+  $import_accounts = &drupal_static(__FUNCTION__, array());
+  $cid = 'import-accounts:' . $account->username;
+
+  if (!isset($import_accounts[$cid])) {
+    $token = media_theplatform_mpx_token_acquire($account, NULL, TRUE);
+    $url = 'https://access.auth.theplatform.com/data/Account?' . drupal_http_build_query(array(
+      'schema' => '1.3',
+      'form' => 'cjson',
+      'byDisabled'=> 'false',
+      'token' => $token,
+      'fields' => 'id,guid,title,pid',
+    ));
+    $results = _media_theplatform_mpx_retrieve_feed_data($url);
+    $import_accounts[$cid] = !empty($results['entries']) ? $results['entries'] : array();
+  }
+
+  return $import_accounts[$cid];
+}
+
+/**
+ * Get the list of import accounts available to select for an mpx account.
+ *
+ * @param object $account
+ *   An mpx account.
+ * @param bool $exclude_existing
+ *   If TRUE will exclude any import accounts currently in use by other mpx
+ *   accounts. Default is TRUE.
+ *
+ * @return array
+ *   An associative array of import account titles, keyed also by the import
+ *   account titles.
+ */
+function media_theplatform_mpx_account_get_import_account_options($account, $exclude_existing = TRUE) {
+  $import_accounts = media_theplatform_mpx_account_fetch_import_accounts($account);
+  if (empty($import_accounts)) {
+    return array();
+  }
+
+  $options = array();
+  foreach ($import_accounts as $import_account) {
+    $options[$import_account['title']] = $import_account['title'];
+  }
+
+  if ($exclude_existing) {
+    $query = db_select('mpx_accounts', 'mpxa');
+    $query->addField('mpxa', 'import_account');
+    if (!empty($account->id) && !empty($account->account_pid)) {
+      // Import account names are unique across all users on thePlatform so
+      // there is no concern that two different mpx accounts would have the
+      // same import account name.
+      $query->condition('id', $account->id, '<>');
+    }
+    if ($existing_import_accounts = $query->execute()->fetchCol()) {
+      $options = array_diff($options, $existing_import_accounts);
+    }
+  }
+
+  natcasesort($options);
+  return $options;
 }
 
 /**

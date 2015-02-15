@@ -100,7 +100,12 @@ function media_theplatform_mpx_get_players_select($account = NULL, $key = 'playe
 
   // Index by file fid.
   while ($record = $result->fetchAssoc()) {
-    $players[ $record['import_account'] ][ $record[$key] ] = $record['id'] . ' - ' . $record['pid'] . ' - ' . $record['title'];
+    if (!empty($account)) {
+      $players[$record[$key]] = $record['id'] . ' - ' . $record['pid'] . ' - ' . $record['title'];
+    }
+    else {
+      $players[$record['import_account']][$record[$key]] = $record['id'] . ' - ' . $record['pid'] . ' - ' . $record['title'];
+    }
   }
 
   return $players;

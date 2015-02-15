@@ -1,5 +1,7 @@
 <?php
 
+class MpxTokenException extends Exception {}
+
 /**
  * Class MpxToken
  *
@@ -165,7 +167,7 @@ class MpxToken {
    * @return MpxToken
    *   The token object if a token was fetched, or FALSE otherwise.
    *
-   * @throws Exception
+   * @throws MpxTokenException
    */
   public static function fetch($username, $password, $duration = NULL) {
     if (!isset($duration)) {
@@ -204,7 +206,7 @@ class MpxToken {
       return $token;
     }
     else {
-      throw new Exception("Failed to fetch new mpx token for account {$username}");
+      throw new MpxTokenException("Failed to fetch new mpx token for account {$username}");
     }
   }
 
@@ -227,7 +229,7 @@ class MpxToken {
    * function only interacts with the thePlatform API and does not delete the
    * token from the cache.
    *
-   * @throws Exception
+   * @throws MpxTokenException
    */
   public function expire() {
     // Expire the token using the API.
@@ -243,7 +245,7 @@ class MpxToken {
       $this->expire = NULL;
     }
     else {
-      throw new Exception("Failed to expire mpx authentication token {$this->value} for account {$this->username}");
+      throw new MpxTokenException("Failed to expire mpx authentication token {$this->value} for account {$this->username}");
     }
   }
 
