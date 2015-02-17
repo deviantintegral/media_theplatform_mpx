@@ -17,8 +17,7 @@ function media_theplatform_mpx_account_list() {
     array('data' => t('Username'), 'field' => 'username', 'sort' => 'ASC'),
     array('data' => t('Import account'), 'field' => 'import_account'),
     array('data' => t('Default player')),
-    //array('data' => t('Players'), 'field' => 'player_count'),
-    //array('data' => t('Videos'), 'field' => 'video_count'),
+    array('data' => t('Imported videos'), 'field' => 'video_count'),
     array('data' => t('API token')),
     array('data' => t('Operations')),
   );
@@ -26,6 +25,9 @@ function media_theplatform_mpx_account_list() {
     ->extend('TableSort')
     ->extend('PagerDefault');
   $query->fields('mpxa', array('id'));
+  $query->leftJoin('mpx_video', 'mpxv', 'mpxv.parent_account = mpxa.id');
+  $query->addExpression('COUNT(mpxv.video_id)', 'video_count');
+  $query->groupBy('mpxa.id');
   $query->orderByHeader($header);
   $query->limit(25);
   $results = $query->execute()->fetchAllAssoc('id');
@@ -63,6 +65,9 @@ function media_theplatform_mpx_account_list() {
       $row['data'][] = l(t('Players not imported'), 'admin/content/file/mpxplayer');
       $row['class'][] = 'error';
     }
+
+    // Imported video count.
+    $row['data'][] = $result->video_count;
 
     if ($token = media_theplatform_mpx_token_acquire($account)) {
       $row['data'][] = t('Expires in !interval', array('!interval' => format_interval($token->expire - REQUEST_TIME)));
