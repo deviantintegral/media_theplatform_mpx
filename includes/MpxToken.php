@@ -10,6 +10,15 @@ class MpxTokenException extends Exception {}
 class MpxToken {
 
   /**
+   * Maximum possible token TTL is one week, expressed in seconds.
+   *
+   * @todo Should this value be lower?
+   *
+   * @var int
+   */
+  const MAX_TTL = 604800;
+
+  /**
    * The account username linked to the token.
    *
    * @var string
