@@ -31,7 +31,7 @@ function media_theplatform_mpx_account_list() {
   $query->orderByHeader($header);
   $query->limit(25);
   $results = $query->execute()->fetchAllAssoc('id');
-  $accounts = media_theplatform_mpx_account_load_multiple(array_keys($results));
+  $accounts = MpxAccount::loadMultiple(array_keys($results));
 
   $rows = array();
   foreach ($results as $id => $result) {
@@ -62,14 +62,14 @@ function media_theplatform_mpx_account_list() {
       $row['class'][] = 'error';
     }
     else {
-      $row['data'][] = l(t('Players not imported'), 'admin/content/file/mpxplayer');
+      $row['data'][] = l(t('Players not imported'), 'admin/content/file/mpxplayer', array('query' => drupal_get_destination()));
       $row['class'][] = 'error';
     }
 
     // Imported video count.
     $row['data'][] = $result->video_count;
 
-    if ($token = media_theplatform_mpx_token_acquire($account)) {
+    if ($token = $account->acquireToken()) {
       $row['data'][] = t('Expires in !interval', array('!interval' => format_interval($token->expire - REQUEST_TIME)));
     }
     else {
@@ -164,7 +164,7 @@ function media_theplatform_mpx_account_validate_password(&$element, &$form_state
       $token = MpxToken::fetch($form_state['values']['username'], $element['#value']);
       $token->expire();
     }
-    catch (MpxTokenException $e) {
+    catch (Exception $e) {
       form_error($element, t('Unable to validate mpx account credentials.') . ' ' . $e->getMessage());
     }
   }
@@ -177,9 +177,9 @@ function media_theplatform_mpx_account_validate_password(&$element, &$form_state
  */
 function media_theplatform_mpx_account_add_form_validate($form, &$form_state) {
   if (!empty($form_state['values']['username']) && !empty($form_state['values']['password']) && !form_get_errors()) {
-    $account = (object) $form_state['values'];
+    $account = MpxAccount::create($form_state['values']);
     // Check if an unused import account can be selected.
-    if (!media_theplatform_mpx_account_get_import_account_options($account)) {
+    if (!$account->getImportAccountOptions()) {
       form_set_error('', t('The mpx account @account does not have any available or unused import accounts.', array('@account' => $account->username)));
     }
   }
@@ -192,9 +192,8 @@ function media_theplatform_mpx_account_add_form_validate($form, &$form_state) {
  */
 function media_theplatform_mpx_account_add_form_submit($form, &$form_state) {
   form_state_values_clean($form_state);
-  $account = (object) $form_state['values'];
-  media_theplatform_mpx_account_save($account);
-  drupal_set_message(t('The mpx account @account has been created.', array('@account' => $account->username)));
+  $account = MpxAccount::create($form_state['values']);
+  $account->save();
   watchdog('media_theplatform_mpx', 'Created mpx account @account.', array('@account' => $account->username), WATCHDOG_INFO);
   // Redirect to the edit form to select import account and default player.
   $form_state['redirect'] = 'admin/config/media/theplatform/accounts/' . $account->id . '/edit';
@@ -203,12 +202,15 @@ function media_theplatform_mpx_account_add_form_submit($form, &$form_state) {
 /**
  * Form constructor for the edit mpx account form.
  *
+ * @param MpxAccount $account
+ *   The mpx account to edit.
+ *
  * @see media_theplatform_mpx_account_edit_form_validate()
  * @see media_theplatform_mpx_account_edit_form_submit()
  *
  * @ingroup forms
  */
-function media_theplatform_mpx_account_edit_form($form, &$form_state, $account) {
+function media_theplatform_mpx_account_edit_form($form, &$form_state, MpxAccount $account) {
   $form['username_display'] = array(
     '#type' => 'item',
     '#title' => t('Username'),
@@ -223,7 +225,7 @@ function media_theplatform_mpx_account_edit_form($form, &$form_state, $account) 
     '#element_validate' => array('media_theplatform_mpx_account_validate_password'),
   );
 
-  $import_account_options = media_theplatform_mpx_account_get_import_account_options($account);
+  $import_account_options = $account->getImportAccountOptions();
   if (!empty($account->import_account)) {
     $form['import_account_display'] = array(
       '#type' => 'item',
@@ -287,8 +289,13 @@ function media_theplatform_mpx_account_edit_form($form, &$form_state, $account) 
  */
 function media_theplatform_mpx_account_edit_form_submit($form, &$form_state) {
   form_state_values_clean($form_state);
-  $account = (object) $form_state['values'];
-  media_theplatform_mpx_account_save($account);
+  $account = MpxAccount::create($form_state['values']);
+  // If the user has not typed in a new password, then we should ensure it does
+  // not get set to empty.
+  if (empty($account->password)) {
+    $account->password = $form_state['build_info']['args'][0]->password;
+  }
+  $account->save();
   drupal_set_message(t('The mpx account %account has been saved.', array('%account' => $account->username)));
   watchdog('media_theplatform_mpx', 'Updated mpx account @account.', array('@account' => $account->username), WATCHDOG_INFO);
   $form_state['redirect'] = 'admin/config/media/theplatform/accounts';
@@ -297,11 +304,14 @@ function media_theplatform_mpx_account_edit_form_submit($form, &$form_state) {
 /**
  * Form constructor for the edit mpx account form.
  *
+ * @param MpxAccount $account
+ *   The mpx account to delete.
+ *
  * @see media_theplatform_mpx_account_delete_form_submit()
  *
  * @ingroup forms
  */
-function media_theplatform_mpx_account_delete_form($form, &$form_state, $account) {
+function media_theplatform_mpx_account_delete_form($form, &$form_state, MpxAccount $account) {
   return confirm_form(
     $form,
     t('Are you sure you want to delete the mpx account %account?', array('%account' => $account->username)),
@@ -316,7 +326,6 @@ function media_theplatform_mpx_account_delete_form($form, &$form_state, $account
 function media_theplatform_mpx_account_delete_form_submit($form, &$form_state) {
   $account = $form_state['build_info']['args'][0];
   _media_theplatform_mpx_delete_account($account->id);
-  //media_theplatform_mpx_account_delete($account->id);
   //drupal_set_message(t('The mpx account %account has been deleted.', array('%account' => $account->username)));
   watchdog('media_theplatform_mpx', 'Deleted mpx account @account.', array('@account' => $account->username), WATCHDOG_INFO);
   $form_state['redirect'] = 'admin/config/media/theplatform/accounts';
@@ -429,10 +438,9 @@ function media_theplatform_mpx_check_account_settings($account_id = NULL) {
   // check all available accounts that at least one account is configured
   // properly.
   $account_configured = FALSE;
-  $account_ids = !empty($account_id) ? array($account_id) : NULL;
-  $accounts = media_theplatform_mpx_account_load_multiple($account_ids);
+  $accounts = $account_id ? MpxAccount::loadMultiple(array($account_id)) : MpxAccount::loadAll();
   foreach ($accounts as $account) {
-    if (media_theplatform_mpx_token_acquire($account) && !empty($account->import_account)) {
+    if ($account->acquireToken() && !empty($account->import_account)) {
       $account_configured = TRUE;
       break;
     }
@@ -601,7 +609,7 @@ function media_theplatform_mpx_form_mpx_video_sync($form, &$form_state) {
     '#tree' => TRUE,
   );
 
-  foreach (media_theplatform_mpx_account_load_multiple() as $account) {
+  foreach (MpxAccount::loadAll() as $account) {
     $player_select = media_theplatform_mpx_get_players_select($account);
     if (empty($player_select)) {
       continue;
@@ -640,7 +648,7 @@ function media_theplatform_mpx_form_mpx_video_sync_submit($form, &$form_state) {
       ->fetchField();
     if ($currently_stored_default_player != $values['default_player_id']) {
       _media_theplatform_mpx_set_field($account_id, 'default_player', $values['default_player_id']);
-      $account = media_theplatform_mpx_account_load($account_id);
+      $account = MpxAccount::load($account_id);
       $player = media_theplatform_mpx_get_mpx_player_by_player_id($values['default_player_id']);
       watchdog('media_theplatform_mpx', 'Player @pid -- @player -- set as default player for account @account.',
         array(

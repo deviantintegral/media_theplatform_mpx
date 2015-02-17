@@ -1,7 +1,5 @@
 <?php
 
-class MpxTokenException extends Exception {}
-
 /**
  * Class MpxToken
  *
@@ -61,21 +59,21 @@ class MpxToken {
    * In most cases, using MpxToken::acquire() is recommended since this may
    * return an expired token object.
    *
-   * @param object $account
-   *   The mpx account object.
+   * @param string $username
+   *   The mpx account username.
    *
    * @return MpxToken|bool
    *   The token object if available, otherwise FALSE if no token was available.
    */
-  public static function load($account) {
+  public static function load($username) {
     $tokens = &drupal_static('media_theplatform_mpx_tokens', array());
-    $cid = 'token:' . $account->username;
+    $cid = 'token:' . $username;
 
     if (!isset($tokens[$cid])) {
       $tokens[$cid] = FALSE;
       if ($cache = cache_get($cid, 'cache_mpx')) {
         /** @var object $cache */
-        $tokens[$cid] = new static($account->username, $cache->data, $cache->expire);
+        $tokens[$cid] = new static($username, $cache->data, $cache->expire);
       }
     }
 
@@ -122,45 +120,6 @@ class MpxToken {
   }
 
   /**
-   * Get a current authentication token for an account.
-   *
-   * @param object $account
-   *   The mpx account object.
-   * @param int $duration
-   *   The number of seconds for which the token should be valid.
-   * @param bool $force
-   *   Set to TRUE if a fresh authentication token should always be fetched.
-   *
-   * @return MpxToken
-   *   A valid MPX token object.
-   *
-   * @throws Exception
-   */
-  public static function acquire($account, $duration = NULL, $force = FALSE) {
-    $token = static::load($account);
-
-    if ($force || !$token || !$token->isValid($duration)) {
-      // Delete the token from the cache first in case there is a failure in
-      // MpxToken::fetch() below.
-      if ($token) {
-        $token->delete();
-      }
-
-      // Log an error if the requested duration is larger than the token TTL.
-      if ($duration && ($ttl = variable_get('media_theplatform_mpx__token_ttl')) && $duration > $ttl) {
-        watchdog('media_theplatform_mpx', 'MpxToken::acquire() called with $duration @duration greater than the token TTL @ttl.', array('@duration' => $duration, '@ttl' => $ttl));
-        $duration = $ttl;
-      }
-
-      $token = static::fetch($account->username, $account->password);
-      // @todo Validate if the new token also valid for $duration.
-      $token->save();
-    }
-
-    return $token;
-  }
-
-  /**
    * Fetch a fresh authentication token using thePlatform API.
    *
    * In most cases, using MpxToken::acquire() is recommended since this does
@@ -174,9 +133,9 @@ class MpxToken {
    *   The number of seconds for which the token should be valid.
    *
    * @return MpxToken
-   *   The token object if a token was fetched, or FALSE otherwise.
+   *   The token object if a token was fetched.
    *
-   * @throws MpxTokenException
+   * @throws MpxApiException
    */
   public static function fetch($username, $password, $duration = NULL) {
     if (!isset($duration)) {
@@ -192,69 +151,54 @@ class MpxToken {
       $query['_duration'] = $duration * 1000;
       $query['_idleTimeout'] = $duration * 1000;
     }
-    $url = url("https://identity.auth.theplatform.com/idm/web/Authentication/signIn", array('query' => $query));
-    $options = array(
-      'method' => 'POST',
-      'data' => http_build_query(array(
-        'username' => $username,
-        'password' => $password,
-      )),
-      'timeout' => 15,
-      'headers' => array('Content-Type' => 'application/x-www-form-urlencoded'),
-    );
-    $result_data = _media_theplatform_mpx_retrieve_feed_data($url, TRUE, $options);
-    if (!empty($result_data['signInResponse']['token'])) {
-      $lifetime = floor(min($result_data['signInResponse']['duration'], $result_data['signInResponse']['idleTimeout']) / 1000);
-      $token = new MpxToken(
-        $username,
-        $result_data['signInResponse']['token'],
-        REQUEST_TIME + $lifetime
-      );
-      watchdog('media_theplatform_mpx', 'Fetched new mpx token @token for account @username that expires on @date (in @duration).', array('@token' => $token->value, '@username' => $username, '@date' => format_date($token->expire), '@duration' => format_interval($lifetime)), WATCHDOG_INFO);
-      return $token;
-    }
-    else {
-      throw new MpxTokenException("Failed to fetch new mpx token for account {$username}");
-    }
-  }
 
-  /**
-   * Release an account's token if it has one.
-   *
-   * @param object $account
-   *   The mpx account object.
-   */
-  public static function release($account) {
-    if ($token = static::load($account)) {
-      $token->delete();
-    }
+    $data = MpxApi::request(
+      'https://identity.auth.theplatform.com/idm/web/Authentication/signIn',
+      $query,
+      array(
+        'method' => 'POST',
+        'data' => array(
+          'username' => $username,
+          'password' => $password,
+        ),
+        'headers' => array(
+          'Content-Type' => 'application/x-www-form-urlencoded',
+        ),
+      )
+    );
+
+    $lifetime = floor(min($data['signInResponse']['duration'], $data['signInResponse']['idleTimeout']) / 1000);
+    $token = new MpxToken(
+      $username,
+      $data['signInResponse']['token'],
+      REQUEST_TIME + $lifetime
+    );
+    watchdog('media_theplatform_mpx', 'Fetched new mpx token @token for account @username that expires on @date (in @duration).', array('@token' => $token->value, '@username' => $username, '@date' => format_date($token->expire), '@duration' => format_interval($lifetime)), WATCHDOG_INFO);
+    return $token;
   }
 
   /**
    * Expire an authentication token using thePlatform API.
    *
-   * In most cases, using MpxToken::release() is recommended instead. This
-   * function only interacts with the thePlatform API and does not delete the
-   * token from the cache.
+   * In most cases, using MpxAccount::releaseToken() is recommended instead.
+   * This method only interacts with the thePlatform API and does not delete
+   * the token from the cache.
    *
-   * @throws MpxTokenException
+   * @throws MpxApiException
    */
   public function expire() {
-    // Expire the token using the API.
-    $url = url("https://identity.auth.theplatform.com/idm/web/Authentication/signOut", array('query' => array(
-      'schema' => '1.0',
-      'form' => 'json',
-      '_token' => $this->value,
-    )));
-    $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
-    if (!empty($result_data)) {
-      watchdog('media_theplatform_mpx', 'Expired mpx authentication token @token for account @account.', array('@token' => $this->value, '@account' => $this->username), WATCHDOG_INFO);
-      $this->value = NULL;
-      $this->expire = NULL;
-    }
-    else {
-      throw new MpxTokenException("Failed to expire mpx authentication token {$this->value} for account {$this->username}");
-    }
+    MpxApi::request(
+      'https://identity.auth.theplatform.com/idm/web/Authentication/signOut',
+      array(
+        'schema' => '1.0',
+        'form' => 'json',
+        '_token' => $this->value,
+      )
+    );
+
+    watchdog('media_theplatform_mpx', 'Expired mpx authentication token @token for account @account.', array('@token' => $this->value, '@account' => $this->username), WATCHDOG_INFO);
+    $this->value = NULL;
+    $this->expire = NULL;
   }
 
   /**

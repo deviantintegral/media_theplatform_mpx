@@ -11,12 +11,12 @@
  * - Returns FALSE if no mpxPlayers exist in mpx account.
  * - Returns error msg if no mpx_token variable.
  */
-function media_theplatform_mpx_get_players_from_theplatform($account) {
+function media_theplatform_mpx_get_players_from_theplatform(MpxAccount $account) {
 
   global $user;
 
   // Check for the signIn token and account.
-  $mpx_token = media_theplatform_mpx_token_acquire($account);
+  $mpx_token = $account->acquireToken();
   $mpx_sub_account = $account->import_account;
 
   if (!$mpx_token) {
@@ -180,7 +180,7 @@ function media_theplatform_mpx_import_all_players($type = NULL) {
   $incoming = array();
 
   // Retrieve list of players for all accounts.
-  foreach (media_theplatform_mpx_account_load_multiple() as $account_data) {
+  foreach (MpxAccount::loadAll() as $account_data) {
     // Check if player sync has been turned off for this account.
     if (!variable_get('media_theplatform_mpx__account_' . $account_data->id . '_cron_player_sync', 1)) {
       continue;
@@ -285,7 +285,7 @@ function media_theplatform_mpx_import_all_players($type = NULL) {
  * @return string
  *   Returns output of media_theplatform_mpx_update_player() or media_theplatform_mpx_insert_player()
  */
-function media_theplatform_mpx_import_player($player, $account = NULL) {
+function media_theplatform_mpx_import_player($player, MpxAccount $account) {
   $uri = 'mpx://p/' . $player['id'] . '/a/' . basename($account->account_id);
   $fid = db_select('file_managed', 'f')
     ->fields('f', array('fid'))

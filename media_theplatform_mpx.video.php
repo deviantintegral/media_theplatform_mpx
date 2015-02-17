@@ -14,9 +14,9 @@
  * @return Array
  *   Array of mpxMedia id's that have changed since $since.
  */
-function media_theplatform_mpx_get_changed_ids($account) {
+function media_theplatform_mpx_get_changed_ids(MpxAccount $account) {
 
-  $token = media_theplatform_mpx_token_acquire($account);
+  $token = $account->acquireToken();
   $feed_request_item_limit = variable_get('media_theplatform_mpx__cron_videos_per_run', 250);
 
   $url = 'https://read.data.media.theplatform.com/media/notify?token=' . rawurlencode($token) .
@@ -124,12 +124,28 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
       case 'publish':
         // Import/Update the video.
         if (!empty($item['video'])) {
-          // If an account wasn't stored, it was queued in a previous version of
-          // this module.  Assume account 1 in these cases.
-          $item['account'] = !empty($item['account']) ? $item['account'] : media_theplatform_mpx_account_load(1);
+
+          /** @var MpxAccount $account */
+          $account = NULL;
+          if (!empty($item['account'])) {
+            $account = $item['account'];
+          }
+          elseif (!empty($item['account_id'])) {
+            $account = MpxAccount::load($item['account_id']);
+          }
+          else {
+            // If an account wasn't stored, it was queued in a previous version of
+            // this module.  Assume account 1 in these cases.
+            $accounts = MpxAccount::loadAll();
+            $item['account'] = reset($accounts);
+          }
+          if (empty($account)) {
+            throw new Exception("Unable to load mpx account for item.");
+          }
+
           // Check if player sync has been turned off for this account.  If so,
           // do not import/update this video.
-          if (!variable_get('media_theplatform_mpx__account_' . $item['account']->id . '_cron_video_sync', 1)) {
+          if (!variable_get('media_theplatform_mpx__account_' . $account->id . '_cron_video_sync', 1)) {
             return;
           }
           $video = $item['video'];
@@ -169,10 +185,10 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
             'countries' => serialize(_media_theplatform_mpx_get_media_item_data('media$countries', $video)),
           );
           // Allow modules to alter the video item for pulling in custom metadata.
-          drupal_alter('media_theplatform_mpx_media_import_item', $video_item, $video, $item['account']);
+          drupal_alter('media_theplatform_mpx_media_import_item', $video_item, $video, $account);
           // Perform the import/update.
 
-          media_theplatform_mpx_import_video($video_item, $item['account']);
+          media_theplatform_mpx_import_video($video_item, $account);
         }
         break;
 
@@ -216,7 +232,7 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
 /**
  * Helper that retrieves and returns data from an mpx feed URL.
  */
-function _media_theplatform_mpx_process_video_import_feed_data($result_data, $media_to_update = NULL, $account = NULL) {
+function _media_theplatform_mpx_process_video_import_feed_data($result_data, $media_to_update = NULL, MpxAccount $account) {
   // Initalize arrays to store mpxMedia data.
   $queue_items = array();
   $published_ids = array();
@@ -244,7 +260,7 @@ function _media_theplatform_mpx_process_video_import_feed_data($result_data, $me
     $item = array(
       'queue_operation' => 'publish',
       'video' => $video,
-      'account' => $account,
+      'account_id' => $account->id,
     );
     $queue_items[] = $item;
   }
@@ -308,14 +324,14 @@ function _media_theplatform_mpx_process_video_import_feed_data($result_data, $me
 /**
  * Processes a batch import/update.
  */
-function _media_theplatform_mpx_process_batch_video_import($type, $account = NULL) {
+function _media_theplatform_mpx_process_batch_video_import($type, MpxAccount $account) {
 
   // Get the parts for the batch url and construct it.
   $batch_url = $account->proprocessing_batch_url;
   $batch_item_count = $account->proprocessing_batch_item_count;
   $current_batch_item = (int) $account->proprocessing_batch_current_item;
   $feed_request_item_limit = variable_get('media_theplatform_mpx__cron_videos_per_run', 250);
-  $token = media_theplatform_mpx_token_acquire($account);
+  $token = $account->acquireToken();
 
   $url = $batch_url . '&range=' . $current_batch_item . '-' . ($current_batch_item + ($feed_request_item_limit - 1));
   $url .= '&token=' . rawurlencode($token);
@@ -427,7 +443,7 @@ function _media_theplatform_mpx_get_feed_item_count($url) {
 /**
  * Processes a video update.
  */
-function _media_theplatform_mpx_process_video_update($type, $account = NULL) {
+function _media_theplatform_mpx_process_video_update($type, MpxAccount $account) {
   // This log message may seem redundant, but it's important for detecting if an
   // ingestion process has begun and is currently in progress.
   watchdog('media_theplatform_mpx', 'Beginning video update process @method for @account.',
@@ -485,7 +501,7 @@ function _media_theplatform_mpx_process_video_update($type, $account = NULL) {
   // Get the feed url.
   $batch_url = _media_theplatform_mpx_get_video_feed_url($ids, $account);
 
-  $token = media_theplatform_mpx_token_acquire($account);
+  $token = $account->acquireToken();
   $url = $batch_url . '&token=' . rawurlencode($token);
 
   // Get the total result count for this update.  If it is greater than the feed
@@ -525,7 +541,7 @@ function _media_theplatform_mpx_process_video_update($type, $account = NULL) {
 /**
  * Processes a video update.
  */
-function _media_theplatform_mpx_process_video_import($type, $account = NULL) {
+function _media_theplatform_mpx_process_video_import($type, MpxAccount $account) {
   // This log message may seem redundant, but it's important for detecting if an
   // ingestion process has begun and is currently in progress.
   watchdog('media_theplatform_mpx', 'Running initial video import for @account @method',
@@ -543,7 +559,7 @@ function _media_theplatform_mpx_process_video_import($type, $account = NULL) {
   // Get the feed url.
   $batch_url = _media_theplatform_mpx_get_video_feed_url('all', $account);
 
-  $token = media_theplatform_mpx_token_acquire($account);
+  $token = $account->acquireToken();
   $url = $batch_url . '&token=' . rawurlencode($token);
 
   // Get the total result count for this update.  If it is greater than the feed
@@ -558,7 +574,7 @@ function _media_theplatform_mpx_process_video_import($type, $account = NULL) {
     _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_current_item', 0);
     // Reload the $account object because it does not have the
     // 'proprocessing_batch_*' variables that were set above.
-    $account = media_theplatform_mpx_account_load($account->id);
+    $account = MpxAccount::load($account->id);
 
     // Perform the first batch operation, not the update.
     return _media_theplatform_mpx_process_batch_video_import($type, $account);
@@ -602,7 +618,7 @@ function media_theplatform_mpx_import_all_videos($type) {
   // ingestion process has begun and is currently in progress.
   watchdog('media_theplatform_mpx', 'Beginning video import/update process @method for all accounts.', array('@method' => $type), WATCHDOG_NOTICE);
 
-  foreach (media_theplatform_mpx_account_load_multiple() as $account_data) {
+  foreach (MpxAccount::loadAll() as $account_data) {
 
     // Check if video sync has been turned off for this account.
     if (!variable_get('media_theplatform_mpx__account_' . $account_data->id . '_cron_video_sync', 1)) {
@@ -610,7 +626,7 @@ function media_theplatform_mpx_import_all_videos($type) {
     }
 
     // Don't do anything if we don't have signIn token or import account.
-    if (!media_theplatform_mpx_token_acquire($account_data) || empty($account_data->import_account) ||
+    if (!$account_data->acquireToken() || empty($account_data->import_account) ||
         !media_theplatform_mpx_is_valid_player_for_account($account_data->default_player, $account_data)) {
       continue;
     }
@@ -775,14 +791,14 @@ function media_theplatform_mpx_import_video($video, $account = NULL) {
 /**
  * Helper that returns player data for an mpx video.
  */
-function _media_theplatform_mpx_get_video_player($video, $account = NULL) {
+function _media_theplatform_mpx_get_video_player($video, MpxAccount $account = NULL) {
 
   if (!empty($video['player_id'])) {
 
     return media_theplatform_mpx_get_mpx_player_by_player_id($video['player_id']);
   }
 
-  if (is_object($account) && !empty($account->default_player)) {
+  if (!empty($account->default_player)) {
 
     return media_theplatform_mpx_get_mpx_player_by_player_id($account->default_player);
   }
@@ -793,7 +809,7 @@ function _media_theplatform_mpx_get_video_player($video, $account = NULL) {
 /**
  * Helper that returns the file URI for an mpx video.
  */
-function _media_theplatform_mpx_get_video_file_uri($video, $account = NULL) {
+function _media_theplatform_mpx_get_video_file_uri($video, MpxAccount $account = NULL) {
 
   if (!is_array($video) || empty($video['guid'])) {
     return '';
@@ -807,7 +823,7 @@ function _media_theplatform_mpx_get_video_file_uri($video, $account = NULL) {
 
   $uri = 'mpx://m/' . $video['guid'] . '/p/' . $player['fid'];
 
-  if (is_object($account) && !empty($account->account_id)) {
+  if (!empty($account->account_id)) {
     $uri .= '/a/' . basename($account->account_id);
   }
 
@@ -817,7 +833,7 @@ function _media_theplatform_mpx_get_video_file_uri($video, $account = NULL) {
 /**
  * Helper that saves a new mpx video file entity.
  */
-function _media_theplatform_mpx_create_video_file($video, $account = NULL) {
+function _media_theplatform_mpx_create_video_file($video, MpxAccount $account = NULL) {
 
   // Get uri string to create file:
   //   "m" is for media.  "p" for player.  "a" for account.
@@ -876,7 +892,7 @@ function _media_theplatform_mpx_create_video_file($video, $account = NULL) {
  * @return String
  *   Returns 'insert' for counters in media_theplatform_mpx_import_all_videos()
  */
-function media_theplatform_mpx_insert_video($video, $fid = NULL, $account = NULL) {
+function media_theplatform_mpx_insert_video($video, $fid = NULL, MpxAccount $account = NULL) {
   // If file doesn't exist, write it to file_managed.
   if (!$fid) {
     $file = _media_theplatform_mpx_create_video_file($video, $account);
@@ -1015,7 +1031,7 @@ function _media_theplatform_mpx_delete_video_images($video) {
  * @return String
  *   Returns 'update' for counters in media_theplatform_mpx_import_all_players()
  */
-function media_theplatform_mpx_update_video($video, $fid = NULL, $account = NULL) {
+function media_theplatform_mpx_update_video($video, $fid = NULL, MpxAccount $account = NULL) {
 
   // Update mpx_video record.
   $update_fields = array(
@@ -1135,13 +1151,13 @@ function media_theplatform_mpx_update_video($video, $fid = NULL, $account = NULL
 /**
  * Returns associative array of mpx_video data for given $field and its $value.
  */
-function media_theplatform_mpx_get_mpx_video_by_field($field, $value, $account = NULL) {
+function media_theplatform_mpx_get_mpx_video_by_field($field, $value, MpxAccount $account = NULL) {
 
   $query = db_select('mpx_video', 'v')
     ->fields('v')
     ->condition($field, $value, '=');
 
-  if (is_object($account) && !empty($account->id)) {
+  if (!empty($account->id)) {
     $query->condition('parent_account', $account->id, '=');
   }
 
@@ -1171,14 +1187,14 @@ function media_theplatform_mpx_get_videos_by_fid($fid) {
 /**
  * Returns array of all records in mpx_video given a file entity's fid.
  */
-function media_theplatform_mpx_get_videos_by_id($id, $account = NULL) {
+function media_theplatform_mpx_get_videos_by_id($id, MpxAccount $account = NULL) {
 
   $query = db_select('mpx_video', 'f')
     ->fields('f')
     ->condition('id', $id, '=')
     ->orderBy('video_id', 'DESC');
 
-  if (is_object($account) && !empty($account->id)) {
+  if (!empty($account->id)) {
     $query->condition('parent_account', $account->id, '=');
   }
 
@@ -1188,13 +1204,13 @@ function media_theplatform_mpx_get_videos_by_id($id, $account = NULL) {
 /**
  * Returns array of all records in file_managed with mpx://m/$guid/%.
  */
-function media_theplatform_mpx_get_files_by_guid($guid, $account = NULL) {
+function media_theplatform_mpx_get_files_by_guid($guid, MpxAccount $account = NULL) {
 
   $query = db_select('file_managed', 'f')
     ->fields('f')
     ->condition('uri', 'mpx://m/' . $guid . '/%', 'LIKE');
 
-  if (is_object($account) && !empty($account->account_id)) {
+  if (!empty($account->account_id)) {
     $query->condition('uri', '%/a/' . basename($account->account_id), 'LIKE');
   }
 
@@ -1235,7 +1251,7 @@ function media_theplatform_mpx_get_thumbnail_url($guid) {
 /**
  * Validates and restores backup last notification sequence ID.
  */
-function _media_theplatform_mpx_restore_last_notification($account) {
+function _media_theplatform_mpx_restore_last_notification(MpxAccount $account) {
   $backup_last_notification_value = variable_get('media_theplatform_mpx__backup_last_notification_value');
 
   if (!$backup_last_notification_value) {
@@ -1247,7 +1263,7 @@ function _media_theplatform_mpx_restore_last_notification($account) {
 
   // Check if the backup value is still valid.  Last notification  sequence
   // IDs are only stored by thePlatform for a week.
-  $token = media_theplatform_mpx_token_acquire($account);
+  $token = $account->acquireToken();
   $url = 'https://read.data.media.theplatform.com/media/notify?token=' . rawurlencode($token) .
     '&account=' . rawurlencode($account->import_account) .
     '&block=false&filter=Media&clientId=drupal_media_theplatform_mpx_' . $account->account_pid .
@@ -1273,10 +1289,10 @@ function _media_theplatform_mpx_restore_last_notification($account) {
 /**
  * Returns most recent notification sequence number from thePlatform.
  */
-function media_theplatform_mpx_set_last_notification($account, $last_notification = NULL) {
+function media_theplatform_mpx_set_last_notification(MpxAccount $account, $last_notification = NULL) {
 
   if (empty($last_notification)) {
-    $token = media_theplatform_mpx_token_acquire($account);
+    $token = $account->acquireToken();
     $url = 'https://read.data.media.theplatform.com/media/notify?token=' . rawurlencode($token) .
       '&account=' . rawurlencode($account->import_account) .
       '&filter=Media&clientId=drupal_media_theplatform_mpx_' . $account->account_pid;

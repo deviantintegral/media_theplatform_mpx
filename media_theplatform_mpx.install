@@ -415,8 +415,10 @@ function media_theplatform_mpx_uninstall() {
   drupal_load('module', 'media_theplatform_mpx');
 
   // Remove accounts.
-  if ($accounts = media_theplatform_mpx_account_load_multiple()) {
-    media_theplatform_mpx_account_delete_multiple(array_keys($accounts));
+  if ($ids = db_query("SELECT id FROM {mpx_accounts}")->fetchCol()) {
+    foreach ($ids as $id) {
+      _media_theplatform_mpx_delete_account($id, FALSE);
+    }
   }
 
   // Remove variables.

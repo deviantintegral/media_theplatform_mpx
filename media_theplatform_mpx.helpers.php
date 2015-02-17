@@ -74,14 +74,14 @@ function media_theplatform_mpx_get_accounts_select($account_id, $username = NULL
       $token = MpxToken::fetch($username, $password);
     }
     elseif (empty($token) && !empty($account_id)) {
-      $account_data = media_theplatform_mpx_account_load($account_id);
+      $account_data = MpxAccount::load($account_id);
       if (empty($account_data)) {
         watchdog('media_theplatform_mpx', 'Failed to retrieve all import accounts.  Account data unavailable for account @id.',
           array('@id' => $account_id), WATCHDOG_ERROR);
 
         return array();
       }
-      $token = media_theplatform_mpx_token_acquire($account_data);
+      $token = $account_data->acquireToken();
     }
     elseif (empty($token)) {
       watchdog('media_theplatform_mpx', 'Failed to retrieve all import accounts because a account ID, token or username and password were not available.',
