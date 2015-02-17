@@ -633,30 +633,6 @@ function _media_theplatform_mpx_get_default_released_file_pid($media_data) {
 }
 
 /**
- * Helper for testing _media_theplatform_mpx_get_media_item_data().
- */
-function _test_media_theplatform_mpx_get_media_item_data() {
-
-  $path = 'media$categories/media$name';
-  $path = 'media$content/plfile$releases/plrelease$url';
-  $path = 'media$availableDate';
-
-  $account = media_theplatform_mpx_account_load(1);
-  $theplatform_account_id = $account->account_id;
-  $theplatform_token = media_theplatform_mpx_token_acquire($account);
-
-  $json_feed_url = 'https://read.data.media.theplatform.com/media/data/Media?schema=1.4.0&form=json&pretty=true&byOwnerId=' . $theplatform_account_id . '&token=' . rawurlencode($theplatform_token);
-  $json_feed_contents = file_get_contents($json_feed_url);
-  $feed_data = drupal_json_decode($json_feed_contents);
-
-  $media_data_item = $feed_data['entries'][0];
-
-  $result = _media_theplatform_mpx_get_media_item_data($path, $media_data_item);
-
-  return $result;
-}
-
-/**
  * Helper function for getting data from thePlatform feed arrays.
  */
 function _media_theplatform_mpx_get_media_item_data($path, $media_data) {
