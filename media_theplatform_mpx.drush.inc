@@ -201,9 +201,9 @@ function drush_media_theplatform_mpx_ingest_mpx_videos_validate($account_id = 'a
   }
 
   // If a parent ingestion process is running for this account, return an error.
-  if (!$forced_to_run && !lock_may_be_available('media_theplatform_mpx_ingest_videos_' . $id)) {
+  if (!$forced_to_run && $account_id && !lock_may_be_available('media_theplatform_mpx_ingest_videos_' . $account_id)) {
     return _drush_media_theplatform_mpx_print('MPX video ingestion already running for account @id.  Aborting mpx video ingestion.',
-      array('@id' => $id), 'error');
+      array('@id' => $account_id), 'error');
   }
 
   // Throw an error if any of the account data is incorrect or absent.
