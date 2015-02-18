@@ -202,14 +202,13 @@ class MpxToken {
       'timeout' => 15,
       'headers' => array('Content-Type' => 'application/x-www-form-urlencoded'),
     );
-    $time = time();
     $result_data = _media_theplatform_mpx_retrieve_feed_data($url, TRUE, $options);
     if (!empty($result_data['signInResponse']['token'])) {
       $lifetime = floor(min($result_data['signInResponse']['duration'], $result_data['signInResponse']['idleTimeout']) / 1000);
       $token = new MpxToken(
         $username,
         $result_data['signInResponse']['token'],
-        $time + $lifetime
+        REQUEST_TIME + $lifetime
       );
       watchdog('media_theplatform_mpx', 'Fetched new mpx token @token for account @username that expires on @date (in @duration).', array('@token' => $token->value, '@username' => $username, '@date' => format_date($token->expire), '@duration' => format_interval($lifetime)), WATCHDOG_INFO);
       return $token;
