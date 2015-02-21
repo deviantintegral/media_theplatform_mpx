@@ -136,7 +136,6 @@ class MpxAccount {
   public function delete() {
     $transaction = db_transaction();
     try {
-      module_invoke_all('media_theplatform_mpx_account_delete', $this);
       // @todo Make account deletion use some kind of queue so it can be run without a batch process.
       _media_theplatform_mpx_delete_account($this->id, FALSE);
     }
