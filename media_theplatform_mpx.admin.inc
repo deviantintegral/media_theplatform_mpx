@@ -647,8 +647,9 @@ function media_theplatform_mpx_form_mpx_video_sync_submit($form, &$form_state) {
       ->execute()
       ->fetchField();
     if ($currently_stored_default_player != $values['default_player_id']) {
-      _media_theplatform_mpx_set_field($account_id, 'default_player', $values['default_player_id']);
       $account = MpxAccount::load($account_id);
+      $account->default_player = $values['default_player_pid'];
+      $account->save();
       $player = media_theplatform_mpx_get_mpx_player_by_player_id($values['default_player_id']);
       watchdog('media_theplatform_mpx', 'Player @pid -- @player -- set as default player for account @account.',
         array(
