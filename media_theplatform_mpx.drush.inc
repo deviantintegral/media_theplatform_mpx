@@ -1155,6 +1155,7 @@ function _drush_media_theplatform_mpx_request_video_data($request_queue_item) {
     // will be released once its expiration is reached.
     for ($i = 0; $i < 5; $i++) {
       try {
+        $request_queue = DrupalQueue::get('media_theplatform_mpx_video_request_queue_' . $request_account->id);
         $request_queue->releaseItem($request_queue_item);
       }
       catch (Exception $e) {
