@@ -376,30 +376,33 @@ function media_theplatform_mpx_schema() {
         'type' => 'int',
         'not null' => FALSE,
       ),
-      'last_notification' => array(
-        'description' => 'Last Notification Sequence ID',
+    ),
+    'primary key' => array('id'),
+  );
+
+  $schema['mpx_account_data'] = array(
+    'description' => 'Stores variable mpx account data.',
+    'fields' => array(
+      'account_id' => array(
+        'description' => 'Internal Account ID',
         'type' => 'int',
-        'size' => 'big',
-        'not null' => FALSE,
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
       ),
-      'proprocessing_batch_url' => array(
-        'description' => 'Feed Request Batch URL',
+      'name' => array(
+        'description' => "The name of the variable.",
         'type' => 'varchar',
-        'length' => 1024,
-        'not null' => FALSE,
+        'length' => '64',
+        'not null' => TRUE,
       ),
-      'proprocessing_batch_item_count' => array(
-        'description' => 'Feed Request Batch Item Count.',
-        'type' => 'int',
-        'not null' => FALSE,
-      ),
-      'proprocessing_batch_current_item' => array(
-        'description' => 'Current Feed Request Batch Item.',
-        'type' => 'int',
+      'value' => array(
+        'description' => "The value of the variable.",
+        'type' => 'blob',
         'not null' => FALSE,
       ),
     ),
-    'primary key' => array('id'),
+    'primary key' => array('account_id', 'name'),
   );
 
   $schema['cache_mpx'] = drupal_get_schema_unprocessed('system', 'cache');
@@ -964,4 +967,56 @@ function media_theplatform_mpx_update_7218() {
       ->condition('account', $old)
       ->execute();
   }
+}
+
+/**
+ * Add the mpx_account_data table.
+ */
+function media_theplatform_mpx_update_7219() {
+  // A non-empty value indicates that an import process is currently running.
+  if (db_query("SELECT 1 FROM {mpx_accounts} WHERE proprocessing_batch_url <> '' AND proprocessing_batch_url IS NOT NULL")->fetchField()) {
+    throw new DrupalUpdateException("Cannot run media_theplatform_mpx_update_7219() while mpx import is currently running.");
+  }
+
+  if (!db_table_exists('mpx_account_data')) {
+    $schema = array(
+      'description' => 'Stores variable mpx account data.',
+      'fields' => array(
+        'account_id' => array(
+          'description' => 'Internal Account ID',
+          'type' => 'int',
+          'unsigned' => TRUE,
+          'not null' => TRUE,
+          'default' => 0,
+        ),
+        'name' => array(
+          'description' => "The name of the variable.",
+          'type' => 'varchar',
+          'length' => '64',
+          'not null' => TRUE,
+        ),
+        'value' => array(
+          'description' => "The value of the variable.",
+          'type' => 'blob',
+          'not null' => FALSE,
+        ),
+      ),
+      'primary key' => array('account_id', 'name'),
+    );
+    db_create_table('mpx_account_data', $schema);
+  }
+
+  $results = db_query("SELECT id, last_notification FROM {mpx_accounts} WHERE last_notification IS NOT NULL")->fetchAll();
+  foreach ($results as $result) {
+    db_insert('mpx_account_data')->fields(array(
+      'account_id' => $result->id,
+      'name' => 'last_notification',
+      'value' => $result->last_notification,
+    ))->execute();
+  }
+
+  db_drop_field('mpx_accounts', 'last_notification');
+  db_drop_field('mpx_accounts', 'proprocessing_batch_url');
+  db_drop_field('mpx_accounts', 'proprocessing_batch_item_count');
+  db_drop_field('mpx_accounts', 'proprocessing_batch_current_item');
 }

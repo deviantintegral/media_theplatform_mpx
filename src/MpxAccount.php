@@ -13,6 +13,7 @@ class MpxAccount {
   public $proprocessing_batch_url;
   public $proprocessing_batch_item_count;
   public $proprocessing_batch_current_item;
+  public $data = array();
 
   /**
    * Constructs a new mpx account object, without saving it.
@@ -62,6 +63,7 @@ class MpxAccount {
     $accounts = db_query("SELECT * FROM {mpx_accounts} WHERE id IN (:ids)", array(':ids' => $ids), array('fetch' => get_called_class()))->fetchAllAssoc('id');
     foreach ($accounts as $account) {
       $account->password = decrypt($account->password);
+      $account->data = db_query("SELECT name, value FROM {mpx_account_data} WHERE account_id = :id", array(':id' => $account->id))->fetchAllKeyed();
       module_invoke_all('media_theplatform_mpx_account_load', $account);
     }
     return $accounts;
@@ -77,6 +79,7 @@ class MpxAccount {
     $accounts = db_query("SELECT * FROM {mpx_accounts}", array(), array('fetch' => get_called_class()))->fetchAllAssoc('id');
     foreach ($accounts as $account) {
       $account->password = decrypt($account->password);
+      $account->data = db_query("SELECT name, value FROM {mpx_account_data} WHERE account_id = :id", array(':id' => $account->id))->fetchAllKeyed();
       module_invoke_all('media_theplatform_mpx_account_load', $account);
     }
     return $accounts;
@@ -306,5 +309,45 @@ class MpxAccount {
 
     natcasesort($options);
     return $options;
+  }
+
+  /**
+   * Returns the stored value for a given key.
+   *
+   * @param string $key
+   *   The key of the data to retrieve.
+   * @param mixed $default
+   *   The default value to use if the key is not found.
+   * @return mixed
+   *   The stored value, or the default value if no value exists.
+   */
+  public function getDataValue($key, $default = NULL) {
+    if (array_key_exists($key, $this->data)) {
+      return $this->data[$key];
+    }
+    else {
+      return $default;
+    }
+  }
+
+  /**
+   * Saves a value for a given key.
+   *
+   * @param string $key
+   *   The key of the data to store.
+   * @param mixed $value
+   *   The data to store.
+   */
+  public function setDataValue($key, $value) {
+    $this->data[$key] = $value;
+    db_merge('mpx_account_data')
+      ->key(array(
+        'account_id' => $this->id,
+        'name' => $key,
+      ))
+      ->fields(array(
+        'value' => $value
+      ))
+      ->execute();
   }
 }

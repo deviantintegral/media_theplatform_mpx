@@ -1019,6 +1019,7 @@ function _media_theplatform_mpx_delete_account_data($account_id) {
   $queue->deleteQueue();
 
   db_delete('mpx_accounts')->condition('id', $account_id)->execute();
+  db_delete('mpx_account_data')->condition('account_id', $account_id)->execute();
 
   // Remove variables disabling video and player sync for this account.
   variable_del('media_theplatform_mpx__account_' . $account_id . '_cron_player_sync');

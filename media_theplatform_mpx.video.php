@@ -22,7 +22,7 @@ function media_theplatform_mpx_get_changed_ids(MpxAccount $account) {
   $url = 'https://read.data.media.theplatform.com/media/notify?token=' . rawurlencode($token) .
     '&account=' . rawurlencode($account->import_account) .
     '&block=false&filter=Media&clientId=drupal_media_theplatform_mpx_' . $account->account_pid .
-    '&since=' . $account->last_notification .
+    '&since=' . $account->getDataValue('last_notification') .
     '&size=' . $feed_request_item_limit;
 
   $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
@@ -327,9 +327,9 @@ function _media_theplatform_mpx_process_video_import_feed_data($result_data, $me
 function _media_theplatform_mpx_process_batch_video_import($type, MpxAccount $account) {
 
   // Get the parts for the batch url and construct it.
-  $batch_url = $account->proprocessing_batch_url;
-  $batch_item_count = $account->proprocessing_batch_item_count;
-  $current_batch_item = (int) $account->proprocessing_batch_current_item;
+  $batch_url = $account->getDataValue('proprocessing_batch_url');
+  $batch_item_count = $account->getDataValue('proprocessing_batch_item_count');
+  $current_batch_item = (int) $account->getDataValue('proprocessing_batch_current_item');
   $feed_request_item_limit = variable_get('media_theplatform_mpx__cron_videos_per_run', 250);
   $token = $account->acquireToken();
 
@@ -374,17 +374,17 @@ function _media_theplatform_mpx_process_batch_video_import($type, MpxAccount $ac
 
   $current_batch_item += $feed_request_item_limit;
   if ($current_batch_item <= $batch_item_count) {
-    _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_current_item', $current_batch_item);
+    $account->setDataValue('proprocessing_batch_current_item', $current_batch_item);
   }
   else {
     // Reset the batch system variables.
-    _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_url', '');
-    _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_item_count', 0);
-    _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_current_item', 0);
+    $account->setDataValue('proprocessing_batch_url', '');
+    $account->setDataValue('proprocessing_batch_item_count', 0);
+    $account->setDataValue('proprocessing_batch_current_item', 0);
     // In case this is the end of the initial import batch, set the last
     // notification id.
     // HERE
-    if (!$account->last_notification) {
+    if (!$account->getDataValue('last_notification')) {
       media_theplatform_mpx_set_last_notification($account);
     }
   }
@@ -513,9 +513,9 @@ function _media_theplatform_mpx_process_video_update($type, MpxAccount $account)
     // Set last notification for the next update.
     media_theplatform_mpx_set_last_notification($account, $media_to_update['last_notification']);
     // Set starter batch system variables.
-    _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_url', $batch_url);
-    _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_item_count', $total_result_count);
-    _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_current_item', 0);
+    $account->setDataValue('proprocessing_batch_url', $batch_url);
+    $account->setDataValue('proprocessing_batch_item_count', $total_result_count);
+    $account->setDataValue('proprocessing_batch_current_item', 0);
     // Perform the first batch operation, not the update.
     return _media_theplatform_mpx_process_batch_video_import($type, $account);
   }
@@ -569,12 +569,9 @@ function _media_theplatform_mpx_process_video_import($type, MpxAccount $account)
 
   if ($total_result_count && $total_result_count > $feed_request_item_limit) {
     // Set starter batch system variables.
-    _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_url', $batch_url);
-    _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_item_count', $total_result_count);
-    _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_current_item', 0);
-    // Reload the $account object because it does not have the
-    // 'proprocessing_batch_*' variables that were set above.
-    $account = MpxAccount::load($account->id);
+    $account->setDataValue('proprocessing_batch_url', $batch_url);
+    $account->setDataValue('proprocessing_batch_item_count', $total_result_count);
+    $account->setDataValue('proprocessing_batch_current_item', 0);
 
     // Perform the first batch operation, not the update.
     return _media_theplatform_mpx_process_batch_video_import($type, $account);
@@ -632,13 +629,13 @@ function media_theplatform_mpx_import_all_videos($type) {
     }
 
     // Check if we're running a feed request batch.  If so, construct the batch URL.
-    if ($account_data->proprocessing_batch_url) {
+    if ($account_data->getDataValue('proprocessing_batch_url')) {
       _media_theplatform_mpx_process_batch_video_import($type, $account_data);
       continue;
     }
 
     // Check if we have a notification stored.  If so, run an update.
-    if ($account_data->last_notification) {
+    if ($account_data->getDataValue('last_notification')) {
       _media_theplatform_mpx_process_video_update($type, $account_data);
       continue;
     }
@@ -1316,7 +1313,7 @@ function media_theplatform_mpx_set_last_notification(MpxAccount $account, $last_
   // If we have a value, save it in the mpx_accounts table and in our backup
   // variable.
   if ($last_notification) {
-    _media_theplatform_mpx_set_field($account->id, 'last_notification', $last_notification);
+    $account->setDataValue('last_notification', $last_notification);
     // Save the last notification value in the fallback variable for recovery purposes.
     variable_set('media_theplatform_mpx__backup_last_notification_value', $last_notification);
 

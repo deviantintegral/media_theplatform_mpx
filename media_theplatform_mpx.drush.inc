@@ -424,14 +424,14 @@ function _drush_media_theplatform_mpx_check_notification_sequence_id(MpxAccount 
   $url = 'https://read.data.media.theplatform.com/media/notify?token=' . $token
     . '&account=' . rawurlencode($account->import_account)
     . '&clientId=drupal_media_theplatform_mpx_reports_' . $account->account_pid
-    . '&since=' . $account->last_notification
+    . '&since=' . $account->getDataValue('last_notification')
     . '&block=false&filter=Media';
 
   $response = _media_theplatform_mpx_retrieve_feed_data($url);
 
   if (isset($response[0]['type']) && $response[0]['type'] == 'Exception') {
 
-    _media_theplatform_mpx_set_field($account->id, 'last_notification', NULL);
+    $account->setDataValue('last_notification', NULL);
 
     return _drush_media_theplatform_mpx_print('Last notification sequence ID is invalid.  Setting last_notification value to NULL to perform a complete re-ingestion for this account.', array(), 'error');;
   }
@@ -797,13 +797,13 @@ function _drush_media_theplatform_mpx_process_complete_video_ingestion(MpxAccoun
     // wait/reward is less ideal when requesting more or less video data at
     // a time.  Though this could be different for non-test environments.
     $request_item_limit = variable_get('media_theplatform_mpx__drush_video_ingestion_request_item_limit', 100);
-    $request_count = $account->proprocessing_batch_item_count;
-    $current_batch_item = (int) $account->proprocessing_batch_current_item;
+    $request_count = $account->getDataValue('proprocessing_batch_item_count');
+    $current_batch_item = (int) $account->getDataValue('proprocessing_batch_current_item');
 
     for ($i = $current_batch_item; $i < $request_count; $i += $request_item_limit) {
       $range = $i . '-' . ($i + ($request_item_limit - 1));
       $request_queue_item = array(
-        'request_url' => $account->proprocessing_batch_url,
+        'request_url' => $account->getDataValue('proprocessing_batch_url'),
         'request_range' => $range,
         'request_count' => $request_count,
         'account_id' => $account->id,
@@ -825,11 +825,11 @@ function _drush_media_theplatform_mpx_process_complete_video_ingestion(MpxAccoun
 
   // Reset the batch system variables to indicate the ingestion is done.
   if (!$request_queue->numberOfItems()) {
-    _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_url', '');
-    _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_item_count', 0);
-    _media_theplatform_mpx_set_field($account->id, 'proprocessing_batch_current_item', 0);
+    $account->setDataValue('proprocessing_batch_url', '');
+    $account->setDataValue('proprocessing_batch_item_count', 0);
+    $account->setDataValue('proprocessing_batch_current_item', 0);
 
-    if (!$account->last_notification) {
+    if (!$account->getDataValue('last_notification')) {
       media_theplatform_mpx_set_last_notification($account);
     }
 
@@ -937,7 +937,7 @@ function _drush_media_theplatform_mpx_process_outstanding_video_notifications(Mp
   $start_time = time();
 
   // Build the notification service request base URL.
-  $last_notification_id = $account->last_notification;
+  $last_notification_id = $account->getDataValue('last_notification');
   $base_update_url = 'https://read.data.media.theplatform.com/media/notify?account=' . rawurlencode($account->import_account)
     . '&clientId=drupal_drush_media_theplatform_mpx_' . $account->account_pid
     . '&block=' . ($blocking ? 'true' : 'false')
@@ -1072,14 +1072,11 @@ function _drush_media_theplatform_mpx_process_video_ingestion_as_account_handler
 
   // Ensure we have a valid notification sequence ID.  If not, then
   // reset the last notification value and start a complete video ingestion.
-  if (!_drush_media_theplatform_mpx_check_notification_sequence_id($account)) {
-    // Retrieve current account data.
-    $account = MpxAccount::load($account->id);
-  }
+  _drush_media_theplatform_mpx_check_notification_sequence_id($account);
 
   // If a batch url stored or a last_notification sequence ID is not stored,
   // start an initial ingestion, or a complete re-ingestion.
-  if (empty($account->last_notification) || $account->proprocessing_batch_url) {
+  if (!$account->getDataValue('last_notification') || $account->getDataValue('proprocessing_batch_url')) {
     _drush_media_theplatform_mpx_process_complete_video_ingestion($account);
     if ($parent_process_metadata) {
       lock_release($parent_process_metadata['lock_name']);
@@ -1103,11 +1100,11 @@ function _drush_media_theplatform_mpx_process_video_ingestion_as_account_handler
   // If the command is supposed to quit after pulling updates, do not
   // establish a polling connection to thePlatform, and simply retrieve and
   // process all outstanding updates instead.
-  if ($account->last_notification && drush_get_option('quit-when-complete')) {
+  if ($account->getDataValue('last_notification') && drush_get_option('quit-when-complete')) {
     $return = _drush_media_theplatform_mpx_process_outstanding_video_notifications($account);
   }
   // Begin listening for change notifications.
-  elseif ($account->last_notification) {
+  elseif ($account->getDataValue('last_notification')) {
     $return = _drush_media_theplatform_mpx_process_outstanding_video_notifications($account, TRUE);
   }
   // Something is wrong if we don't have a last_notification value by this point.
