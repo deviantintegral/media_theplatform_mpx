@@ -871,6 +871,9 @@ function media_theplatform_mpx_update_7215() {
   $records = db_query("SELECT id, username, token FROM {mpx_accounts}")->fetchAll();
   foreach ($records as $record) {
     $record->username = _media_theplatform_mpx_decrypt_value($record->username);
+    if (empty($record->username)) {
+      throw new DrupalUpdateException("Unable to decode mpx_accounts.username for id $record->id");
+    }
     if (!empty($record->token)) {
       $record->token = _media_theplatform_mpx_decrypt_value($record->token);
     }

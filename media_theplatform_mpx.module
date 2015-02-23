@@ -1165,7 +1165,7 @@ function _media_theplatform_mpx_encrypt_value($value) {
   }
 
   $library = libraries_load('zend_crypt');
-  $key = md5(drupal_get_hash_salt());
+  $key = md5($GLOBALS['drupal_hash_salt']);
 
   // If library doesn't exist, use a less secure means of encryption/decryption.
   if (!$library['loaded']) {
@@ -1205,7 +1205,7 @@ function _media_theplatform_mpx_decrypt_value($value) {
   }
 
   $library = libraries_load('zend_crypt');
-  $key = md5(drupal_get_hash_salt());
+  $key = md5($GLOBALS['drupal_hash_salt']);
 
   // If library doesn't exist, use a less secure means of encryption/decryption.
   if (!$library['loaded']) {
