@@ -441,6 +441,7 @@ function media_theplatform_mpx_uninstall() {
   variable_del('media_theplatform_mpx__drush_video_notification_ingestion_request_item_limit');
   variable_del('media_theplatform_mpx__drush_video_ingestion_notification_timeout');
   variable_del('media_theplatform_mpx__drush_video_ingestion_request_timeout');
+  variable_del('media_theplatform_mpx_assets_protocol_fallback');
 
   // Deprecated variables.
   variable_del('media_theplatform_mpx__username');
