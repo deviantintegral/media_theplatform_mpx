@@ -105,8 +105,13 @@ class MpxApi {
    */
   public static function processJsonResponse($response) {
     $data = json_decode($response->data, TRUE);
-    if ($data === FALSE) {
-      throw new MpxApiException($response, "Unable to decode JSON response from request to {$response->url}.");
+    if ($data === NULL && json_last_error() !== JSON_ERROR_NONE) {
+      if (function_exists('json_last_error_msg')) {
+        throw new MpxApiException($response, "Unable to decode JSON response from request to {$response->url}: " . json_last_error_msg());
+      }
+      else {
+        throw new MpxApiException($response, "Unable to decode JSON response from request to {$response->url}");
+      }
     }
 
     $response->data = $data;
