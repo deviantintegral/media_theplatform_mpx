@@ -1013,6 +1013,11 @@ function _media_theplatform_mpx_delete_account_data($account_id) {
     }
   }
 
+  // Delete the request queue for the account.
+  /** @var DrupalReliableQueueInterface $queue */
+  $queue = DrupalQueue::get('media_theplatform_mpx_video_request_queue_' . $account_id, TRUE);
+  $queue->deleteQueue();
+
   db_delete('mpx_accounts')->condition('id', $account_id)->execute();
 
   // Remove variables disabling video and player sync for this account.

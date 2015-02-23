@@ -451,6 +451,11 @@ function media_theplatform_mpx_uninstall() {
   variable_del('media_theplatform_mpx__account_id');
   variable_del('media_theplatform_mpx__account_pid');
   variable_del('media_theplatform_mpx__last_notification');
+
+  // Delete the cron queue.
+  /** @var DrupalReliableQueueInterface $queue */
+  $queue = DrupalQueue::get('media_theplatform_mpx_video_cron_queue', TRUE);
+  $queue->deleteQueue();
 }
 
 /**
