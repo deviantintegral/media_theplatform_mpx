@@ -324,16 +324,19 @@ function _media_theplatform_mpx_process_video_import_feed_data($result_data, $me
 /**
  * Processes a batch import/update.
  */
-function _media_theplatform_mpx_process_batch_video_import($type, MpxAccount $account) {
+function _media_theplatform_mpx_process_batch_video_import(MpxAccount $account, array $options = array()) {
+  $options += array(
+    'method' => 'manually',
+    'limit' => variable_get('media_theplatform_mpx__cron_videos_per_run', 250),
+  );
 
   // Get the parts for the batch url and construct it.
   $batch_url = $account->getDataValue('proprocessing_batch_url');
   $batch_item_count = $account->getDataValue('proprocessing_batch_item_count');
   $current_batch_item = (int) $account->getDataValue('proprocessing_batch_current_item');
-  $feed_request_item_limit = variable_get('media_theplatform_mpx__cron_videos_per_run', 250);
   $token = $account->acquireToken();
 
-  $url = $batch_url . '&range=' . $current_batch_item . '-' . ($current_batch_item + ($feed_request_item_limit - 1));
+  $url = $batch_url . '&range=' . $current_batch_item . '-' . ($current_batch_item + ($options['limit'] - 1));
   $url .= '&token=' . rawurlencode($token);
 
   // This log message may seem redundant, but it's important for detecting if an
@@ -341,9 +344,9 @@ function _media_theplatform_mpx_process_batch_video_import($type, MpxAccount $ac
   watchdog('media_theplatform_mpx', 'Processing batch video import @method for @account. <br /><br /> Retrieving @limit videos from:
     <br /><br />  @url.',
     array(
-      '@method' => $type,
+      '@method' => $options['method'],
       '@account' => _media_theplatform_mpx_account_log_string($account),
-      '@limit' => $feed_request_item_limit,
+      '@limit' => $options['limit'],
       '@url' => $url,
     ),
     WATCHDOG_NOTICE);
@@ -352,7 +355,7 @@ function _media_theplatform_mpx_process_batch_video_import($type, MpxAccount $ac
   if (!$result_data) {
     watchdog('media_theplatform_mpx', 'Aborting batch video import @method.  No video data returned from thePlatform.',
       array(
-        '@method' => $type,
+        '@method' => $options['method'],
         '@account' => _media_theplatform_mpx_account_log_string($account),
       ),
       WATCHDOG_ERROR);
@@ -364,7 +367,7 @@ function _media_theplatform_mpx_process_batch_video_import($type, MpxAccount $ac
   if (!$processesing_success) {
     watchdog('media_theplatform_mpx', 'Aborting batch video import @method for @account.  Error occured while processing video data, refer to previous log messages',
       array(
-        '@method' => $type,
+        '@method' => $options['method'],
         '@account' => _media_theplatform_mpx_account_log_string($account),
       ),
       WATCHDOG_ERROR);
@@ -372,7 +375,7 @@ function _media_theplatform_mpx_process_batch_video_import($type, MpxAccount $ac
     return FALSE;
   }
 
-  $current_batch_item += $feed_request_item_limit;
+  $current_batch_item += $options['limit'];
   if ($current_batch_item <= $batch_item_count) {
     $account->setDataValue('proprocessing_batch_current_item', $current_batch_item);
   }
@@ -443,12 +446,17 @@ function _media_theplatform_mpx_get_feed_item_count($url) {
 /**
  * Processes a video update.
  */
-function _media_theplatform_mpx_process_video_update($type, MpxAccount $account) {
+function _media_theplatform_mpx_process_video_update(MpxAccount $account, $options = array()) {
+  $options += array(
+    'method' => 'manually',
+    'limit' => variable_get('media_theplatform_mpx__cron_videos_per_run', 250),
+  );
+
   // This log message may seem redundant, but it's important for detecting if an
   // ingestion process has begun and is currently in progress.
   watchdog('media_theplatform_mpx', 'Beginning video update process @method for @account.',
     array(
-      '@method' => $type,
+      '@method' => $options['method'],
       '@account' => _media_theplatform_mpx_account_log_string($account),
     ),
     WATCHDOG_INFO);
@@ -507,9 +515,8 @@ function _media_theplatform_mpx_process_video_update($type, MpxAccount $account)
   // Get the total result count for this update.  If it is greater than the feed
   // request item limit, start a new batch.
   $total_result_count = count(explode(',', $ids));
-  $feed_request_item_limit = variable_get('media_theplatform_mpx__cron_videos_per_run', 250);
 
-  if ($total_result_count && $total_result_count > $feed_request_item_limit) {
+  if ($total_result_count && $total_result_count > $options['limit']) {
     // Set last notification for the next update.
     media_theplatform_mpx_set_last_notification($account, $media_to_update['last_notification']);
     // Set starter batch system variables.
@@ -517,7 +524,7 @@ function _media_theplatform_mpx_process_video_update($type, MpxAccount $account)
     $account->setDataValue('proprocessing_batch_item_count', $total_result_count);
     $account->setDataValue('proprocessing_batch_current_item', 0);
     // Perform the first batch operation, not the update.
-    return _media_theplatform_mpx_process_batch_video_import($type, $account);
+    return _media_theplatform_mpx_process_batch_video_import($account, $options);
   }
 
   $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
@@ -541,13 +548,18 @@ function _media_theplatform_mpx_process_video_update($type, MpxAccount $account)
 /**
  * Processes a video update.
  */
-function _media_theplatform_mpx_process_video_import($type, MpxAccount $account) {
+function _media_theplatform_mpx_process_video_import(MpxAccount $account, array $options = array()) {
+  $options += array(
+    'method' => 'manually',
+    'limit' => variable_get('media_theplatform_mpx__cron_videos_per_run', 250),
+  );
+
   // This log message may seem redundant, but it's important for detecting if an
   // ingestion process has begun and is currently in progress.
   watchdog('media_theplatform_mpx', 'Running initial video import for @account @method',
     array(
       '@account' => _media_theplatform_mpx_account_log_string($account),
-      '@method' => $type,
+      '@method' => $options['method'],
     ),
     WATCHDOG_NOTICE);
 
@@ -565,16 +577,15 @@ function _media_theplatform_mpx_process_video_import($type, MpxAccount $account)
   // Get the total result count for this update.  If it is greater than the feed
   // request item limit, start a new batch.
   $total_result_count = _media_theplatform_mpx_get_feed_item_count($url);
-  $feed_request_item_limit = variable_get('media_theplatform_mpx__cron_videos_per_run', 250);
 
-  if ($total_result_count && $total_result_count > $feed_request_item_limit) {
+  if ($total_result_count && $total_result_count > $options['limit']) {
     // Set starter batch system variables.
     $account->setDataValue('proprocessing_batch_url', $batch_url);
     $account->setDataValue('proprocessing_batch_item_count', $total_result_count);
     $account->setDataValue('proprocessing_batch_current_item', 0);
 
     // Perform the first batch operation, not the update.
-    return _media_theplatform_mpx_process_batch_video_import($type, $account);
+    return _media_theplatform_mpx_process_batch_video_import($account, $options);
   }
 
   watchdog('media_theplatform_mpx', 'Retrieving all media data from thePlatform for @account.',
@@ -615,33 +626,19 @@ function media_theplatform_mpx_import_all_videos($type) {
   // ingestion process has begun and is currently in progress.
   watchdog('media_theplatform_mpx', 'Beginning video import/update process @method for all accounts.', array('@method' => $type), WATCHDOG_NOTICE);
 
-  foreach (MpxAccount::loadAll() as $account_data) {
-
+  foreach (MpxAccount::loadAll() as $account) {
     // Check if video sync has been turned off for this account.
-    if (!variable_get('media_theplatform_mpx__account_' . $account_data->id . '_cron_video_sync', 1)) {
+    if (!variable_get('media_theplatform_mpx__account_' . $account->id . '_cron_video_sync', 1)) {
       continue;
     }
 
-    // Don't do anything if we don't have signIn token or import account.
-    if (!$account_data->acquireToken() || empty($account_data->import_account) ||
-        !media_theplatform_mpx_is_valid_player_for_account($account_data->default_player, $account_data)) {
-      continue;
+    try {
+      $account->ingestVideos(array('method' => $type));
     }
-
-    // Check if we're running a feed request batch.  If so, construct the batch URL.
-    if ($account_data->getDataValue('proprocessing_batch_url')) {
-      _media_theplatform_mpx_process_batch_video_import($type, $account_data);
-      continue;
+    catch (Exception $e) {
+      // Log the error and move on to the next account.
+      watchdog_exception('media_theplatform_mpx', $e);
     }
-
-    // Check if we have a notification stored.  If so, run an update.
-    if ($account_data->getDataValue('last_notification')) {
-      _media_theplatform_mpx_process_video_update($type, $account_data);
-      continue;
-    }
-
-    // No last notification set, so this would be an initial import.
-    _media_theplatform_mpx_process_video_import($type, $account_data);
   }
 
   watchdog('media_theplatform_mpx', 'Processed video import/update @method for all accounts.', array('@method' => $type), WATCHDOG_NOTICE);

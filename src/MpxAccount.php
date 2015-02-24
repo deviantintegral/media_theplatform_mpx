@@ -350,4 +350,65 @@ class MpxAccount {
       ))
       ->execute();
   }
+
+  /**
+   * Run video ingestion for the account.
+   *
+   * @param array $options
+   *   (optional) An array of additional options that can have one or more of
+   *   the following elements:
+   *   - limit: An integer with the maximum number of items to ingest. Defaults
+   *     to the value of the media_theplatform_mpx__cron_videos_per_run
+   *     variable, which defaults to 250 itself.
+   *   - method: A string containing how this method was invoked. Used for
+   *     watchdog statements. Defaults to 'manually'.
+   *
+   * @throws Exception
+   */
+  public function ingestVideos(array $options = array()) {
+    if (empty($this->import_account)) {
+      throw new Exception("The mpx account $this->id does not have the import account set and cannot yet ingest videos.");
+    }
+    if (empty($this->default_player)) {
+      throw new Exception("The mpx account $this->id does not have the default player set and cannot yet ingest videos.");
+    }
+
+    // Attempt to acquire a lock for ingestion for this account.
+    $lock_id = 'media_theplatform_mpx_ingest_videos_' . $this->id;
+    $lock_timeout = (float) variable_get('media_theplatform_mpx__cron_videos_timeout', 180);
+    if (!lock_acquire($lock_id, $lock_timeout)) {
+      throw new Exception("Unable to acquire lock for video ingestion for mpx account $this->id. Ingestion may currently be running in another process.");
+    }
+
+    $transaction = db_transaction();
+
+    try {
+      timer_start(__METHOD__);
+      watchdog('media_theplatform_mpx', 'Starting video ingestion for mpx account @id.', array('@id' => $this->id), WATCHDOG_INFO);
+
+      if ($this->getDataValue('proprocessing_batch_url')) {
+        // Check if we're running a feed request batch.  If so, construct the batch URL.
+        _media_theplatform_mpx_process_batch_video_import($this, $options);
+      }
+      elseif ($this->getDataValue('last_notification')) {
+        // Check if we have a notification stored.  If so, run an update.
+        _media_theplatform_mpx_process_video_update($this, $options);
+      }
+      else {
+        // No last notification set, so this would be an initial import.
+        _media_theplatform_mpx_process_video_import($this, $options);
+      }
+
+      watchdog('media_theplatform_mpx', 'Completed video ingestion for mpx account @id in @elapsed sec.', array('@id' => $this->id, '@elapsed' => (timer_read(__METHOD__) / 1000.0)), WATCHDOG_INFO);
+
+      // Ensure the lock is released.
+      lock_release($lock_id);
+    }
+    catch (Exception $e) {
+      $transaction->rollback();
+      // Lock should be released even on exceptions.
+      lock_release($lock_id);
+      throw $e;
+    }
+  }
 }

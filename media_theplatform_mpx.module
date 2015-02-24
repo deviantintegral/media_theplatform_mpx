@@ -433,7 +433,9 @@ function _media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TRUE, $o
   // Fetch the actual feed data.
   $feed_request_timeout = variable_get('media_theplatform_mpx__cron_videos_timeout', 180);
 
-  $options += array('timeout' => $feed_request_timeout);
+  $options += array(
+    'timeout' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
+  );
 
   // Allow for altering the URL before making the request.
   drupal_alter('media_theplatform_mpx_feed_request', $url, $options);

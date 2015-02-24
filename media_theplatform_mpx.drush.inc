@@ -13,16 +13,45 @@ define('MTPM_REQUEST_TIMEOUT', 60.0);
 define('MTPM_REQUEST_TIMEOUT_SHORT', 30.0);
 define('MTPM_TIMEOUT_DELTA', 0.1);
 
-
 /**
  * Implements hook_drush_command().
  */
 function media_theplatform_mpx_drush_command() {
-
   $commands = array();
+
+  $commands['mpx-ingest'] = array(
+    'description' => dt('Ingest videos for a specific mpx account'),
+    'aliases' => array('mpxi'),
+    'arguments '=> array(
+      'account_id' => dt('The ID of the account to import. If not provided, all accounts will be used.'),
+    ),
+    'options' => array(
+      'limit' => dt('The number of new or updated items to process from the feed at once. The default is 250.'),
+      'queue-run' => dt('Will run the process queue after ingestion.'),
+      'queue-concurrency' => dt('The number of concurrent processes to use when running the process queue.'),
+    ),
+    'examples' => array(
+      'drush mpx-ingest 1' => dt('Ingest videos for mpx account 1.'),
+      'drush mpxi 1 --limit=100' => dt('Ingest up to 100 new and 100 updated videos for mpx account 1.'),
+    ),
+  );
+  $commands['mpx-ingest-all'] = array(
+    'description' => dt('Ingest videos for all mpx accounts'),
+    'aliases' => array('mpxia'),
+    'options' => array(
+      'limit' => dt('The number of new or updated items to process from the feed at once. The default is 250.'),
+      'queue-run' => dt('Will run the process queue after ingestion.'),
+      'queue-concurrency' => dt('The number of concurrent processes to use when running the process queue.'),
+    ),
+    'examples' => array(
+      'drush mpx-ingest-all 1' => dt('Ingest videos for each mpx account.'),
+      'drush mpxia --limit=100' => dt('Ingest up to 100 new and 100 updated videos for each mpx accounts.'),
+    ),
+  );
 
   $commands['restore-mpx-last-notification'] = array(
     'description' => dt('Restores the most recently saved last_notification sequence ID from a backup system variable.'),
+    'hidden' => TRUE,
     'aliases' => array('mpxrln'),
     'options' => array(
       'account-id' => array(
@@ -34,6 +63,7 @@ function media_theplatform_mpx_drush_command() {
 
   $commands['ingest-mpx-videos'] = array(
     'description' => dt('Runs a continuous mpx video ingestion process.'),
+    'hidden' => TRUE,
     'aliases' => array('mpxv'),
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_DATABASE,
     'arguments' => array(
@@ -92,6 +122,124 @@ function media_theplatform_mpx_drush_command() {
   );
 
   return $commands;
+}
+
+/**
+ * Validation callback for drush mpx-ingest.
+ */
+function drush_media_theplatform_mpx_mpx_ingest_validate($account_id) {
+  if (!MpxAccount::load($account_id)) {
+    return drush_set_error('MPX_INGEST_ACCOUNT_NOT_FOUND', dt("Unable to load mpx account @id.", array('@id' => $account_id)));
+  }
+
+  // Check for locks used by drush ingest-mpx-videos.
+  if (!lock_may_be_available(MEDIA_THEPLATFORM_MPX_VIDEO_INGESTION_LOCK_BASENAME . '_parent_' . $account_id)) {
+    return drush_set_error('MPX_INGEST_LOCK_ERROR', dt("Drush video ingestion is currently running for mpx account @id.", array('@id' => $account_id)));
+  }
+}
+
+/**
+ * Command callback for drush mpx-ingest.
+ *
+ * @param int $account_id
+ *   The mpx account ID.
+ */
+function drush_media_theplatform_mpx_mpx_ingest($account_id) {
+  try {
+    $account = MpxAccount::load($account_id);
+    $options = array('method' => 'via Drush');
+    if ($limit = drush_get_option('limit')) {
+      $options['limit'] = (int) $limit;
+    }
+    $account->ingestVideos($options);
+    _drush_media_theplatform_mpx_run_queue();
+  }
+  catch (Exception $e) {
+    watchdog_exception('media_theplatform_mpx', $e);
+    return drush_set_error('MPX_INGEST_EXCEPTION', $e->getMessage());
+  }
+}
+
+/**
+ * Validation callback for drush mpx-ingest-all.
+ */
+function drush_media_theplatform_mpx_mpx_ingest_all_validate() {
+  if (!MpxAccount::loadAll()) {
+    return drush_set_error('MPX_INGEST_NO_ACCOUNTS', "No mpx accounts available.");
+  }
+
+  // Check for locks used by drush ingest-mpx-videos.
+  if (!lock_may_be_available('media_theplatform_mpx_ingest_videos_all')) {
+    return drush_set_error('MPX_INGEST_LOCK_ERROR', dt("Drush video ingestion is currently running for all accounts."));
+  }
+}
+
+/**
+ * Command callback for drush mpx-ingest-all.
+ */
+function drush_media_theplatform_mpx_mpx_ingest_all() {
+  $accounts = MpxAccount::loadAll();
+  $invocations = array();
+  foreach ($accounts as $account) {
+    $invocations[] = array(
+      'site' => '@self',
+      'command' => 'mpx-ingest',
+      'args' => array($account->id),
+    );
+  }
+  $common_options = array(
+    'queue-run' => FALSE,
+  );
+  foreach (array('limit') as $option) {
+    $value = drush_get_option($option);
+    if (isset($value)) {
+      $common_options[$option] = $value;
+    }
+  }
+  $common_backend_options = array(
+    'concurrency' => count($invocations),
+  );
+  drush_backend_invoke_concurrent($invocations, $common_options, $common_backend_options);
+  _drush_media_theplatform_mpx_run_queue();
+}
+
+/**
+ * Run the media_theplatform_mpx_video_cron_queue queue.
+ */
+function _drush_media_theplatform_mpx_run_queue() {
+  $count = DrupalQueue::get('media_theplatform_mpx_video_cron_queue', TRUE)->numberOfItems();
+  if (!$count || !drush_get_option('queue-run')) {
+    return;
+  }
+
+  drush_log(dt('The media_theplatform_mpx_video_cron_queue contains @count items.', array('@count' => $count)), 'ok');
+
+  // The process the items from the queue.
+  $concurrency = (int) drush_get_option('queue-concurrency', 10);
+  if (module_exists('concurrent_queue')) {
+    drush_invoke_process(
+      '@self',
+      'queue-run-concurrent',
+      array('media_theplatform_mpx_video_cron_queue'),
+      array(
+        'concurrency' => $concurrency,
+      )
+    );
+  }
+  else {
+    $invocations = array_fill(0, $concurrency, array(
+      'site' => '@self',
+      'command' => 'queue-run',
+      'args' => array('media_theplatform_mpx_video_cron_queue'),
+    ));
+    drush_backend_invoke_concurrent(
+      $invocations,
+      array(),
+      array(
+        'concurrency' => $concurrency,
+      )
+    );
+  }
 }
 
 /**
