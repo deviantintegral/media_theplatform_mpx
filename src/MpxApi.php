@@ -76,6 +76,7 @@ class MpxApi {
     $response = drupal_http_request($url, $options);
     $response->url = $url;
     $response->params = $params;
+
     if (!empty($response->error)) {
       throw new MpxApiException($response, "Error $response->code on request to $url: $response->error");
     }
@@ -83,9 +84,7 @@ class MpxApi {
       throw new MpxApiException($response, "Empty response from request to $url.");
     }
 
-    $response->url = $url;
-    $response->params = $params;
-    if (isset($params['form']) && in_array($params['form'], array('json', 'cjson'))) {
+    if (isset($response->headers['content-type']) && preg_match('~^(application|text)/json~', $response->headers['content-type'])) {
       return static::processJsonResponse($response);
     }
 
