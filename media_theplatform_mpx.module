@@ -520,7 +520,7 @@ function _media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TRUE, $o
       ini_set('memory_limit', $memory_limit);
     }
 
-    if (!empty($result->data) && $result_data === NULL) {
+    if (!empty($result->data) && $result_data === NULL && json_last_error() != JSON_ERROR_NONE) {
       watchdog('media_theplatform_mpx', 'Failed to decode JSON response data with drupal_json_decode() from the following URL: @url
 <br />...and the following data returned from thePlatform:
 <br /><pre>@response</pre>.', array('@url' => $url, '@response' => print_r($result, TRUE)), WATCHDOG_ERROR);

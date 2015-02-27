@@ -2055,7 +2055,7 @@ function _drush_media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TR
 
     // Build a list of constant names associated to their values. This is done
     // to identify what error happened.
-    if (!empty($result->data) && empty($result_data)) {
+    if (!empty($result->data) && $result_data !== NULL && json_last_error() != JSON_ERROR_NONE) {
       $constants = get_defined_constants(true);
       $json_errors = array();
       foreach ($constants["json"] as $name => $value) {
