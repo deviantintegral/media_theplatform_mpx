@@ -429,10 +429,6 @@ function _media_theplatform_mpx_convert_shorthand_to_bytes($shorthand) {
  * @deprecated
  */
 function _media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TRUE, $options = array()) {
-
-  // Fetch the actual feed data.
-  $feed_request_timeout = variable_get('media_theplatform_mpx__cron_videos_timeout', 180);
-
   $options += array(
     'timeout' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
   );
@@ -440,9 +436,9 @@ function _media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TRUE, $o
   // Allow for altering the URL before making the request.
   drupal_alter('media_theplatform_mpx_feed_request', $url, $options);
 
-  $start_time = time();
+  // Fetch the actual feed data.
   $result = drupal_http_request($url, $options);
-  $response_time = time() - $start_time;
+  $response_time = timer_read('drupal_http_request') / 1000;
 
   if (!is_object($result)) {
     watchdog('media_theplatform_mpx', 'Failed to retrieve mpx feed data. drupal_http_request() did not return an object.',
