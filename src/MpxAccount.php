@@ -9,10 +9,6 @@ class MpxAccount {
   public $account_id;
   public $account_pid;
   public $default_player;
-  public $last_notification;
-  public $proprocessing_batch_url;
-  public $proprocessing_batch_item_count;
-  public $proprocessing_batch_current_item;
   public $data = array();
 
   /**

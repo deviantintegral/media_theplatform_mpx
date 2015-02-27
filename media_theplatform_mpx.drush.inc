@@ -19,6 +19,11 @@ define('MTPM_TIMEOUT_DELTA', 0.1);
 function media_theplatform_mpx_drush_command() {
   $commands = array();
 
+  $commands['mpx-account-list'] = array(
+    'description' => dt('List key MPX account data.'),
+    'aliases' => array('mpxal'),
+  );
+
   $commands['mpx-ingest'] = array(
     'description' => dt('Ingest videos for a specific mpx account'),
     'aliases' => array('mpxi'),
@@ -122,6 +127,53 @@ function media_theplatform_mpx_drush_command() {
   );
 
   return $commands;
+}
+
+/**
+ * Command callback for drush mpx-account-list.
+ */
+function drush_media_theplatform_mpx_mpx_account_list() {
+  $accounts = MpxAccount::loadAll();
+
+  if (empty($accounts)) {
+    return drush_print(dt("No mpx accounts available."));
+  }
+
+  $rows = array();
+  $rows[] = array(
+    dt('Id'),
+    dt('Username'),
+    dt('Import account'),
+    dt('Imported videos'),
+    dt('API token'),
+  );
+  foreach ($accounts as $account) {
+    $row = array(
+      $account->id,
+      $account->username,
+    );
+
+    if (!empty($account->import_account)) {
+      $row[] = $account->import_account;
+    }
+    else {
+      $row[] = dt('Not configured');
+    }
+
+    // Imported video count.
+    $row[] = db_query("SELECT COUNT(fid) FROM {mpx_video} WHERE parent_account = :id", array(':id' => $account->id))->fetchField();
+
+    if ($token = $account->acquireToken()) {
+      $row[] = dt('Expires in !interval', array('!interval' => format_interval($token->expire - REQUEST_TIME)));
+    }
+    else {
+      $row[] = dt('Not available');
+    }
+
+    $rows[] = $row;
+  }
+
+  drush_print_table($rows, TRUE);
 }
 
 /**
