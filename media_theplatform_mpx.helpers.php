@@ -9,47 +9,6 @@
 define('MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL', variable_get('media_theplatform_mpx__watchdog_severity', WATCHDOG_INFO));
 define('MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL', variable_get('media_theplatform_mpx__output_message_watchdog_severity', WATCHDOG_INFO));
 
-/**
- * @deprecated
- *
- * Stores a field value for a specified field and table by specified ID field and value.
- */
-function _media_theplatform_mpx_set_field($id, $field_name, $field_value, $table = 'mpx_accounts', $id_field = 'id') {
-
-  if (!$field_name) {
-    return FALSE;
-  }
-
-  if (in_array($field_name, array('password'))) {
-    $field_value = encrypt($field_value);
-  }
-
-  $result = db_update($table)
-    ->fields(array($field_name => $field_value))
-    ->condition($id_field, $id, '=')
-    ->execute();
-
-  return $result;
-}
-
-/**
- * @deprecated
- *
- * Sets a field value for a specified account.
- */
-function _media_theplatform_mpx_set_account_value($account_id, $field_name, $field_value) {
-
-  if (!is_null($field_value) && in_array($field_name, array('password'))) {
-    $field_value = encrypt($field_value);
-  }
-
-  $result = db_update('mpx_accounts')
-    ->fields(array($field_name => $field_value))
-    ->condition('id', $account_id, '=')
-    ->execute();
-
-  return $result;
-}
 
 /**
  * @deprecated

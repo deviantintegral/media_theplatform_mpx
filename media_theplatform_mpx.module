@@ -1242,3 +1242,44 @@ function _media_theplatform_mpx_decrypt_value($value) {
   }
   return $return;
 }
+/**
+ * @deprecated
+ *
+ * Stores a field value for a specified field and table by specified ID field and value.
+ */
+function _media_theplatform_mpx_set_field($id, $field_name, $field_value, $table = 'mpx_accounts', $id_field = 'id') {
+  if ($table === 'mpx_accounts') {
+    if ($id = db_select('mpx_accounts')
+      ->addField('mpxa', array('id'))
+      ->condition($id_field, $id)
+      ->execute()->fetchField()) {
+      return _media_theplatform_mpx_set_account_value($id, $field_name, $field_value);
+    }
+    else {
+      return FALSE;
+    }
+  }
+  else {
+    return db_update($table)
+      ->fields(array($field_name => $field_value))
+      ->condition($id_field, $id, '=')
+      ->execute();
+  }
+}
+
+/**
+ * @deprecated
+ *
+ * Sets a field value for a specified account.
+ */
+function _media_theplatform_mpx_set_account_value($account_id, $field_name, $field_value) {
+  $account = MpxAccount::load($account_id);
+  if (property_exists($account, $field_name)) {
+    $account->{$field_name} = $field_value;
+    $account->save();
+  }
+  else {
+    $account->setDataValue($field_name, $field_value);
+  }
+  return TRUE;
+}
