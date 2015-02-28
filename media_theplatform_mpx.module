@@ -235,16 +235,7 @@ function media_theplatform_mpx_file_delete($file) {
     // this record in the database or thru PHP, well, it could kill other
     // mpxMedia Files that reference it and then good luck to you.
     if ($parts['mpx_type'] == 'player') {
-      $player = media_theplatform_mpx_get_mpx_player_by_fid($file->fid);
-      $delete_result = db_delete('mpx_player')->condition('fid', $file->fid)->execute();
-      if (!$delete_result) {
-        watchdog('media_theplatform_mpx', 'Failed to delete player @pid associated with file @fid which is being deleted.',
-          array(
-            '@pid' => $player['id'],
-            '@fid' => $file->fid,
-          ),
-          WATCHDOG_ERROR);
-      }
+      db_delete('mpx_player')->condition('fid', $file->fid)->execute();
     }
     // Deleting a Video:
     elseif ($parts['mpx_type'] == 'video') {
@@ -258,30 +249,18 @@ function media_theplatform_mpx_file_delete($file) {
         unlink($local_path);
       }
 
-      $fid = db_query_range("SELECT fid FROM {file_managed} WHERE fid <> :fid AND uri LIKE :uri", 0, 1, array(':fid' => $file->fid, ':uri' => db_like('mpx://m/' . $guid . '/') . '%'))->fetchField();
-
-      // If other files exist:
-      if ($fid) {
-        // Update mpx_video record with the next fid.
+      if ($alt_fid = db_query_range("SELECT fid FROM {file_managed} WHERE fid <> :fid AND uri LIKE :uri", 0, 1, array(':fid' => $file->fid, ':uri' => db_like('mpx://m/' . $guid . '/') . '%'))->fetchField()) {
+        // If other files exist, update mpx_video record with the next fid.
         db_update('mpx_video')
-          ->fields(array('fid' => $fid))
+          ->fields(array('fid' => $alt_fid))
           ->condition('fid', $file->fid)
           ->execute();
-        entity_get_controller('file')->resetCache(array($fid));
+        entity_get_controller('file')->resetCache(array($alt_fid));
+        watchdog('media_theplatform_mpx', 'Reassigned mpx video data for @guid from deleted file @fid to file @alt-fid.', array('@guid' => $guid, '@fid' => $file->fid, '@alt-fid' => $alt_fid));
       }
-      // Else no other files exist:
       else {
-        // @todo - store video_id
-        // Delete the mpx_video record.
-        $delete_result = db_delete('mpx_video')->condition('fid', $file->fid)->execute();
-        if (!$delete_result) {
-          watchdog('media_theplatform_mpx', 'Failed to delete video with GUID "@guid" associated with file @fid which is being deleted.',
-            array(
-              '@guid' => $guid,
-              '@fid' => $file->fid,
-            ),
-            WATCHDOG_ERROR);
-        }
+        // Otherwise delete the mpx video record.
+        db_delete('mpx_video')->condition('fid', $file->fid)->execute();
       }
     }
   }
