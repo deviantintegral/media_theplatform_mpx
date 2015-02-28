@@ -395,7 +395,7 @@ class MpxAccount {
         _media_theplatform_mpx_process_video_import($this, $options);
       }
 
-      watchdog('media_theplatform_mpx', 'Completed video ingestion for mpx account @id in @elapsed sec.', array('@id' => $this->id, '@elapsed' => (timer_read(__METHOD__) / 1000.0)), WATCHDOG_INFO);
+      watchdog('media_theplatform_mpx', 'Completed video ingestion for mpx account @id in @elapsed sec.', array('@id' => $this->id, '@elapsed' => round(timer_read(__METHOD__) / 1000.0, 2)), WATCHDOG_INFO);
 
       // Ensure the lock is released.
       lock_release($lock_id);

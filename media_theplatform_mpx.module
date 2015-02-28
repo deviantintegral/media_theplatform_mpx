@@ -417,7 +417,7 @@ function _media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TRUE, $o
 
   // Fetch the actual feed data.
   $result = drupal_http_request($url, $options);
-  $response_time = timer_read('drupal_http_request') / 1000;
+  $response_time = round(timer_read('drupal_http_request') / 1000.0, 2);
 
   if (!is_object($result)) {
     watchdog('media_theplatform_mpx', 'Failed to retrieve mpx feed data. drupal_http_request() did not return an object.',
