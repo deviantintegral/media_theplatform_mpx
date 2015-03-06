@@ -7,6 +7,9 @@
 // Hooks and callbacks for integrating with File Entity module for display.
 include_once __DIR__ . '/includes/media_theplatform_mpx.formatters.inc';
 
+// Field API integration
+include_once __DIR__ . '/media_theplatform_mpx.field.inc';
+
 // Helper functions.
 include_once __DIR__ . '/media_theplatform_mpx.admin.inc';
 include_once __DIR__ . '/media_theplatform_mpx.helpers.php';
@@ -166,16 +169,25 @@ function media_theplatform_mpx_menu() {
  * Implements hook_theme().
  */
 function media_theplatform_mpx_theme($existing, $type, $theme, $path) {
-  return array(
-    'media_theplatform_mpx_video' => array(
-      'variables' => array(
-        'uri' => NULL,
-      ),
-      'file' => 'media_theplatform_mpx.theme.inc',
-      'path' => $path . '/includes/themes',
-      'template' => 'media-theplatform-mpx-video',
+  $info['media_theplatform_mpx_video'] = array(
+    'variables' => array(
+      'uri' => NULL,
     ),
+    'file' => 'media_theplatform_mpx.theme.inc',
+    'path' => $path . '/includes/themes',
+    'template' => 'd7 media-theplatform-mpx-video',
   );
+
+  $info['media_theplatform_mpx_player_iframe'] = array(
+    'variables' => array(
+      'file' => NULL,
+      'guid' => NULL,
+      'attributes' => array(),
+    ),
+    'file' => 'media_theplatform_mpx.theme.inc',
+  );
+
+  return $info;
 }
 
 /**
@@ -1197,4 +1209,44 @@ function _media_theplatform_mpx_set_account_value($account_id, $field_name, $fie
     $account->setDataValue($field_name, $field_value);
   }
   return TRUE;
+}
+
+/**
+ * Fetch the iframe URL for the player of a specific mpx video.
+ *
+ * @param array $variables
+ *   An associative array containing one of the following:
+ *   - file: The mpx video file object.
+ *   - guid: The mpx video guid string.
+ *
+ * @return string|null
+ *   The iframe URL if available, or NULL if not available.
+ */
+function media_theplatform_mpx_get_player_iframe_url(array $variables) {
+  // If an mpx video file object was provided, fetch the guid, player_id, and
+  // account_id values.
+  if (!empty($variables['file']) && $variables['file']->filemime === 'video/mpx') {
+    /** @var MediaThePlatformMpxStreamWrapper $wrapper */
+    $wrapper = file_stream_wrapper_get_instance_by_uri($variables['file']->uri);
+    $parts = $wrapper->get_parameters();
+    $variables['guid'] = $parts['mpx_id'];
+    $variables += db_query("SELECT COALESCE(mpxv.player_id, mpxa.default_player) AS player_id, mpxa.account_id, mpxa.account_pid FROM {mpx_video} mpxv INNER JOIN {mpx_accounts} mpxa ON mpxv.parent_account = mpxa.id WHERE fid = :fid", array(':fid' => $variables['file']->fid))->fetchAssoc();
+  }
+
+  // If a manual guid value was provided, fetch the player_id and account_id
+  // values.
+  if (!empty($variables['guid'])) {
+    $variables += db_query("SELECT COALESCE(mpxv.player_id, mpxa.default_player) AS player_id, mpxa.account_id, mpxa.account_pid FROM {mpx_video} mpxv INNER JOIN {mpx_accounts} mpxa ON mpxv.parent_account = mpxa.id WHERE guid = :guid", array(':guid' => $variables['guid']))->fetchAssoc();
+  }
+
+  // Ensure the player_pid value is set if possible.
+  if (empty($variables['player_pid']) && !empty($variables['player_id'])) {
+    if ($player_pid = db_query("SELECT pid FROM {mpx_player} WHERE player_id = :id", array(':id' => $variables['player_id']))->fetchField()) {
+      $variables['player_pid'] = $player_pid;
+    }
+  }
+
+  if (!empty($variables['account_pid']) && !empty($variables['player_pid']) && !empty($variables['account_id']) && !empty($variables['guid'])) {
+    return '//player.theplatform.com/p/' . $variables['account_pid'] . '/' . $variables['player_pid'] . '/embed/select/media/guid/' . basename($variables['account_id']) . '/' . $variables['guid'];
+  }
 }
