@@ -14,7 +14,8 @@ function media_theplatform_mpx_file_formatter_info() {
     'label' => t('mpx Video'),
     'file types' => array('video'),
     'view callback' => 'media_theplatform_mpx_file_formatter_video_view',
-    'settings callback' => 'media_theplatform_mpx_file_formatter_video_settings',
+    'mime types' => array('video/mpx'),
+    'hidden' => TRUE,
   );
   $formatters['media_theplatform_mpx_image'] = array(
     'label' => t('mpx Preview Image'),
@@ -24,6 +25,7 @@ function media_theplatform_mpx_file_formatter_info() {
     ),
     'view callback' => 'media_theplatform_mpx_file_formatter_image_view',
     'settings callback' => 'media_theplatform_mpx_file_formatter_image_settings',
+    'mime types' => array('video/mpx', 'player/mpx'),
   );
   return $formatters;
 }
@@ -32,9 +34,8 @@ function media_theplatform_mpx_file_formatter_info() {
  * Implements hook_file_formatter_FORMATTER_view().
  */
 function media_theplatform_mpx_file_formatter_video_view($file, $display, $langcode) {
-  $scheme = file_uri_scheme($file->uri);
   // WYSIWYG does not yet support video inside a running editor instance.
-  if ($scheme == 'mpx' && empty($file->override['wysiwyg'])) {
+  if ($file->filemime === 'video/mpx' && empty($file->override['wysiwyg'])) {
     $element = array(
       '#theme' => 'media_theplatform_mpx_video',
       '#uri' => $file->uri,
@@ -44,23 +45,11 @@ function media_theplatform_mpx_file_formatter_video_view($file, $display, $langc
 }
 
 /**
- * Implements hook_file_formatter_FORMATTER_settings().
- */
-function media_theplatform_mpx_file_formatter_video_settings($form, &$form_state, $settings) {
-  $element = array();
-  // We don't customize anything in Drupal, its all via thePlatform.
-  $element['info'] = array(
-    '#markup' => t('All mpxPlayer display settings are configured through your account on thePlatform and imported upon Sync.'),
-  );
-  return $element;
-}
-
-/**
  * Implements hook_file_formatter_FORMATTER_view().
  */
 function media_theplatform_mpx_file_formatter_image_view($file, $display, $langcode) {
-  $scheme = file_uri_scheme($file->uri);
-  if ($scheme == 'mpx') {
+  if ($file->filemime === 'video/mpx' || $file->filemime === 'player/mpx') {
+    /** @var MediaThePlatformMpxStreamWrapper $wrapper */
     $wrapper = file_stream_wrapper_get_instance_by_uri($file->uri);
     $parts = $wrapper->get_parameters();
 
