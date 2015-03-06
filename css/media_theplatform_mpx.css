@@ -11,12 +11,3 @@
 .media-mpx-wrapper tr th {
   border: 0;
 }
-#-media-theplatform-mpx-signin-form .form-submit {
-  float: left;
-}
-#-media-theplatform-mpx-account-list-form input[type="submit"] {
-  float: left;
-}
-#-media-theplatform-mpx-account-list-form hr {
-  clear: both;
-}
