@@ -58,7 +58,7 @@ function media_theplatform_mpx_file_default_displays() {
   $file_display->weight = -50;
   $file_display->status = TRUE;
   $file_display->settings = array(
-    'image_style' => 'square_thumbnail',
+    'image_style' => 'media_thumbnail',
   );
   $file_displays['video__preview__media_theplatform_mpx_image'] = $file_display;
 
