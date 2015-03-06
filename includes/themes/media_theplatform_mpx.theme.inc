@@ -34,4 +34,6 @@ function media_theplatform_mpx_preprocess_media_theplatform_mpx_video(&$variable
   $body = media_theplatform_mpx_replace_html_ids($body, $parts['mpx_id']);
   $variables['player_html'] = $body;
   $variables['mpx_id'] = $parts['mpx_id'];
+
+  drupal_add_css(drupal_get_path('module', 'media_theplatform_mpx') . '/css/media_theplatform_mpx.css');
 }

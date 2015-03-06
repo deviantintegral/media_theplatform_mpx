@@ -163,18 +163,6 @@ function media_theplatform_mpx_menu() {
 }
 
 /**
- * Implements hook_init().
- */
-function media_theplatform_mpx_init() {
-  // Add module CSS.
-  drupal_add_css(drupal_get_path('module', 'media_theplatform_mpx') . '/css/media_theplatform_mpx.css', array(
-    'group' => CSS_DEFAULT,
-    'type' => 'file',
-    'every_page' => TRUE)
-  );
-}
-
-/**
  * Implements hook_theme().
  */
 function media_theplatform_mpx_theme($existing, $type, $theme, $path) {
