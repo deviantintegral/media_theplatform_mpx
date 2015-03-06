@@ -103,7 +103,11 @@ class MpxApi {
    * @throws MpxApiException
    */
   public static function processJsonResponse($response) {
-    $data = json_decode($response->data, TRUE);
+    $options = 0;
+    if (defined('JSON_BIGINT_AS_STRING')) {
+      $options = JSON_BIGINT_AS_STRING;
+    }
+    $data = json_decode($response->data, TRUE, 256, $options);
     if ($data === NULL && json_last_error() !== JSON_ERROR_NONE) {
       if (function_exists('json_last_error_msg')) {
         throw new MpxApiException($response, "Unable to decode JSON response from request to {$response->url}: " . json_last_error_msg());
