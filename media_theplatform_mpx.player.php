@@ -130,32 +130,6 @@ function media_theplatform_mpx_is_valid_player_for_account($player_id, $account 
 }
 
 /**
- * Returns URL string of a player for given $pid.
- */
-function media_theplatform_mpx_get_player_url($pid, $account = NULL) {
-
-  return 'https://player.theplatform.com/p/' . $account->account_pid . '/' . $pid;
-}
-
-/**
- * Returns HTML from a mpxPlayer's URL.
- *
- * @param String $pid
- *   A mpxPlayer's Pid.
- * @param String $type
- *   Either 'head' or 'body'.
- *
- * @return String
- *   HTML requested.
- */
-function media_theplatform_mpx_get_player_html($pid, $type = 'head', $account) {
-
-  $url = media_theplatform_mpx_get_player_url($pid, $account) . '/' . $type;
-
-  return _media_theplatform_mpx_retrieve_feed_data($url, FALSE);
-}
-
-/**
  * Imports all mpxPlayers into Media Library.
  *
  * @param String $type
@@ -363,7 +337,6 @@ function media_theplatform_mpx_insert_player($player, $fid = NULL, $account = NU
       }
     }
 
-    $head_html = media_theplatform_mpx_get_player_html($player['pid'], 'head', $account);
     $insert_fields = array(
       'title' => $player['title'],
       'id' => $player['id'],
@@ -373,9 +346,6 @@ function media_theplatform_mpx_insert_player($player, $fid = NULL, $account = NU
       'fid' => $fid,
       'parent_account' => $player['parent_account'],
       'account' => $player['account'],
-      'head_html' => $head_html,
-      'body_html' => media_theplatform_mpx_get_player_html($player['pid'], 'body', $account),
-      'player_data' => serialize(media_theplatform_mpx_extract_mpx_player_data($head_html)),
       'created' => REQUEST_TIME,
       'updated' => REQUEST_TIME,
       'status' => 1,
@@ -452,15 +422,11 @@ function media_theplatform_mpx_insert_player($player, $fid = NULL, $account = NU
 function media_theplatform_mpx_update_player($player, $fid, $mpx_player = NULL, $account = NULL) {
 
   try {
-    $head_html = media_theplatform_mpx_get_player_html($player['pid'], 'head', $account);
     $update_fields = array(
       'title' => $player['title'],
       'pid' => $player['pid'],
       'guid' => $player['guid'],
       'description' => $player['description'],
-      'head_html' => $head_html,
-      'body_html' => media_theplatform_mpx_get_player_html($player['pid'], 'body', $account),
-      'player_data' => serialize(media_theplatform_mpx_extract_mpx_player_data($head_html)),
       'status' => 1,
     );
 
@@ -562,70 +528,4 @@ function media_theplatform_mpx_get_mpx_player_by_player_id($player_id) {
  */
 function media_theplatform_mpx_get_mpx_player_count() {
   return db_query("SELECT count(player_id) FROM {mpx_player}")->fetchField();
-}
-
-/**
- * Returns CSS extracted from given Head HTML of a mpxPlayer.
- *
- * @param string $head
- *   HTML from the mpxPlayer's <HEAD>
- *
- * @return String
- *   Returns all CSS (does not include a surrounding <style> wrapper)
- */
-function media_theplatform_mpx_get_mpx_player_css($head) {
-  // Get inline CSS from all <style> tags (there can be multiple).
-  $inline_css = implode(media_theplatform_mpx_extract_all_css_inline($head), "\n");
-  $external_css = '';
-  // Get css from all external stylesheets.
-  $paths = media_theplatform_mpx_extract_all_css_links($head);
-  foreach ($paths as $file) {
-    $external_css .= media_theplatform_mpx_get_external_css($file) . "\n";
-  }
-  return $inline_css . "\n" . $external_css;
-}
-
-/**
- * Returns array of CSS and JS data extracted from given Head HTML of a mpxPlayer.
- *
- * @param string $pid
- *   The mpxPlayer's Public ID
- *
- * @return Array
- *   Contains CSS classes/code, inline JS, and external JS file URLs
- */
-function media_theplatform_mpx_extract_mpx_player_data($head) {
-
-  $player_data = array();
-
-  // mpxPlayer meta tags.
-  $player_data['meta'] = media_theplatform_mpx_extract_all_meta_tags($head);
-
-  // mpxPlayer CSS.
-  $player_data['css'] = media_theplatform_mpx_get_mpx_player_css($head);
-
-  // External JS files.
-  $js_files = media_theplatform_mpx_extract_all_js_links($head);
-  if ($js_files) {
-    foreach ($js_files as $src) {
-      $player_data['js']['external'][] = $src;
-    }
-  }
-
-  // Add any inline JS.
-  $inline = media_theplatform_mpx_extract_all_js_inline($head);
-  if ($inline) {
-    foreach ($inline as $script) {
-      $player_data['js']['inline'][] = $script;
-    }
-  }
-
-  return $player_data;
-}
-
-/**
- * Returns array of CSS and JS data stored in mpxPlayer's player_data field.
- */
-function media_theplatform_mpx_get_player_data($player) {
-  return unserialize($player['player_data']);
 }

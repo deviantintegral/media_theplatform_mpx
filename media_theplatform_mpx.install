@@ -71,19 +71,6 @@ function media_theplatform_mpx_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
-      'head_html' => array(
-        'type' => 'blob',
-        'description' => 'HTML in the <head> tag',
-      ),
-      'body_html' => array(
-        'type' => 'blob',
-        'description' => 'HTML in the <head> tag',
-      ),
-      'player_data' => array(
-        'type' => 'blob',
-        'description' => 'Serialized array of player data',
-        'size' => 'big',
-      ),
       'created' => array(
         'description' => 'timestamp of created',
         'type' => 'int',
@@ -1019,4 +1006,13 @@ function media_theplatform_mpx_update_7219() {
   db_drop_field('mpx_accounts', 'proprocessing_batch_url');
   db_drop_field('mpx_accounts', 'proprocessing_batch_item_count');
   db_drop_field('mpx_accounts', 'proprocessing_batch_current_item');
+}
+
+/**
+ * Drop player_data, body_html, and head_html columns.
+ */
+function media_theplatform_mpx_update_7220() {
+  db_drop_field('mpx_player', 'player_data');
+  db_drop_field('mpx_player', 'body_html');
+  db_drop_field('mpx_player', 'head_html');
 }
