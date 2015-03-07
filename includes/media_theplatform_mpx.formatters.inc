@@ -10,13 +10,6 @@
  * Implements hook_file_formatter_info().
  */
 function media_theplatform_mpx_file_formatter_info() {
-  $formatters['media_theplatform_mpx_video'] = array(
-    'label' => t('mpx Video'),
-    'file types' => array('video'),
-    'view callback' => 'media_theplatform_mpx_file_formatter_video_view',
-    'mime types' => array('video/mpx'),
-    'hidden' => TRUE,
-  );
   $formatters['media_theplatform_mpx_image'] = array(
     'label' => t('mpx Preview Image'),
     'file types' => array('video'),
@@ -28,20 +21,6 @@ function media_theplatform_mpx_file_formatter_info() {
     'mime types' => array('video/mpx', 'player/mpx'),
   );
   return $formatters;
-}
-
-/**
- * Implements hook_file_formatter_FORMATTER_view().
- */
-function media_theplatform_mpx_file_formatter_video_view($file, $display, $langcode) {
-  // WYSIWYG does not yet support video inside a running editor instance.
-  if ($file->filemime === 'video/mpx' && empty($file->override['wysiwyg'])) {
-    $element = array(
-      '#theme' => 'media_theplatform_mpx_video',
-      '#uri' => $file->uri,
-    );
-    return $element;
-  }
 }
 
 /**

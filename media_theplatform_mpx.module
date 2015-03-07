@@ -169,15 +169,6 @@ function media_theplatform_mpx_menu() {
  * Implements hook_theme().
  */
 function media_theplatform_mpx_theme($existing, $type, $theme, $path) {
-  $info['media_theplatform_mpx_video'] = array(
-    'variables' => array(
-      'uri' => NULL,
-    ),
-    'file' => 'media_theplatform_mpx.theme.inc',
-    'path' => $path . '/includes/themes',
-    'template' => 'd7 media-theplatform-mpx-video',
-  );
-
   $info['media_theplatform_mpx_player_iframe'] = array(
     'variables' => array(
       'file' => NULL,
