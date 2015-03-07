@@ -522,10 +522,3 @@ function media_theplatform_mpx_get_mpx_player_by_player_id($player_id) {
   return db_query('SELECT * FROM {mpx_player} WHERE player_id = :player_id',
     array(':player_id' => $player_id))->fetchAssoc();
 }
-
-/**
- * Returns total number of records in mpx_player table.
- */
-function media_theplatform_mpx_get_mpx_player_count() {
-  return db_query("SELECT count(player_id) FROM {mpx_player}")->fetchField();
-}

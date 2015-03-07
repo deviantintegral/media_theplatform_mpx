@@ -480,18 +480,12 @@ function media_theplatform_mpx_page_mpx_players() {
  * @ingroup forms
  */
 function media_theplatform_mpx_form_mpx_player_sync($form, &$form_state) {
-  if (media_theplatform_mpx_get_mpx_player_count() > 0) {
-    $collapsed = TRUE;
-  }
-  else {
-    $collapsed = FALSE;
-  }
   $form['player_sync'] = array(
     '#type' => 'fieldset',
     '#title' => t('Sync mpxPlayers'),
     '#description' => t('Note: Any mpxPlayer marked as "Disabled" in thePlatform mpx will not be retrieved in the Sync process.'),
     '#collapsible' => TRUE,
-    '#collapsed' => $collapsed,
+    '#collapsed' => (bool) db_query("SELECT 1 FROM {mpx_player}")->fetchField(),
   );
   $form['player_sync']['actions'] = array('#type' => 'actions');
   $form['player_sync']['actions']['submit'] = array(
@@ -576,7 +570,7 @@ function media_theplatform_mpx_get_table_mpx_players() {
 function media_theplatform_mpx_page_mpx_videos() {
   $output = array();
   // If no mpxPlayers, you cant do anything with mpxMedia.
-  if (!media_theplatform_mpx_get_mpx_player_count()) {
+  if (!db_query("SELECT 1 FROM {mpx_player}")->fetchField()) {
     $output['#markup'] = t('No mpxPlayers have been imported.');
     if (user_access('sync mpx_player')) {
       $output['#markup'] .= ' ' . l(t('Sync mpxPlayers.'), 'admin/content/file/mpxplayer');
