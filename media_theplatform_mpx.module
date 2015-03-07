@@ -116,13 +116,8 @@ function media_theplatform_mpx_stream_wrappers() {
  * Implements hook_ctools_plugin_api().
  */
 function media_theplatform_mpx_ctools_plugin_api($owner, $api) {
-  static $api_versions = array(
-    'file_entity' => array(
-      'file_default_displays' => 1,
-    ),
-  );
-  if (isset($api_versions[$owner][$api])) {
-    return array('version' => $api_versions[$owner][$api]);
+  if ($owner == 'file_entity' && $api == 'file_default_displays') {
+    return array('version' => 1);
   }
 }
 
@@ -1077,6 +1072,7 @@ function _media_theplatform_mpx_decrypt_value($value) {
   }
   return $return;
 }
+
 /**
  * @deprecated
  *
@@ -1320,15 +1316,5 @@ function media_theplatform_mpx_is_file_active($file) {
   }
   elseif ($file->filemime === 'player/mpx') {
     return (bool) db_query("SELECT status FROM {mpx_player} WHERE fid = :fid", array(':fid' => $file->fid))->fetchField();
-  }
-  $wrapper = file_stream_wrapper_get_instance_by_uri($file->uri);
-  $parts = $wrapper->get_parameters();
-  if ($parts['mpx_type'] == 'player') {
-    $player = media_theplatform_mpx_get_mpx_player_by_fid($file->fid);
-    return $player['status'];
-  }
-  elseif ($parts['mpx_type'] == 'video') {
-    $video = media_theplatform_mpx_get_mpx_video_by_field('guid', $parts['mpx_id']);
-    return $video['status'];
   }
 }
