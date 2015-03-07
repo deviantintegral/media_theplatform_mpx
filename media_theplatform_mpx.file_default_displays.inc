@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Default display configuration for the default file types.
+ * Default file display configuration for the media_theplatform_mpx module.
  */
 
 /**

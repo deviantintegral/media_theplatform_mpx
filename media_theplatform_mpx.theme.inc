@@ -1,6 +1,11 @@
 <?php
 
 /**
+ * @file
+ * Theme integration for the media_theplatform_mpx module.
+ */
+
+/**
  * Returns HTML for an mpx video player embedded in an iframe tag.
  *
  * @param array $variables

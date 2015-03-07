@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * @file
+ * Drush integration for the media_theplatform_mpx module.
+ */
 
 define('MEDIA_THEPLATFORM_MPX_VIDEO_INGESTION_LOCK_BASENAME', 'drush_media_theplatform_mpx_ingest_mpx_videos');
 

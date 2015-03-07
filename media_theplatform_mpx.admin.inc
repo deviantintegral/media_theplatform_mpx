@@ -2,7 +2,7 @@
 
 /**
  * @file
- * MPX Functions for forms.
+ * Administration callbacks and forms for the media_theplatform_mpx module.
  */
 
 /**

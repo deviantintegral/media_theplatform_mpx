@@ -16,7 +16,7 @@ class MpxApi {
    *
    * @param MpxAccount $account
    *   The mpx account making the request.
-   * @param $url
+   * @param string $url
    *   The URL of the API request.
    * @param array $params
    *   (optional) An array of query parameters to add to the request.

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * API integration for media_theplatform_mpx module.
+ * API integration for the media_theplatform_mpx module.
  */
 
 /**
