@@ -53,7 +53,7 @@ function media_theplatform_mpx_drush_command() {
       'queue-concurrency' => dt('The number of concurrent processes to use when running the process queue.'),
     ),
     'examples' => array(
-      'drush mpx-ingest-all 1' => dt('Ingest videos for each mpx account.'),
+      'drush mpx-ingest-all' => dt('Ingest videos for each mpx account.'),
       'drush mpxia --limit=100' => dt('Ingest up to 100 new and 100 updated videos for each mpx accounts.'),
     ),
   );
