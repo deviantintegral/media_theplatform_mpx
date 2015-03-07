@@ -8,7 +8,6 @@
 include_once __DIR__ . '/media_theplatform_mpx.field.inc';
 
 // Helper functions.
-include_once __DIR__ . '/media_theplatform_mpx.admin.inc';
 include_once __DIR__ . '/media_theplatform_mpx.helpers.php';
 include_once __DIR__ . '/media_theplatform_mpx.player.php';
 include_once __DIR__ . '/media_theplatform_mpx.video.php';
