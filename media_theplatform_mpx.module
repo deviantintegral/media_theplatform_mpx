@@ -835,14 +835,11 @@ function _media_theplatform_mpx_delete_account_media($account_id, $type, &$conte
  * Helper that deletes all data for an mpx account after its media are deleted.
  */
 function _media_theplatform_mpx_delete_account_data($account_id) {
-  // Perform special operations only if the module is not being uninstalled.
-  if (class_exists('MpxAccount') && $account = MpxAccount::load($account_id)) {
-    module_invoke_all('media_theplatform_mpx_account_delete', $account);
-    // Only release the account's token if no other mpx accounts have the same
-    // username.
-    if (!db_query("SELECT 1 FROM {mpx_accounts} WHERE username = :username AND id <> :id", array(':username' => $account->username, ':id' => $account_id))->fetchField()) {
-      $account->releaseToken();
-    }
+  // Attempt to load the mpx account object. This will only work if the module
+  // is not being uninstalled.
+  $account = NULL;
+  if (class_exists('MpxAccount')) {
+    $account = MpxAccount::load($account_id);
   }
 
   // Delete the request queue for the account.
@@ -852,6 +849,16 @@ function _media_theplatform_mpx_delete_account_data($account_id) {
 
   db_delete('mpx_accounts')->condition('id', $account_id)->execute();
   db_delete('mpx_account_data')->condition('account_id', $account_id)->execute();
+
+  // Invoke the deletion hook.
+  if (!empty($account)) {
+    module_invoke_all('media_theplatform_mpx_account_delete', $account);
+    // Only release the account's token if no other mpx accounts have the same
+    // username.
+    if (!db_query("SELECT 1 FROM {mpx_accounts} WHERE username = :username AND id <> :id", array(':username' => $account->username, ':id' => $account_id))->fetchField()) {
+      $account->releaseToken();
+    }
+  }
 
   // Remove variables disabling video and player sync for this account.
   variable_del('media_theplatform_mpx__account_' . $account_id . '_cron_player_sync');
