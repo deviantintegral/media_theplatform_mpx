@@ -57,11 +57,7 @@ class MpxAccount {
       return array();
     }
     $accounts = db_query("SELECT * FROM {mpx_accounts} WHERE id IN (:ids)", array(':ids' => $ids), array('fetch' => get_called_class()))->fetchAllAssoc('id');
-    foreach ($accounts as $account) {
-      $account->password = decrypt($account->password);
-      $account->data = db_query("SELECT name, value FROM {mpx_account_data} WHERE account_id = :id", array(':id' => $account->id))->fetchAllKeyed();
-      module_invoke_all('media_theplatform_mpx_account_load', $account);
-    }
+    static::attachLoad($accounts);
     return $accounts;
   }
 
@@ -73,12 +69,25 @@ class MpxAccount {
    */
   public static function loadAll() {
     $accounts = db_query("SELECT * FROM {mpx_accounts}", array(), array('fetch' => get_called_class()))->fetchAllAssoc('id');
+    static::attachLoad($accounts);
+    return $accounts;
+  }
+
+  /**
+   * Perform load operations for mpx accounts.
+   *
+   * @param array $accounts
+   *   An array of mpx account objects.
+   */
+  public static function attachLoad(array &$accounts) {
     foreach ($accounts as $account) {
       $account->password = decrypt($account->password);
-      $account->data = db_query("SELECT name, value FROM {mpx_account_data} WHERE account_id = :id", array(':id' => $account->id))->fetchAllKeyed();
+      // Do not fail if media_theplatform_mpx_update_7219() has not run yet.
+      if (db_table_exists('mpx_account_data')) {
+        $account->data = db_query("SELECT name, value FROM {mpx_account_data} WHERE account_id = :id", array(':id' => $account->id))->fetchAllKeyed();
+      }
       module_invoke_all('media_theplatform_mpx_account_load', $account);
     }
-    return $accounts;
   }
 
   /**
