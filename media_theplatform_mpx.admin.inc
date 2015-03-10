@@ -295,6 +295,10 @@ function media_theplatform_mpx_account_edit_form_submit($form, &$form_state) {
   if (empty($account->password)) {
     $account->password = $form_state['build_info']['args'][0]->password;
   }
+  // Ensure that the default_player field will not get set to '0'.
+  if (empty($account->default_player)) {
+    $account->default_player = NULL;
+  }
   $account->save();
   drupal_set_message(t('The mpx account %account has been saved.', array('%account' => $account->username)));
   watchdog('media_theplatform_mpx', 'Updated mpx account @account.', array('@account' => $account->username), WATCHDOG_INFO);
