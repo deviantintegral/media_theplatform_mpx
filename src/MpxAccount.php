@@ -368,6 +368,16 @@ class MpxAccount {
    *   - method: A string containing how this method was invoked. Used for
    *     watchdog statements. Defaults to 'manually'.
    *
+   * @return array
+   *   A summary of the ingestion run including the following elements:
+   *   - message: The summary message.
+   *   - args: The summary message arguments for use with t().
+   *   - timer: The elapsed ingestion time in milliseconds.
+   *   - queue_count_before: The number of items in the cron queue before
+   *     ingestion started.
+   *   - queue_count_after: The number of items in the cron queue after
+   *     ingestion started.
+   *
    * @throws Exception
    */
   public function ingestVideos(array $options = array()) {
@@ -388,8 +398,11 @@ class MpxAccount {
     $transaction = db_transaction();
 
     try {
-      timer_start(__METHOD__);
       watchdog('media_theplatform_mpx', 'Starting video ingestion for mpx account @id.', array('@id' => $this->id), WATCHDOG_INFO);
+
+      $summary = array();
+      $summary['queue_count_before'] = DrupalQueue::get('media_theplatform_mpx_video_cron_queue', TRUE)->numberOfItems();
+      timer_start($lock_id);
 
       if ($this->getDataValue('proprocessing_batch_url')) {
         // Check if we're running a feed request batch.  If so, construct the batch URL.
@@ -404,10 +417,22 @@ class MpxAccount {
         _media_theplatform_mpx_process_video_import($this, $options);
       }
 
-      watchdog('media_theplatform_mpx', 'Completed video ingestion for mpx account @id in @elapsed sec.', array('@id' => $this->id, '@elapsed' => round(timer_read(__METHOD__) / 1000.0, 2)), WATCHDOG_INFO);
-
       // Ensure the lock is released.
       lock_release($lock_id);
+
+      $summary['timer'] = timer_read($lock_id);
+      $summary['queue_count_after'] = DrupalQueue::get('media_theplatform_mpx_video_cron_queue', TRUE)->numberOfItems();
+      $summary['message'] = "Completed video ingestion for mpx account @id in @elapsed sec, @memory peak memory usage.\nmedia_theplatform_mpx_video_cron_queue: @tasks new tasks, @task-count total tasks.";
+      $summary['args'] = array(
+        '@id' => $this->id,
+        '@elapsed' => round($summary['timer'] / 1000.0, 2),
+        '@tasks' => $summary['queue_count_after'] - $summary['queue_count_before'],
+        '@task-count' => $summary['queue_count_after'],
+        '@memory' => format_size(memory_get_peak_usage(TRUE)),
+      );
+
+      watchdog('media_theplatform_mpx', $summary['message'], $summary['args'], WATCHDOG_INFO);
+      return $summary;
     }
     catch (Exception $e) {
       $transaction->rollback();
