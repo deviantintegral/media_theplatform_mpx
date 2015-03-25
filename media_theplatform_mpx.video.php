@@ -1129,7 +1129,7 @@ function media_theplatform_mpx_update_video($video, $fid = NULL, MpxAccount $acc
   // Delete thumbnail from files_*/media-mpx directory.
   _media_theplatform_mpx_delete_video_images($video);
 
-  watchdog('media_theplatform', 'Updated video @id - "@title" - associated with file @fid for @account.',
+  watchdog('media_theplatform_mpx', 'Updated video @id - "@title" - associated with file @fid for @account.',
     array(
       '@id' => basename($video['id']),
       '@title' => $video['title'],
