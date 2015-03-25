@@ -662,8 +662,11 @@ function media_theplatform_mpx_form_mpx_video_sync_submit($form, &$form_state) {
   // Import videos.
   media_theplatform_mpx_import_all_videos('manually');
 
-  drupal_set_message(t('<a href="@cron">Run cron now</a> to complete the import/update process.',
-    array('@cron' => url('admin/reports/status/run-cron', array('query' => drupal_get_destination())))));
+  // Only show this message about cron if "Sync mpxMedia on Cron" is enabled.
+  if (variable_get('media_theplatform_mpx__cron_videos', 1)) {
+    $cron_url = url('admin/reports/status/run-cron', array('query' => drupal_get_destination()));
+    drupal_set_message(t('<a href="@cron">Run cron now</a> to complete the import/update process.', array('@cron' => $cron_url)));
+  }
 }
 
 /**
