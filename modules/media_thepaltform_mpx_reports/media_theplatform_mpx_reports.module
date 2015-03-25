@@ -5,38 +5,21 @@
  * Implements hook_menu().
  */
 function media_theplatform_mpx_reports_menu() {
-
   $items = array();
 
-  if (variable_get('media_theplatform_mpx__cron_videos', 1)) {
-    $items['admin/config/media/theplatform/status'] = array(
-      'title' => t('Media: thePlatform MPX Status (BETA)'),
-      'description' => t('BETA: Reports current ingestion status.'),
-      'page callback' => 'media_theplatform_mpx_reports_page_status',
-      'type' => MENU_LOCAL_TASK,
-      'access arguments' => array('administer mpx account'),
-    );
-  }
+  $items['admin/config/media/theplatform/status'] = array(
+    'title' => t('Media: thePlatform MPX Status (BETA)'),
+    'description' => t('BETA: Reports current ingestion status.'),
+    'page callback' => 'media_theplatform_mpx_reports_page_status',
+    'type' => MENU_LOCAL_TASK,
+    'access callback' => 'media_theplatform_mpx_reports_page_access',
+  );
 
   return $items;
 }
 
-/**
- * Implements hook_form_media_theplatform_mpx_form_cron_settings_alter().
- */
-function media_theplatform_mpx_form_media_theplatform_mpx_form_cron_settings_alter(&$form, &$form_state) {
-
-  $form['#submit'][] = '_media_theplatform_mpx_reports_form_cron_settings_submit';
-}
-
-/**
- * Form submission handler for the media_theplatform_mpx_form_cron_settings form.
- */
-function _media_theplatform_mpx_reports_form_cron_settings_submit(&$form, &$form_state) {
-
-  // Rebuild the menu so that if cron video ingestion has been turned off, the
-  // cron queue status page becomes unavailable, since it is no longer any use.
-  menu_rebuild();
+function media_theplatform_mpx_reports_page_access() {
+  return user_access('administer mpx account') && variable_get('media_theplatform_mpx__cron_videos', 1);
 }
 
 /**
