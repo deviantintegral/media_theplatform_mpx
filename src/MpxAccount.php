@@ -9,7 +9,7 @@ class MpxAccount {
   public $account_id;
   public $account_pid;
   public $default_player;
-  public $data = array();
+  private $data;
 
   /**
    * Constructs a new mpx account object, without saving it.
@@ -82,10 +82,6 @@ class MpxAccount {
   public static function attachLoad(array &$accounts) {
     foreach ($accounts as $account) {
       $account->password = decrypt($account->password);
-      // Do not fail if media_theplatform_mpx_update_7219() has not run yet.
-      if (db_table_exists('mpx_account_data')) {
-        $account->data = db_query("SELECT name, value FROM {mpx_account_data} WHERE account_id = :id", array(':id' => $account->id))->fetchAllKeyed();
-      }
       module_invoke_all('media_theplatform_mpx_account_load', $account);
     }
   }
@@ -327,6 +323,9 @@ class MpxAccount {
    *   The stored value, or the default value if no value exists.
    */
   public function getDataValue($key, $default = NULL) {
+    if (!isset($this->data)) {
+      $this->data = db_query("SELECT name, value FROM {mpx_account_data} WHERE account_id = :id", array(':id' => $this->id))->fetchAllKeyed();
+    }
     if (array_key_exists($key, $this->data)) {
       return $this->data[$key];
     }
@@ -344,7 +343,6 @@ class MpxAccount {
    *   The data to store.
    */
   public function setDataValue($key, $value) {
-    $this->data[$key] = $value;
     db_merge('mpx_account_data')
       ->key(array(
         'account_id' => $this->id,
@@ -354,6 +352,9 @@ class MpxAccount {
         'value' => $value
       ))
       ->execute();
+    // Reset the data array so it will be fetched fresh the next time
+    // getDataValue() is called.
+    unset($this->data);
   }
 
   /**
@@ -436,6 +437,8 @@ class MpxAccount {
     }
     catch (Exception $e) {
       $transaction->rollback();
+      // Clear the data values.
+      unset($this->data);
       // Lock should be released even on exceptions.
       lock_release($lock_id);
       throw $e;
