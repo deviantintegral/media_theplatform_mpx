@@ -1243,44 +1243,6 @@ function media_theplatform_mpx_get_thumbnail_url($guid) {
 }
 
 /**
- * Validates and restores backup last notification sequence ID.
- */
-function _media_theplatform_mpx_restore_last_notification(MpxAccount $account) {
-  $backup_last_notification_value = variable_get('media_theplatform_mpx__backup_last_notification_value');
-
-  if (!$backup_last_notification_value) {
-    watchdog('media_theplatform_mpx', 'Attempt to restore backup last_notification for @account failed - no value exists.',
-      array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_ERROR);
-
-    return FALSE;
-  }
-
-  // Check if the backup value is still valid.  Last notification  sequence
-  // IDs are only stored by thePlatform for a week.
-  $token = $account->acquireToken();
-  $url = 'https://read.data.media.theplatform.com/media/notify?token=' . rawurlencode($token) .
-    '&account=' . rawurlencode($account->import_account) .
-    '&block=false&filter=Media&clientId=drupal_media_theplatform_mpx_' . $account->account_pid .
-    '&since=' . $backup_last_notification_value .
-    '&size=1';
-  $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
-
-  if (empty($result_data)) {
-    watchdog('media_theplatform_mpx', 'Attempt to validate backup last_notification value "@value" failed.  This might occur if the sequence ID is over a week old.',
-      array(
-        '@value' => $backup_last_notification_value,
-      ),
-      WATCHDOG_ERROR);
-
-    return FALSE;
-  }
-
-  media_theplatform_mpx_set_last_notification($account, $backup_last_notification_value);
-
-  return TRUE;
-}
-
-/**
  * Returns most recent notification sequence number from thePlatform.
  */
 function media_theplatform_mpx_set_last_notification(MpxAccount $account, $last_notification = NULL) {
@@ -1307,13 +1269,9 @@ function media_theplatform_mpx_set_last_notification(MpxAccount $account, $last_
     }
   }
 
-  // If we have a value, save it in the mpx_accounts table and in our backup
-  // variable.
+  // If we have a value, save it.
   if ($last_notification) {
     $account->setDataValue('last_notification', $last_notification);
-    // Save the last notification value in the fallback variable for recovery purposes.
-    variable_set('media_theplatform_mpx__backup_last_notification_value', $last_notification);
-
     return TRUE;
   }
 

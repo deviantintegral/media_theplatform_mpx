@@ -58,18 +58,6 @@ function media_theplatform_mpx_drush_command() {
     ),
   );
 
-  $commands['restore-mpx-last-notification'] = array(
-    'description' => dt('Restores the most recently saved last_notification sequence ID from a backup system variable.'),
-    'hidden' => TRUE,
-    'aliases' => array('mpxrln'),
-    'options' => array(
-      'account-id' => array(
-        'description' => dt('The ID of the account the value will be reset for, from the "id" column in the mpx_accounts table.') . "\n",
-        'example_value' => '1',
-      ),
-    ),
-  );
-
   $commands['ingest-mpx-videos'] = array(
     'description' => dt('Runs a continuous mpx video ingestion process.'),
     'hidden' => TRUE,
@@ -295,43 +283,6 @@ function _drush_media_theplatform_mpx_run_queue() {
       )
     );
   }
-}
-
-/**
- * Validation for the restore-last-notification command.
- */
-function drush_media_theplatform_mpx_restore_mpx_last_notification_validate($account_id) {
-  $account = MpxAccount::load($account_id);
-
-  if (empty($account)) {
-    return _drush_media_theplatform_mpx_print('Account ID is invalid.  Account data was not retrieved.',
-      array(), 'error');
-  }
-
-  $backup_last_notification_value = variable_get('media_theplatform_mpx__backup_last_notification_value');
-
-  if (!$backup_last_notification_value) {
-    return _drush_media_theplatform_mpx_print('Backup last notification value does not exist.',
-      array(), 'error');
-  }
-
-  return TRUE;
-}
-
-/**
- * Command that restores backup last notification sequence ID in cases
- * where the value may be set to NULL in the database accidentally.
- */
-function drush_media_theplatform_mpx_restore_mpx_last_notification($account_id) {
-  $account = MpxAccount::load($account_id);
-
-  $success = _media_theplatform_mpx_restore_last_notification($account);
-
-  if (!$success) {
-    return _drush_media_theplatform_mpx_print('Last notification value failed to be restored.  Check watchdog logs for errors.', array(), 'error');
-  }
-
-  return _drush_media_theplatform_mpx_print('Last notification value was restored.');
 }
 
 /**
