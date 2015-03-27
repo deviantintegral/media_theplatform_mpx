@@ -37,7 +37,7 @@ function media_theplatform_mpx_drush_command() {
     'options' => array(
       'limit' => dt('The number of new or updated items to process from the feed at once. The default is 250.'),
       'queue-run' => dt('Will run the process queue after ingestion.'),
-      'queue-concurrency' => dt('The number of concurrent processes to use when running the process queue.'),
+      'queue-concurrency' => dt('The number of concurrent processes to use when running the process queue. The default is 1 so that the queue will be run in order.'),
     ),
     'examples' => array(
       'drush mpx-ingest 1' => dt('Ingest videos for mpx account 1.'),
@@ -50,7 +50,7 @@ function media_theplatform_mpx_drush_command() {
     'options' => array(
       'limit' => dt('The number of new or updated items to process from the feed at once. The default is 250.'),
       'queue-run' => dt('Will run the process queue after ingestion.'),
-      'queue-concurrency' => dt('The number of concurrent processes to use when running the process queue. The default is 5.'),
+      'queue-concurrency' => dt('The number of concurrent processes to use when running the process queue. The default is 1 so that the queue will be run in order.'),
     ),
     'examples' => array(
       'drush mpx-ingest-all' => dt('Ingest videos for each mpx account.'),
@@ -258,7 +258,7 @@ function _drush_media_theplatform_mpx_run_queue() {
   }
 
   // The process the items from the queue.
-  $concurrency = (int) drush_get_option('queue-concurrency', 5);
+  $concurrency = (int) drush_get_option('queue-concurrency', 1);
   if (module_exists('concurrent_queue')) {
     drush_invoke_process(
       '@self',
