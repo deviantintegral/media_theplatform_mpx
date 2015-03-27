@@ -115,7 +115,9 @@ class MediaThePlatformMpxStreamWrapper extends MediaReadOnlyStreamWrapper {
 
   function interpolateUrl() {
     if ($params = $this->get_parameters()) {
-      return url('file/' . $params['file']->fid, array('absolute' => TRUE));
+      if (!empty($params['file'])) {
+        return url('file/' . $params['file']->fid, array('absolute' => TRUE));
+      }
     }
   }
 
