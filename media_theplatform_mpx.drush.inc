@@ -196,7 +196,7 @@ function drush_media_theplatform_mpx_mpx_ingest($account_id) {
       $options['limit'] = (int) $limit;
     }
     $summary = $account->ingestVideos($options);
-    drush_log(dt($summary['message'], $summary['args']), 'success');
+    drush_log(dt(str_replace('<br>', "\n", $summary['message']), $summary['args']), 'success');
     _drush_media_theplatform_mpx_run_queue();
   }
   catch (Exception $e) {

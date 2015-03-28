@@ -423,13 +423,14 @@ class MpxAccount {
 
       $summary['timer'] = timer_read($lock_id);
       $summary['queue_count_after'] = DrupalQueue::get('media_theplatform_mpx_video_cron_queue', TRUE)->numberOfItems();
-      $summary['message'] = "Completed video ingestion for mpx account @id in @elapsed sec, @memory peak memory usage.\nmedia_theplatform_mpx_video_cron_queue: @tasks new tasks, @task-count total tasks.";
+      $summary['message'] = "Completed video ingestion for mpx account @id.<br>Last notification ID: @notification_id<br>Peak memory usage: @memory in @elapsed sec<br>media_theplatform_mpx_video_cron_queue: @tasks new tasks, @task-count total tasks.";
       $summary['args'] = array(
         '@id' => $this->id,
         '@elapsed' => round($summary['timer'] / 1000.0, 2),
         '@tasks' => $summary['queue_count_after'] - $summary['queue_count_before'],
         '@task-count' => $summary['queue_count_after'],
         '@memory' => format_size(memory_get_peak_usage(TRUE)),
+        '@notification_id' => $this->getDataValue('last_notification'),
       );
 
       watchdog('media_theplatform_mpx', $summary['message'], $summary['args'], WATCHDOG_INFO);
