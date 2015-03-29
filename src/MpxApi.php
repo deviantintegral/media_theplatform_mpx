@@ -69,6 +69,10 @@ class MpxApi {
       $url .= (strpos($url, '?') !== FALSE ? '&' : '?') . drupal_http_build_query($params);
     }
 
+    // Also invoke the deprecated hook now that the full URL has been built.
+    // @todo Remove this hook invocation.
+    drupal_alter('media_theplatform_mpx_feed_request', $url, $options);
+
     if (isset($options['method']) && $options['method'] === 'POST' && isset($options['data']) && is_array($options['data'])) {
       $options['data'] = http_build_query($options['data']);
     }
