@@ -94,7 +94,9 @@ class MpxAccount {
   public function save() {
     $transaction = db_transaction();
     try {
-      $this->is_new = empty($this->id);
+      if (!isset($this->is_new)) {
+        $this->is_new = empty($this->id);
+      }
 
       // Fetch the account_id and account_pid values.
       if (!empty($this->import_account) && empty($this->account_id) && empty($this->account_pid)) {
