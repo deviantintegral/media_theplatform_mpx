@@ -34,15 +34,9 @@ function media_theplatform_mpx_get_players_from_theplatform(MpxAccount $account)
 
   // @todo - do some kind of check to bring back a max # of records?
   // Get the list of players from thePlatform.
-  $result_data = MpxApi::authenticatedRequest(
-    $account,
-    'https://read.data.player.theplatform.com/player/data/Player',
-    array(
-      'schema' => '1.3.0',
-      'form' => 'json',
-      'account' => $mpx_sub_account,
-    )
-  );
+  $player_url = 'https://read.data.player.theplatform.com/player/data/Player?schema=1.3.0&form=json&token=' . rawurlencode($mpx_token) . '&account=' . rawurlencode($mpx_sub_account);
+
+  $result_data = _media_theplatform_mpx_retrieve_feed_data($player_url);
 
   if (!isset($result_data['entryCount'])) {
     watchdog('media_theplatform_mpx', 'Failed to retrieve mpx players for @acccount.  "entryCount" field value not set.',

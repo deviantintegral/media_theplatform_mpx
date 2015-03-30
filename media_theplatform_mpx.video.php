@@ -15,18 +15,17 @@
  *   Array of mpxMedia id's that have changed since $since.
  */
 function media_theplatform_mpx_get_changed_ids(MpxAccount $account) {
-  $result_data = MpxApi::authenticatedRequest(
-    $account,
-    'https://read.data.media.theplatform.com/media/notify',
-    array(
-      'account' => $account->import_account,
-      'block' => 'false',
-      'filter' => 'Media',
-      'clientId' => 'drupal_media_theplatform_mpx_' . $account->account_pid,
-      'since' => $account->getDataValue('last_notification'),
-      'size' => variable_get('media_theplatform_mpx__cron_videos_per_run', 250),
-    )
-  );
+
+  $token = $account->acquireToken();
+  $feed_request_item_limit = variable_get('media_theplatform_mpx__cron_videos_per_run', 250);
+
+  $url = 'https://read.data.media.theplatform.com/media/notify?token=' . rawurlencode($token) .
+    '&account=' . rawurlencode($account->import_account) .
+    '&block=false&filter=Media&clientId=drupal_media_theplatform_mpx_' . $account->account_pid .
+    '&since=' . $account->getDataValue('last_notification') .
+    '&size=' . $feed_request_item_limit;
+
+  $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
 
   if (empty($result_data)) {
     watchdog('media_theplatform_mpx', 'Request for update notifications returned no data for @account.',
@@ -335,15 +334,24 @@ function _media_theplatform_mpx_process_batch_video_import(MpxAccount $account, 
   $batch_url = $account->getDataValue('proprocessing_batch_url');
   $batch_item_count = $account->getDataValue('proprocessing_batch_item_count');
   $current_batch_item = (int) $account->getDataValue('proprocessing_batch_current_item');
+  $token = $account->acquireToken();
 
-  $result_data = MpxApi::authenticatedRequest(
-    $account,
-    $batch_url,
+  $url = $batch_url . '&range=' . $current_batch_item . '-' . ($current_batch_item + ($options['limit'] - 1));
+  $url .= '&token=' . rawurlencode($token);
+
+  // This log message may seem redundant, but it's important for detecting if an
+  // ingestion process has begun and is currently in progress.
+  watchdog('media_theplatform_mpx', 'Processing batch video import @method for @account. <br /><br /> Retrieving @limit videos from:
+    <br /><br />  @url.',
     array(
-      'range' => $current_batch_item . '-' . ($current_batch_item + ($options['limit'] - 1)),
-    )
-  );
+      '@method' => $options['method'],
+      '@account' => _media_theplatform_mpx_account_log_string($account),
+      '@limit' => $options['limit'],
+      '@url' => $url,
+    ),
+    WATCHDOG_NOTICE);
 
+  $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
   if (!$result_data) {
     watchdog('media_theplatform_mpx', 'Aborting batch video import @method.  No video data returned from thePlatform.',
       array(
@@ -388,8 +396,6 @@ function _media_theplatform_mpx_process_batch_video_import(MpxAccount $account, 
 /**
  * Helper that constructs a video feed url given a comma-delited list of video
  * ids or "all" for all media (used during initial import).
- *
- * @todo Convert to a better return format to be used by MpxApi::request().
  */
 function _media_theplatform_mpx_get_video_feed_url($ids = NULL, $account = NULL) {
 
@@ -400,7 +406,6 @@ function _media_theplatform_mpx_get_video_feed_url($ids = NULL, $account = NULL)
   // import, media can be edited before the batch is complete.  This ensures
   // these edited media will be fetched toward the end of the batch.
   $url = 'https://read.data.media.theplatform.com/media/data/Media?schema=1.6.0&form=json&pretty=true' .
-    // @todo Could this just use &account=$account->import_account instead?
     '&byOwnerId=' . $account->account_id .
     '&byApproved=true&byAvailabilityState=notYetAvailable|available|expired' .
     '&byContent=byExists%3Dtrue%26byHasReleases%3Dtrue' .
@@ -416,16 +421,14 @@ function _media_theplatform_mpx_get_video_feed_url($ids = NULL, $account = NULL)
 /**
  * Get the total item count for a given feed url.
  */
-function _media_theplatform_mpx_get_feed_item_count($url, MpxAccount $account) {
-  $count_result_data = MpxApi::authenticatedRequest(
-    $account,
-    $url,
-    array(
-      'count' => 'true',
-      'fields' => 'guid',
-      'range' => '1-1',
-    )
-  );
+function _media_theplatform_mpx_get_feed_item_count($url) {
+
+  $count_url = $url . '&count=true&fields=guid&range=1-1';
+  $feed_request_timeout = variable_get('media_theplatform_mpx__cron_videos_timeout', 180);
+
+  watchdog('media_theplatform_mpx', 'Retrieving total feed item count.', array(), WATCHDOG_INFO);
+
+  $count_result_data = _media_theplatform_mpx_retrieve_feed_data($count_url);
 
   if (!isset($count_result_data['totalResults'])) {
     watchdog('media_theplatform_mpx', 'Failed to retrieve total feed item count.  totalResults field not found in response data.',
@@ -506,6 +509,9 @@ function _media_theplatform_mpx_process_video_update(MpxAccount $account, $optio
   // Get the feed url.
   $batch_url = _media_theplatform_mpx_get_video_feed_url($ids, $account);
 
+  $token = $account->acquireToken();
+  $url = $batch_url . '&token=' . rawurlencode($token);
+
   // Get the total result count for this update.  If it is greater than the feed
   // request item limit, start a new batch.
   $total_result_count = count(explode(',', $ids));
@@ -521,10 +527,7 @@ function _media_theplatform_mpx_process_video_update(MpxAccount $account, $optio
     return _media_theplatform_mpx_process_batch_video_import($account, $options);
   }
 
-  $result_data = MpxApi::authenticatedRequest(
-    $account,
-    $batch_url
-  );
+  $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
 
   if (!$result_data) {
     return FALSE;
@@ -568,9 +571,12 @@ function _media_theplatform_mpx_process_video_import(MpxAccount $account, array 
   // Get the feed url.
   $batch_url = _media_theplatform_mpx_get_video_feed_url('all', $account);
 
+  $token = $account->acquireToken();
+  $url = $batch_url . '&token=' . rawurlencode($token);
+
   // Get the total result count for this update.  If it is greater than the feed
   // request item limit, start a new batch.
-  $total_result_count = _media_theplatform_mpx_get_feed_item_count($batch_url, $account);
+  $total_result_count = _media_theplatform_mpx_get_feed_item_count($url);
 
   if ($total_result_count && $total_result_count > $options['limit']) {
     // Set starter batch system variables.
@@ -585,10 +591,7 @@ function _media_theplatform_mpx_process_video_import(MpxAccount $account, array 
   watchdog('media_theplatform_mpx', 'Retrieving all media data from thePlatform for @account.',
     array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_INFO);
 
-  $result_data = MpxApi::authenticatedRequest(
-    $account,
-    $batch_url
-  );
+  $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
 
   if (empty($result_data)) {
     watchdog('media_theplatform_mpx', 'Failed to retrieve all media data from thePlatform for @account.  Halting the import process.',
@@ -1245,15 +1248,11 @@ function media_theplatform_mpx_get_thumbnail_url($guid) {
 function media_theplatform_mpx_set_last_notification(MpxAccount $account, $last_notification = NULL) {
 
   if (empty($last_notification)) {
-    $result_data = MpxApi::authenticatedRequest(
-      $account,
-      'https://read.data.media.theplatform.com/media/notify',
-      array(
-        'account' => $account->import_account,
-        'filter' => 'Media',
-        'clientId' => 'drupal_media_theplatform_mpx_' . $account->account_pid,
-      )
-    );
+    $token = $account->acquireToken();
+    $url = 'https://read.data.media.theplatform.com/media/notify?token=' . rawurlencode($token) .
+      '&account=' . rawurlencode($account->import_account) .
+      '&filter=Media&clientId=drupal_media_theplatform_mpx_' . $account->account_pid;
+    $result_data = _media_theplatform_mpx_retrieve_feed_data($url);
 
     if (empty($result_data[0]['id'])) {
       watchdog('media_theplatform_mpx', 'Failed to reset mpx last notification sequence ID for @account.  "id" field value not set.',
