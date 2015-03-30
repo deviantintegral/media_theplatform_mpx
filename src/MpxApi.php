@@ -62,11 +62,20 @@ class MpxApi {
    * @throws Exception
    */
   public static function request($url, array $params = array(), array $options = array()) {
+    // If the URL already contains a query string, let's merge it into the
+    // $params array so that it can easily be altered.
+    if ($query = parse_url($url, PHP_URL_QUERY)) {
+      $url = str_replace('?' . $query, '', $url);
+      $params = drupal_get_query_array($query) + $params;
+    }
+
     // Allow for altering the URL before making the request.
     drupal_alter('media_theplatform_mpx_api_request', $url, $params, $options);
 
+    // Append the query parameters back onto the URL.
     if (!empty($params)) {
-      $url .= (strpos($url, '?') !== FALSE ? '&' : '?') . drupal_http_build_query($params);
+      $query = drupal_http_build_query($params);
+      $url .= (strpos($url, '?') !== FALSE ? '&' : '?') . $query;
     }
 
     // Also invoke the deprecated hook now that the full URL has been built.
