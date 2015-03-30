@@ -471,7 +471,7 @@ function media_theplatform_mpx_check_account_settings($account_id = NULL) {
 function media_theplatform_mpx_page_mpx_players() {
   $output = array();
   // Display forms if signin and import_account
-  if (media_theplatform_mpx_check_account_settings() && user_access('sync mpx_player')) {
+  if (media_theplatform_mpx_check_account_settings() && (user_access('sync mpx_player') || user_access('administer mpx account'))) {
     $output['sync'] = drupal_get_form('media_theplatform_mpx_form_mpx_player_sync');
   }
   $output += media_theplatform_mpx_get_table_mpx_players();
@@ -576,7 +576,7 @@ function media_theplatform_mpx_page_mpx_videos() {
   // If no mpxPlayers, you cant do anything with mpxMedia.
   if (!db_query("SELECT 1 FROM {mpx_player}")->fetchField()) {
     $output['#markup'] = t('No mpxPlayers have been imported.');
-    if (user_access('sync mpx_player')) {
+    if (user_access('sync mpx_player') || user_access('administer mpx account')) {
       $output['#markup'] .= ' ' . l(t('Sync mpxPlayers.'), 'admin/content/file/mpxplayer');
     }
     else {
@@ -584,7 +584,7 @@ function media_theplatform_mpx_page_mpx_videos() {
     }
     return $output;
   }
-  if (media_theplatform_mpx_check_account_settings() && user_access('sync mpx_video')) {
+  if (media_theplatform_mpx_check_account_settings() && (user_access('sync mpx_video') || user_access('administer mpx account'))) {
     $output['sync'] = drupal_get_form('media_theplatform_mpx_form_mpx_video_sync');
   }
   $output += media_theplatform_mpx_get_table_mpx_videos();
