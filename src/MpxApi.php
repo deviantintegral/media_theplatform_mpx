@@ -121,6 +121,9 @@ class MpxApi {
     if (!empty($data['responseCode']) && !empty($data['isException'])) {
       throw new MpxApiException($response, "Error {$data['responseCode']} on request to {$response->url}: {$data['description']}");
     }
+    elseif (!empty($data[0]['entry']['responseCode']) && !empty($data[0]['entry']['isException'])) {
+      throw new MpxApiException($response, "Error {$data[0]['entry']['responseCode']} on request to {$response->url}: {$data[0]['entry']['description']}");
+    }
     else {
       return $data;
     }
