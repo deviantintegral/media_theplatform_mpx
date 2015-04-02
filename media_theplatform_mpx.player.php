@@ -77,7 +77,7 @@ function media_theplatform_mpx_get_players_from_theplatform(MpxAccount $account)
 /**
  * Returns array of mpxPlayer fid's and Titles.
  */
-function media_theplatform_mpx_get_players_select($account = NULL, $key = 'player_id') {
+function media_theplatform_mpx_get_players_select(MpxAccount $account = NULL, $key = 'player_id') {
 
   // Retrieve players from mpx_player.
   $query = db_select('mpx_player', 'p');
