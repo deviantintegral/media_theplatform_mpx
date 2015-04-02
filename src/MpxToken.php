@@ -156,13 +156,8 @@ class MpxToken {
       'https://identity.auth.theplatform.com/idm/web/Authentication/signIn',
       $query,
       array(
-        'method' => 'POST',
-        'data' => array(
-          'username' => $username,
-          'password' => $password,
-        ),
         'headers' => array(
-          'Content-Type' => 'application/x-www-form-urlencoded',
+          'Authorization' => 'Basic ' . base64_encode($username . ':' . $password),
         ),
       )
     );
