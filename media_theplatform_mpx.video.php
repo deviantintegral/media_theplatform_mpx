@@ -117,108 +117,96 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
 
   $start_microtime = microtime(TRUE);
 
-  try {
+  switch ($item['queue_operation']) {
 
-    switch ($item['queue_operation']) {
+    case 'publish':
+      // Import/Update the video.
+      if (!empty($item['video'])) {
 
-      case 'publish':
-        // Import/Update the video.
-        if (!empty($item['video'])) {
-
-          /** @var MpxAccount $account */
-          $account = NULL;
-          if (!empty($item['account'])) {
-            $account = $item['account'];
-          }
-          elseif (!empty($item['account_id'])) {
-            $account = MpxAccount::load($item['account_id']);
-          }
-          else {
-            // If an account wasn't stored, it was queued in a previous version of
-            // this module.  Assume account 1 in these cases.
-            $accounts = MpxAccount::loadAll();
-            $item['account'] = reset($accounts);
-          }
-          if (empty($account)) {
-            throw new Exception("Unable to load mpx account for item.");
-          }
-
-          // Check if player sync has been turned off for this account.  If so,
-          // do not import/update this video.
-          if (!variable_get('media_theplatform_mpx__account_' . $account->id . '_cron_video_sync', 1)) {
-            return;
-          }
-          $video = $item['video'];
-          // Prepare the video item for import/update.
-
-          // Sometimes MPX will send us invalid URLs like:
-          // "{ssl:https:http}://mpxstatic-nbcmpx.nbcuni.com/...jpg". We need to
-          // fix the protocol for the ingestion to work.
-          // When the root cause is fixed this code may go away.
-          $thumbnail_url = $video['plmedia$defaultThumbnailUrl'];
-          $thumbnail_url = preg_replace('/(\{.*\})\:\/\/(.*)/', "http://$2", $thumbnail_url);
-
-          $video_item = array(
-            'id' => basename($video['id']),
-            'guid' => $video['guid'],
-            'title' => $video['title'],
-            'description' => $video['description'],
-            'thumbnail_url' => $thumbnail_url,
-            // Additional default mpx fields.
-            'released_file_pids' => serialize(_media_theplatform_mpx_flatten_array(_media_theplatform_mpx_get_media_item_data('media$content/plfile$releases/plrelease$pid', $video))),
-            'default_released_file_pid' => _media_theplatform_mpx_get_default_released_file_pid($video),
-            'categories' => serialize(_media_theplatform_mpx_get_media_item_data('media$categories/media$name', $video)),
-            'author' => _media_theplatform_mpx_get_media_item_data('plmedia$provider', $video),
-            'airdate' => _media_theplatform_mpx_get_media_item_data('pubDate', $video) / 1000,
-            'available_date' => _media_theplatform_mpx_get_media_item_data('media$availableDate', $video) / 1000,
-            'expiration_date' => _media_theplatform_mpx_get_media_item_data('media$expirationDate', $video) / 1000,
-            'keywords' => _media_theplatform_mpx_get_media_item_data('media$keywords', $video),
-            'copyright' => _media_theplatform_mpx_get_media_item_data('media$copyright', $video),
-            'related_link' => _media_theplatform_mpx_get_media_item_data('link', $video),
-            'fab_rating' => _media_theplatform_mpx_get_rating_media_item_data('fab', $video),
-            'fab_sub_ratings' => serialize(_media_theplatform_mpx_get_subrating_media_item_data('fab', $video)),
-            'mpaa_rating' => _media_theplatform_mpx_get_rating_media_item_data('mpaa', $video),
-            'mpaa_sub_ratings' => serialize(_media_theplatform_mpx_get_subrating_media_item_data('mpaa', $video)),
-            'vchip_rating' => _media_theplatform_mpx_get_rating_media_item_data('v-chip', $video),
-            'vchip_sub_ratings' => serialize(_media_theplatform_mpx_get_subrating_media_item_data('v-chip', $video)),
-            'exclude_countries' => (int)_media_theplatform_mpx_get_media_item_data('media$excludeCountries', $video),
-            'countries' => serialize(_media_theplatform_mpx_get_media_item_data('media$countries', $video)),
-          );
-          // Allow modules to alter the video item for pulling in custom metadata.
-          drupal_alter('media_theplatform_mpx_media_import_item', $video_item, $video, $account);
-          // Perform the import/update.
-
-          media_theplatform_mpx_import_video($video_item, $account);
+        /** @var MpxAccount $account */
+        $account = NULL;
+        if (!empty($item['account'])) {
+          $account = $item['account'];
         }
-        break;
-
-      case 'unpublish':
-        if (!empty($item['unpublish_id'])) {
-          media_theplatform_mpx_set_mpx_video_inactive($item['unpublish_id'], 'unpublished');
+        elseif (!empty($item['account_id'])) {
+          $account = MpxAccount::load($item['account_id']);
         }
-        break;
-
-      case 'delete':
-        if (!empty($item['delete_id'])) {
-          media_theplatform_mpx_set_mpx_video_inactive($item['delete_id'], 'deleted');
+        else {
+          // If an account wasn't stored, it was queued in a previous version of
+          // this module.  Assume account 1 in these cases.
+          $accounts = MpxAccount::loadAll();
+          $item['account'] = reset($accounts);
         }
-        break;
+        if (empty($account)) {
+          throw new Exception("Unable to load mpx account for item.");
+        }
 
-      default:
-        watchdog('media_theplatform_mpx', 'Video not processed.  Unable to determine queue operation for cron queue item: @item',
-          array(
-            '@item' => str_replace("\n", '\n', print_r($item, TRUE)),
-          ));
-    }
-  }
-  catch (Exception $e) {
+        // Check if player sync has been turned off for this account.  If so,
+        // do not import/update this video.
+        if (!variable_get('media_theplatform_mpx__account_' . $account->id . '_cron_video_sync', 1)) {
+          return;
+        }
+        $video = $item['video'];
+        // Prepare the video item for import/update.
 
-    watchdog('media_theplatform_mpx', 'FATAL ERROR occurred while processing mpx cron queue item --  "@message"  -- Exception output: @output.',
-      array(
-        '@message' => $e->getMessage(),
-        '@output' => '<pre>' . print_r($e, TRUE) . '</pre>',
-      ),
-      WATCHDOG_ERROR);
+        // Sometimes MPX will send us invalid URLs like:
+        // "{ssl:https:http}://mpxstatic-nbcmpx.nbcuni.com/...jpg". We need to
+        // fix the protocol for the ingestion to work.
+        // When the root cause is fixed this code may go away.
+        $thumbnail_url = $video['plmedia$defaultThumbnailUrl'];
+        $thumbnail_url = preg_replace('/(\{.*\})\:\/\/(.*)/', "http://$2", $thumbnail_url);
+
+        $video_item = array(
+          'id' => basename($video['id']),
+          'guid' => $video['guid'],
+          'title' => $video['title'],
+          'description' => $video['description'],
+          'thumbnail_url' => $thumbnail_url,
+          // Additional default mpx fields.
+          'released_file_pids' => serialize(_media_theplatform_mpx_flatten_array(_media_theplatform_mpx_get_media_item_data('media$content/plfile$releases/plrelease$pid', $video))),
+          'default_released_file_pid' => _media_theplatform_mpx_get_default_released_file_pid($video),
+          'categories' => serialize(_media_theplatform_mpx_get_media_item_data('media$categories/media$name', $video)),
+          'author' => _media_theplatform_mpx_get_media_item_data('plmedia$provider', $video),
+          'airdate' => _media_theplatform_mpx_get_media_item_data('pubDate', $video) / 1000,
+          'available_date' => _media_theplatform_mpx_get_media_item_data('media$availableDate', $video) / 1000,
+          'expiration_date' => _media_theplatform_mpx_get_media_item_data('media$expirationDate', $video) / 1000,
+          'keywords' => _media_theplatform_mpx_get_media_item_data('media$keywords', $video),
+          'copyright' => _media_theplatform_mpx_get_media_item_data('media$copyright', $video),
+          'related_link' => _media_theplatform_mpx_get_media_item_data('link', $video),
+          'fab_rating' => _media_theplatform_mpx_get_rating_media_item_data('fab', $video),
+          'fab_sub_ratings' => serialize(_media_theplatform_mpx_get_subrating_media_item_data('fab', $video)),
+          'mpaa_rating' => _media_theplatform_mpx_get_rating_media_item_data('mpaa', $video),
+          'mpaa_sub_ratings' => serialize(_media_theplatform_mpx_get_subrating_media_item_data('mpaa', $video)),
+          'vchip_rating' => _media_theplatform_mpx_get_rating_media_item_data('v-chip', $video),
+          'vchip_sub_ratings' => serialize(_media_theplatform_mpx_get_subrating_media_item_data('v-chip', $video)),
+          'exclude_countries' => (int)_media_theplatform_mpx_get_media_item_data('media$excludeCountries', $video),
+          'countries' => serialize(_media_theplatform_mpx_get_media_item_data('media$countries', $video)),
+        );
+        // Allow modules to alter the video item for pulling in custom metadata.
+        drupal_alter('media_theplatform_mpx_media_import_item', $video_item, $video, $account);
+        // Perform the import/update.
+
+        media_theplatform_mpx_import_video($video_item, $account);
+      }
+      break;
+
+    case 'unpublish':
+      if (!empty($item['unpublish_id'])) {
+        media_theplatform_mpx_set_mpx_video_inactive($item['unpublish_id'], 'unpublished');
+      }
+      break;
+
+    case 'delete':
+      if (!empty($item['delete_id'])) {
+        media_theplatform_mpx_set_mpx_video_inactive($item['delete_id'], 'deleted');
+      }
+      break;
+
+    default:
+      watchdog('media_theplatform_mpx', 'Video not processed.  Unable to determine queue operation for cron queue item: @item',
+        array(
+          '@item' => str_replace("\n", '\n', print_r($item, TRUE)),
+        ));
   }
 
   // @todo: Do this per account?  By type of operation?
