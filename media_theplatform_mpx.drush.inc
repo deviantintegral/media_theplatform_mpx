@@ -253,7 +253,7 @@ function drush_media_theplatform_mpx_mpx_ingest_all() {
  */
 function _drush_media_theplatform_mpx_run_queue() {
   $count = DrupalQueue::get('media_theplatform_mpx_video_cron_queue', TRUE)->numberOfItems();
-  if (!$count || !drush_get_option('queue-run')) {
+  if (!$count || !drush_get_option('queue-run') || drush_get_error()) {
     return;
   }
 
