@@ -489,7 +489,7 @@ function media_theplatform_mpx_form_mpx_player_sync($form, &$form_state) {
     '#title' => t('Sync mpxPlayers'),
     '#description' => t('Note: Any mpxPlayer marked as "Disabled" in thePlatform mpx will not be retrieved in the Sync process.'),
     '#collapsible' => TRUE,
-    '#collapsed' => (bool) db_query("SELECT 1 FROM {mpx_player}")->fetchField(),
+    '#collapsed' => !((bool) db_query("SELECT 1 FROM {mpx_accounts} mpxa LEFT JOIN {mpx_player} mpxp ON mpxa.id = mpxp.parent_account WHERE mpxp.player_id IS NULL")->fetchField()),
   );
   $form['player_sync']['actions'] = array('#type' => 'actions');
   $form['player_sync']['actions']['submit'] = array(
