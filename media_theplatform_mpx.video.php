@@ -975,33 +975,20 @@ function media_theplatform_mpx_update_video_filename($fid, $video_title) {
 /**
  * Deletes thumbnail images and image styles associated with an mpx video.
  */
-function _media_theplatform_mpx_delete_video_images($video) {
-
-  if (!is_array($video) || empty($video['guid'])) {
+function _media_theplatform_mpx_delete_video_images(array $video) {
+  if (empty($video['guid'])) {
     return;
   }
 
-  $image_path = 'media-mpx/' . $video['guid'] . '.jpg';
-
-  if (file_unmanaged_delete('public://' . $image_path)) {
-    watchdog('media_theplatform_mpx', 'Successfully deleted image with path: public://@path',
-      array('@path' => 'public://' . $image_path), WATCHDOG_NOTICE);
-  }
-  else {
-    watchdog('media_theplatform_mpx', 'Failed to delete image with path: public://@path',
-      array('@path' => 'public://' . $image_path), WATCHDOG_ERROR);
-  }
-
-  if (variable_get('file_private_path', FALSE)) {
-    file_unmanaged_delete('private://' . $image_path);
+  $image_uri = file_build_uri('media-mpx/' . $video['guid'] . '.jpg');
+  if (is_file($image_uri) && !file_unmanaged_delete($image_uri)) {
+    watchdog('media_theplatform_mpx', 'Failed to delete mpx image with path: @path', array('@path' => $image_uri), WATCHDOG_ERROR);
   }
 
   // Delete thumbnail from all the styles.
   // Now, the next time file is loaded, MediaThePlatformMpxStreamWrapper
   // will call getOriginalThumbnail to update image.
-  image_path_flush($image_path);
-  watchdog('media_theplatform_mpx', 'Deleted image styles for image with path: @path.  The next time file is loaded, MediaThePlatformMpxStreamWrapper will call getOriginalThumbnail to update the image.',
-    array('@path' => $image_path), WATCHDOG_INFO);
+  image_path_flush($image_uri);
 }
 
 /**

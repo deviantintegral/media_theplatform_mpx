@@ -78,9 +78,8 @@ class MediaThePlatformMpxStreamWrapper extends MediaReadOnlyStreamWrapper {
   }
 
   function getLocalThumbnailPath() {
-
     $parts = $this->get_parameters();
-    $local_path = 'public://media-mpx/' . $parts['mpx_id'] . '.jpg';
+    $local_path = file_build_uri('media-mpx/' . $parts['mpx_id'] . '.jpg');
     $thumbnail_path = $this->getOriginalThumbnailPath();
 
     if (!empty($thumbnail_path)) {

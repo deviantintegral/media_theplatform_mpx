@@ -36,10 +36,7 @@ function media_theplatform_mpx_file_delete($file) {
     $guid = $parts['mpx_id'];
 
     // Delete any thumbnails in file system that may exist.
-    $local_path = 'public://media-mpx/' . $parts['mpx_id'] . '.jpg';
-    if (is_file($local_path)) {
-      unlink($local_path);
-    }
+    _media_theplatform_mpx_delete_video_images(array('guid' => $guid));
 
     if ($alt_fid = db_query_range("SELECT fid FROM {file_managed} WHERE fid <> :fid AND uri LIKE :uri", 0, 1, array(':fid' => $file->fid, ':uri' => db_like('mpx://m/' . $guid . '/') . '%'))->fetchField()) {
       // If other files exist, update mpx_video record with the next fid.
