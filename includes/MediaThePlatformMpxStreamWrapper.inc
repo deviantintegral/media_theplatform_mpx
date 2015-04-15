@@ -70,13 +70,10 @@ class MediaThePlatformMpxStreamWrapper extends MediaReadOnlyStreamWrapper {
     // If this is a video clip:
     if ($parts['mpx_type'] == 'video') {
       // Look up thumbnail and return URL.
-      // Return the encoded URL.
-      return $this->encodePath(media_theplatform_mpx_get_thumbnail_url($parts['mpx_id']));
-    }
-    // Else for players, return mpx logo.
-    elseif ($parts['mpx_type'] == 'player') {
-      global $base_url;
-      return $base_url . '/' . drupal_get_path('module', 'media_theplatform_mpx') . '/images/mpx_logo.png';
+      if ($thumbnail = media_theplatform_mpx_get_thumbnail_url($parts['mpx_id'])) {
+        // Return the encoded URL.
+        return $this->encodePath($thumbnail);
+      }
     }
   }
 
@@ -84,33 +81,28 @@ class MediaThePlatformMpxStreamWrapper extends MediaReadOnlyStreamWrapper {
 
     $parts = $this->get_parameters();
     $local_path = 'public://media-mpx/' . $parts['mpx_id'] . '.jpg';
+    $thumbnail_path = $this->getOriginalThumbnailPath();
 
-    if (!file_exists($local_path)) {
-      $dirname = drupal_dirname($local_path);
-      file_prepare_directory($dirname, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS);
-      $thumbnail_path = $this->getOriginalThumbnailPath();
+    if (!empty($thumbnail_path)) {
+      if (!is_file($local_path)) {
+        $dirname = drupal_dirname($local_path);
+        file_prepare_directory($dirname, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS);
+        // @todo For remote files this should be using system_retrieve_file().
+        $success = @copy($thumbnail_path, $local_path);
 
-      $success = @copy($thumbnail_path, $local_path);
-
-      if (!$success) {
-        watchdog('media_theplatform_mpx', 'Failed to copy thumbnail image from "@thumbnail_path" to "@local_path".',
-          array(
-            '@thumbnail_path' => $thumbnail_path,
-            '@local_path' => $local_path,
-          ),
-          WATCHDOG_ERROR);
+        if (!$success) {
+          watchdog('media_theplatform_mpx', 'Failed to copy thumbnail image from "@thumbnail_path" to "@local_path".',
+            array(
+              '@thumbnail_path' => $thumbnail_path,
+              '@local_path' => $local_path,
+            ),
+            WATCHDOG_ERROR);
+        }
       }
-      else {
-        watchdog('media_theplatform_mpx', 'Successfully copied thumbnail image from "@thumbnail_path" to "@local_path".',
-          array(
-            '@thumbnail_path' => $thumbnail_path,
-            '@local_path' => $local_path,
-          ),
-          WATCHDOG_DEBUG);
+      if (is_file($local_path)) {
+        return $local_path;
       }
     }
-
-    return $local_path;
   }
 
   function interpolateUrl() {

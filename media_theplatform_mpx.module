@@ -1186,25 +1186,27 @@ function media_theplatform_mpx_file_formatter_image_view($file, $display, $langc
   if ($file->filemime === 'video/mpx' || $file->filemime === 'player/mpx') {
     /** @var MediaThePlatformMpxStreamWrapper $wrapper */
     $wrapper = file_stream_wrapper_get_instance_by_uri($file->uri);
-    $parts = $wrapper->get_parameters();
 
     $image_style = $display['settings']['image_style'];
     $valid_image_styles = image_style_options(FALSE);
 
     if (empty($image_style) || !isset($valid_image_styles[$image_style])) {
-      $element = array(
-        '#theme' => 'image',
-        '#path' => $wrapper->getOriginalThumbnailPath(),
-      );
+      if ($uri = $wrapper->getOriginalThumbnailPath()) {
+        return array(
+          '#theme' => 'image',
+          '#path' => $uri,
+        );
+      }
     }
     else {
-      $element = array(
-        '#theme' => 'image_style',
-        '#style_name' => $image_style,
-        '#path' => $wrapper->getLocalThumbnailPath(),
-      );
+      if ($uri = $wrapper->getLocalThumbnailPath()) {
+        return array(
+          '#theme' => 'image_style',
+          '#style_name' => $image_style,
+          '#path' => $uri,
+        );
+      }
     }
-    return $element;
   }
 }
 

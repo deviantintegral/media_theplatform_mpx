@@ -405,6 +405,30 @@ function media_theplatform_mpx_schema() {
 }
 
 /**
+ * Implements hook_enable().
+ */
+function media_theplatform_mpx_enable() {
+  _media_theplatform_mpx_copy_icons();
+}
+
+/**
+ * Copy the default mpx image for use with the 'Large filetype icon' display.
+ */
+function _media_theplatform_mpx_copy_icons() {
+  $destination = variable_get('media_icon_base_directory', 'public://media-icons') . '/' . variable_get('media_icon_set', 'default');
+  file_prepare_directory($destination, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS);
+
+  $source = drupal_get_path('module', 'media_theplatform_mpx') . '/images/icons/' . variable_get('media_icon_set', 'default');
+  $files = file_scan_directory($source, '/.*\.png$/');
+  foreach ($files as $file) {
+    $result = file_unmanaged_copy($file->uri, $destination, FILE_EXISTS_REPLACE);
+    if (!$result) {
+      throw new Exception("Unable to copy {$file->uri} to $destination.");
+    }
+  }
+}
+
+/**
  * Implements hook_uninstall().
  */
 function media_theplatform_mpx_uninstall() {
@@ -1021,4 +1045,11 @@ function media_theplatform_mpx_update_7220() {
   db_drop_field('mpx_player', 'player_data');
   db_drop_field('mpx_player', 'body_html');
   db_drop_field('mpx_player', 'head_html');
+}
+
+/**
+ * Ensure the default mpx icon is copied to the media icon directory.
+ */
+function media_theplatform_mpx_udpate_7221() {
+  _media_theplatform_mpx_copy_icons();
 }
