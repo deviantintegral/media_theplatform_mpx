@@ -56,8 +56,8 @@ class MpxToken {
   /**
    * Load a token from the cache.
    *
-   * In most cases, using MpxToken::acquire() is recommended since this may
-   * return an expired token object.
+   * In most cases, using MpxAccount::acquireToken() is recommended since this
+   * may return an expired token object.
    *
    * @param string $username
    *   The mpx account username.
@@ -122,8 +122,8 @@ class MpxToken {
   /**
    * Fetch a fresh authentication token using thePlatform API.
    *
-   * In most cases, using MpxToken::acquire() is recommended since this does
-   * not save the token to the cache.
+   * In most cases, using MpxAccount::acquireToken() is recommended since this
+   * does not save the token to the cache.
    *
    * @param string $username
    *   The mpx account username.

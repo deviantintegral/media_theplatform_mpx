@@ -178,7 +178,7 @@ class MpxAccount {
 
         // Log an error if the requested duration is larger than the token TTL.
         if ($duration && ($ttl = variable_get('media_theplatform_mpx__token_ttl')) && $duration > $ttl) {
-          watchdog('media_theplatform_mpx', 'MpxToken::acquire() called with $duration @duration greater than the token TTL @ttl.', array('@duration' => $duration, '@ttl' => $ttl));
+          watchdog('media_theplatform_mpx', 'MpxAccount::acquireToken() called with $duration @duration greater than the token TTL @ttl.', array('@duration' => $duration, '@ttl' => $ttl));
           $duration = $ttl;
         }
 
