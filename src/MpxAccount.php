@@ -425,9 +425,10 @@ class MpxAccount {
 
       $summary['timer'] = timer_read($lock_id);
       $summary['queue_count_after'] = DrupalQueue::get('media_theplatform_mpx_video_cron_queue', TRUE)->numberOfItems();
-      $summary['message'] = "Completed video ingestion for mpx account @id.<br>Last notification ID: @notification_id<br>Peak memory usage: @memory in @elapsed sec<br>media_theplatform_mpx_video_cron_queue: @tasks new tasks, @task-count total tasks.";
+      $summary['message'] = "Completed video ingestion for mpx account @id (@import_account).<br>Last notification ID: @notification_id<br>Peak memory usage: @memory in @elapsed sec<br>media_theplatform_mpx_video_cron_queue: @tasks new tasks, @task-count total tasks.";
       $summary['args'] = array(
         '@id' => $this->id,
+        '@import_account' => $this->import_account,
         '@elapsed' => round($summary['timer'] / 1000.0, 2),
         '@tasks' => $summary['queue_count_after'] - $summary['queue_count_before'],
         '@task-count' => $summary['queue_count_after'],
