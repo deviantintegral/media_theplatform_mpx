@@ -824,7 +824,7 @@ function _media_theplatform_mpx_create_video_file($video, MpxAccount $account = 
   if (!$uri) {
     watchdog('media_theplatform_mpx', 'Failed to create file for video "@title" - @id - and @account.  URI could not be determined.',
       array(
-        '@id' => $video['title'],
+        '@title' => $video['title'],
         '@id' => $video['id'],
         '@account' => _media_theplatform_mpx_account_log_string($account),
       ),
@@ -840,7 +840,7 @@ function _media_theplatform_mpx_create_video_file($video, MpxAccount $account = 
   if (!is_object($file) || empty($file->fid)) {
     watchdog('media_theplatform_mpx', 'Failed to create file for video "@title" - @id - and @account.',
       array(
-        '@id' => $video['title'],
+        '@title' => $video['title'],
         '@id' => $video['id'],
         '@account' => _media_theplatform_mpx_account_log_string($account),
       ),
@@ -853,7 +853,7 @@ function _media_theplatform_mpx_create_video_file($video, MpxAccount $account = 
     array(
       '@fid' => $file->fid,
       '@uri' => $uri,
-      '@id' => $video['title'],
+      '@title' => $video['title'],
       '@id' => $video['id'],
       '@account' => _media_theplatform_mpx_account_log_string($account),
     ),
