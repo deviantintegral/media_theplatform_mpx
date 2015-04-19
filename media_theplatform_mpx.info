@@ -14,3 +14,4 @@ dependencies[] = file_entity (2.x)
 dependencies[] = encrypt (2.x)
 dependencies[] = elements
 configure = admin/config/media/theplatform
+test_dependencies[] = file_admin
