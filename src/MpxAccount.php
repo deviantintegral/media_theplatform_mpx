@@ -9,7 +9,6 @@ class MpxAccount {
   public $account_id;
   public $account_pid;
   public $default_player;
-  private $data;
 
   /**
    * Constructs a new mpx account object, without saving it.
@@ -321,19 +320,26 @@ class MpxAccount {
    *   The key of the data to retrieve.
    * @param mixed $default
    *   The default value to use if the key is not found.
+   *
    * @return mixed
    *   The stored value, or the default value if no value exists.
    */
   public function getDataValue($key, $default = NULL) {
-    if (!isset($this->data)) {
-      $this->data = db_query("SELECT name, value FROM {mpx_account_data} WHERE account_id = :id", array(':id' => $this->id))->fetchAllKeyed();
-    }
-    if (array_key_exists($key, $this->data)) {
-      return $this->data[$key];
-    }
-    else {
-      return $default;
-    }
+    $data = $this->getMultipleDataValues(array($key));
+    return isset($data[$key]) ? $data[$key] : $default;
+  }
+
+  /**
+   * Returns the stored key/value pairs for a given set of keys.
+   *
+   * @param array $keys
+   *   A list of keys to retrieve.
+   *
+   * @return array
+   *   An associative array of items successfully returned, indexed by key.
+   */
+  public function getMultipleDataValues(array $keys) {
+    return db_query("SELECT name, value FROM {mpx_account_data} WHERE account_id = :id AND name IN (:names)", array(':id' => $this->id, ':names' => $keys))->fetchAllKeyed();
   }
 
   /**
@@ -351,12 +357,9 @@ class MpxAccount {
         'name' => $key,
       ))
       ->fields(array(
-        'value' => $value
+        'value' => $value,
       ))
       ->execute();
-    // Reset the data array so it will be fetched fresh the next time
-    // getDataValue() is called.
-    unset($this->data);
   }
 
   /**
@@ -441,8 +444,6 @@ class MpxAccount {
     }
     catch (Exception $e) {
       $transaction->rollback();
-      // Clear the data values.
-      unset($this->data);
       // Lock should be released even on exceptions.
       lock_release($lock_id);
       throw $e;
