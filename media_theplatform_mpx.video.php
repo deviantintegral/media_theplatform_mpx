@@ -1259,29 +1259,41 @@ function media_theplatform_mpx_set_last_notification(MpxAccount $account, $last_
 /**
  * Query thePlatform Media service to get all published mpxMedia files.
  *
- * @param String $id
+ * @param string $id
  *   Value for mpx_video.id.
- *
- * @param String $op
+ * @param string $op
  *   Valid values: 'unpublished' or 'deleted'.
+ *
+ * @throws Exception
  */
 function media_theplatform_mpx_set_mpx_video_inactive($id, $op) {
-
-  // Set status to inactive.
-  $inactive = db_update('mpx_video')
-    ->fields(array('status' => 0))
-    ->condition('id', $id, '=')
-    ->execute();
-
-  if ($inactive) {
-    watchdog('media_theplatform_mpx', 'Successfully disabled video @id by setting its status to 0 in the mpx_video table.',
-      array('@id' => basename($id)), WATCHDOG_INFO);
+  $result = db_query("SELECT fid, status FROM {mpx_video} WHERE id = :id", array(':id' => $id))->fetch();
+  if ($result === FALSE) {
+    // Check to see that the video even exists locally.
+    watchdog('media_theplatform_mpx', 'Unable to disable video @id since it does not exist locally.', array('@id' => $id), WATCHDOG_ERROR);
+    return;
   }
-  else {
-    watchdog('media_theplatform_mpx', 'Failed to disable video @id by setting its status to 0 in the mpx_video table.',
-      array('@id' => basename($id)), WATCHDOG_ERROR);
+  elseif ($result->status) {
+    // Set status to inactive (only if the video is currently published).
+    $update_result = db_update('mpx_video')
+      ->fields(array('status' => 0))
+      ->condition('id', $id)
+      ->execute();
+    if (!$update_result) {
+      throw new Exception("Failed to set the mpx_video.status column to 0 for video $id.");
+    }
+  }
+
+  // Set the file published status if the file_admin module is enabled.
+  if (module_exists('file_admin')) {
+    $file = file_load($result->fid);
+    if ($file->published == FILE_PUBLISHED) {
+      $file->published = FILE_NOT_PUBLISHED;
+      file_save($file);
+    }
   }
 
   // Let other modules perform operations when videos are disabled.
+  // @todo Deprecate this hook. They should rely on hook_file_update() instead.
   module_invoke_all('media_theplatform_mpx_set_video_inactive', $id, $op);
 }

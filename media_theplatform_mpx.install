@@ -320,6 +320,7 @@ function media_theplatform_mpx_schema() {
     'primary key' => array('video_id'),
     'indexes' => array(
       'fid' => array('fid'),
+      'id' => array('id'),
       'guid' => array(array('guid', 255)),
     ),
   );
@@ -1052,4 +1053,11 @@ function media_theplatform_mpx_update_7220() {
  */
 function media_theplatform_mpx_udpate_7221() {
   _media_theplatform_mpx_copy_icons();
+}
+
+/**
+ * Add index on mpx_video.id.
+ */
+function media_theplatform_mpx_update_7222() {
+  db_add_index('mpx_video', 'id', array('id'));
 }
