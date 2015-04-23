@@ -117,6 +117,12 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
 
   $start_microtime = microtime(TRUE);
 
+  // Allow modules to alter the operation performed. In most cases, this should
+  // only be used to change the $item['queue_operation'] value to "skip." Most
+  // other changes to the $video data should occur in an implementation of
+  // hook_media_theplatform_mpx_media_import_item_alter().
+  drupal_alter('media_theplatform_mpx_media_import_operation', $item);
+
   switch ($item['queue_operation']) {
 
     case 'publish':
@@ -200,6 +206,13 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
       if (!empty($item['delete_id'])) {
         media_theplatform_mpx_set_mpx_video_inactive($item['delete_id'], 'deleted');
       }
+      break;
+
+    case 'skip':
+      watchdog('media_theplatform_mpx', 'Cron queue item was skipped: @item',
+        array(
+          '@item' => str_replace("\n", '\n', print_r($item, TRUE)),
+        ));
       break;
 
     default:
