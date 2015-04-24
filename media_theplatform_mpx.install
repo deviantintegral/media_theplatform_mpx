@@ -394,6 +394,8 @@ function media_theplatform_mpx_schema() {
         'description' => "The value of the variable.",
         'type' => 'blob',
         'not null' => FALSE,
+        'size' => 'big',
+        'serialize' => TRUE,
       ),
     ),
     'primary key' => array('account_id', 'name'),
@@ -1060,4 +1062,28 @@ function media_theplatform_mpx_udpate_7221() {
  */
 function media_theplatform_mpx_update_7222() {
   db_add_index('mpx_video', 'id', array('id'));
+}
+
+/**
+ * Serialize the data in the mpx_account_data.value column.
+ */
+function media_theplatform_mpx_update_7223() {
+  db_change_field('mpx_account_data', 'value', 'value', array(
+    'description' => "The value of the variable.",
+    'type' => 'blob',
+    'not null' => FALSE,
+    'size' => 'big',
+    'serialize' => TRUE,
+  ));
+
+  $records = db_query("SELECT account_id, name, value FROM {mpx_account_data}")->fetchAll();
+  foreach ($records as $record) {
+    db_update('mpx_account_data')
+      ->fields(array(
+        'value' => serialize($record->value),
+      ))
+      ->condition('account_id', $record->account_id)
+      ->condition('name', $record->name)
+      ->execute();
+  }
 }

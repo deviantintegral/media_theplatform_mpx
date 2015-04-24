@@ -339,7 +339,9 @@ class MpxAccount {
    *   An associative array of items successfully returned, indexed by key.
    */
   public function getMultipleDataValues(array $keys) {
-    return db_query("SELECT name, value FROM {mpx_account_data} WHERE account_id = :id AND name IN (:names)", array(':id' => $this->id, ':names' => $keys))->fetchAllKeyed();
+    $data = db_query("SELECT name, value FROM {mpx_account_data} WHERE account_id = :id AND name IN (:names)", array(':id' => $this->id, ':names' => $keys))->fetchAllKeyed();
+    $data = array_map('unserialize', $data);
+    return $data;
   }
 
   /**
@@ -357,7 +359,7 @@ class MpxAccount {
         'name' => $key,
       ))
       ->fields(array(
-        'value' => $value,
+        'value' => serialize($value),
       ))
       ->execute();
   }
