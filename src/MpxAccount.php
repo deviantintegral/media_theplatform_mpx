@@ -391,10 +391,13 @@ class MpxAccount {
    */
   public function ingestVideos(array $options = array()) {
     if (empty($this->import_account)) {
-      throw new Exception("The mpx account $this->id does not have the import account set and cannot yet ingest videos.");
+      throw new Exception("The $this does not have the import account set and cannot yet ingest videos.");
     }
     if (empty($this->default_player)) {
-      throw new Exception("The mpx account $this->id does not have the default player set and cannot yet ingest videos.");
+      throw new Exception("The $this does not have the default player set and cannot yet ingest videos.");
+    }
+    if (!variable_get('media_theplatform_mpx__account_' . $this->id . '_cron_video_sync', 1)) {
+      throw new Exception("The video sync has been disabled for $this.");
     }
     if (isset($options['limit']) && $options['limit'] > 500) {
       throw new InvalidArgumentException("The provided limit ({$options['limit']}) cannot be higher than 500.");
@@ -404,13 +407,13 @@ class MpxAccount {
     $lock_id = 'media_theplatform_mpx_ingest_videos_' . $this->id;
     $lock_timeout = (float) variable_get('media_theplatform_mpx__cron_videos_timeout', 180);
     if (!lock_acquire($lock_id, $lock_timeout)) {
-      throw new Exception("Unable to acquire lock for video ingestion for mpx account $this->id. Ingestion may currently be running in another process.");
+      throw new Exception("Unable to acquire lock for video ingestion for $this. Ingestion may currently be running in another process.");
     }
 
     $transaction = db_transaction();
 
     try {
-      watchdog('media_theplatform_mpx', 'Starting video ingestion for mpx account @id.', array('@id' => $this->id), WATCHDOG_INFO);
+      watchdog('media_theplatform_mpx', 'Starting video ingestion for @account.', array('@account' => (string) $this), WATCHDOG_INFO);
 
       $summary = array();
       $summary['queue_count_before'] = DrupalQueue::get('media_theplatform_mpx_video_cron_queue', TRUE)->numberOfItems();
@@ -454,5 +457,12 @@ class MpxAccount {
       lock_release($lock_id);
       throw $e;
     }
+  }
+
+  /**
+   * @return string
+   */
+  public function __toString() {
+    return 'mpx account ' . $this->id . ' (' . $this->import_account . ')';
   }
 }
