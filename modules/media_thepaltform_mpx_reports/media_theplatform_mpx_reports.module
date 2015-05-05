@@ -8,7 +8,7 @@ function media_theplatform_mpx_reports_menu() {
   $items = array();
 
   $items['admin/config/media/theplatform/status'] = array(
-    'title' => t('Media: thePlatform MPX Status (BETA)'),
+    'title' => t('Status'),
     'description' => t('BETA: Reports current ingestion status.'),
     'page callback' => 'media_theplatform_mpx_reports_page_status',
     'type' => MENU_LOCAL_TASK,
@@ -410,7 +410,7 @@ function media_theplatform_mpx_reports_page_status() {
       '#prefix' => '<br /><h1>' . t('Video Ingestion Details for Account @id', array('@id' => $account_id)) . '</h1>',
     );
 
-    $videos_to_be_queued = $account_data->proprocessing_batch_item_count ? $account_data->proprocessing_batch_item_count - ($account_data->proprocessing_batch_current_item - 1) : 0;
+    $videos_to_be_queued = $account_data->getDataValue('proprocessing_batch_item_count') ? $account_data->getDataValue('proprocessing_batch_item_count') - ($account_data->getDataValue('proprocessing_batch_current_item') - 1) : 0;
     $total_videos_to_be_queued_cron_runs = 0;
 
     $build['account_' . $account_id]['videos_to_be_queued_total'] = array(
@@ -424,9 +424,9 @@ function media_theplatform_mpx_reports_page_status() {
 
     if ($videos_to_be_queued) {
 
-      $videos_to_be_queued_url = $account_data->proprocessing_batch_url;
+      $videos_to_be_queued_url = $account_data->getDataValue('proprocessing_batch_url');
       $token = $account_data->acquireToken();
-      $videos_to_be_queued_url = $videos_to_be_queued_url . '&range=' . (int) $account_data->proprocessing_batch_current_item . '-' . $account_data->proprocessing_batch_item_count;
+      $videos_to_be_queued_url = $videos_to_be_queued_url . '&range=' . (int) $account_data->getDataValue('proprocessing_batch_current_item') . '-' . $account_data->getDataValue('proprocessing_batch_item_count');
       $videos_to_be_queued_url .= '&token=' . rawurlencode($token);
       $videos_to_be_queued_url .= '&fields=id,title,guid,updated,plmedia$approved,media$availableDate,media$expirationDate';
 
@@ -475,7 +475,7 @@ function media_theplatform_mpx_reports_page_status() {
       . '&account=' . rawurlencode($account_data->import_account)
       . '&block=false&filter=Media&clientId=drupal_media_theplatform_mpx_reports_' . $account_data->account_pid
       . '&fields=true';
-    $notification_url = $notification_url_base . '&since=' . $account_data->last_notification;
+    $notification_url = $notification_url_base . '&since=' . $account_data->getDataValue('last_notification');
 
     $notification_response = _media_theplatform_mpx_retrieve_feed_data($notification_url);
     $notification_request_failed = isset($notification_response[0]['type']) && $notification_response[0]['type'] == 'Exception';
