@@ -387,6 +387,7 @@ class MpxAccount {
    *     ingestion started.
    *
    * @throws Exception
+   * @throws InvalidArgumentException
    */
   public function ingestVideos(array $options = array()) {
     if (empty($this->import_account)) {
@@ -394,6 +395,9 @@ class MpxAccount {
     }
     if (empty($this->default_player)) {
       throw new Exception("The mpx account $this->id does not have the default player set and cannot yet ingest videos.");
+    }
+    if (isset($options['limit']) && $options['limit'] > 500) {
+      throw new InvalidArgumentException("The provided limit ({$options['limit']}) cannot be higher than 500.");
     }
 
     // Attempt to acquire a lock for ingestion for this account.
