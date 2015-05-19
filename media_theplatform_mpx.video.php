@@ -135,7 +135,7 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
           // If an account wasn't stored, it was queued in a previous version of
           // this module.  Assume account 1 in these cases.
           $accounts = MpxAccount::loadAll();
-          $item['account'] = reset($accounts);
+          $account = reset($accounts);
         }
         if (empty($account)) {
           throw new Exception("Unable to load mpx account for item.");

@@ -1495,7 +1495,7 @@ function _drush_media_theplatform_mpx_process_video_ingestion_as_retriever($acco
       $item = array(
         'queue_operation' => 'publish',
         'video' => $data,
-        'account' => $request_queue_item->data['account'],
+        'account_id' => $request_queue_item->data['account_id'],
       );
       $cron_queue->createItem($item);
     }
@@ -1508,7 +1508,7 @@ function _drush_media_theplatform_mpx_process_video_ingestion_as_retriever($acco
           $item = array(
             'queue_operation' => 'unpublish',
             'unpublish_id' => $video_id,
-            'account' => $request_queue_item->data['account'],
+            'account_id' => $request_queue_item->data['account_id'],
           );
           $cron_queue->createItem($item);
         }
