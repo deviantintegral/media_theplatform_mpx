@@ -181,16 +181,12 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
           'vchip_sub_ratings' => serialize(_media_theplatform_mpx_get_subrating_media_item_data('v-chip', $video)),
           'exclude_countries' => (int)_media_theplatform_mpx_get_media_item_data('media$excludeCountries', $video),
           'countries' => serialize(_media_theplatform_mpx_get_media_item_data('media$countries', $video)),
-          // An internal flag that can be used to prevent this video from being imported.
-          'ignore' => FALSE,
         );
         // Allow modules to alter the video item for pulling in custom metadata.
         drupal_alter('media_theplatform_mpx_media_import_item', $video_item, $video, $account);
-
         // Perform the import/update.
-        if (empty($video_item['ignore'])) {
-          media_theplatform_mpx_import_video($video_item, $account);
-        }
+
+        media_theplatform_mpx_import_video($video_item, $account);
       }
       break;
 
