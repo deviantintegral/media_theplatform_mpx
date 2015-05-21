@@ -15,6 +15,26 @@ define('MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL', variable_get('media_theplatform_mp
 define('MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL', variable_get('media_theplatform_mpx__output_message_watchdog_severity', WATCHDOG_INFO));
 
 /**
+ * Implements hook_hook_info().
+ */
+function media_theplatform_mpx_hook_info() {
+  return array_fill_keys(array(
+    'media_theplatform_mpx_account_load',
+    'media_theplatform_mpx_account_presave',
+    'media_theplatform_mpx_account_insert',
+    'media_theplatform_mpx_account_update',
+    'media_theplatform_mpx_account_delete',
+    'media_theplatform_mpx_api_request_alter',
+    'media_theplatform_mpx_feed_request_alter',
+    'media_theplatform_mpx_file_type',
+    'media_theplatform_mpx_import_media',
+    'media_theplatform_mpx_media_import_item_alter',
+    'media_theplatform_mpx_player_iframe_alter',
+    'media_theplatform_mpx_set_video_inactive',
+  ), array('group' => 'mpx'));
+}
+
+/**
  * Implements hook_menu().
  */
 function media_theplatform_mpx_menu() {
