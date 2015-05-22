@@ -398,6 +398,8 @@ function _media_theplatform_mpx_get_video_feed_url($ids = NULL, $account = NULL)
   // import, media can be edited before the batch is complete.  This ensures
   // these edited media will be fetched toward the end of the batch.
   $url = 'https://read.data.media.theplatform.com/media/data/Media?schema=1.6.0&form=json&pretty=true' .
+    '&account=' . rawurlencode($account->import_account) .
+    // @todo Eventually remove the byOwnerId parameter.
     '&byOwnerId=' . $account->account_id .
     '&byApproved=true&byAvailabilityState=notYetAvailable|available|expired' .
     '&byContent=byExists%3Dtrue%26byHasReleases%3Dtrue' .
