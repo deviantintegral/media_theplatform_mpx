@@ -943,6 +943,8 @@ function media_theplatform_mpx_insert_video($video, $fid = NULL, MpxAccount $acc
   // Update the file entity filename with the newly ingested video title.
   media_theplatform_mpx_update_video_filename($fid, $video['title']);
 
+  module_invoke_all('media_theplatform_mpx_insert_video', $fid, $video, $account);
+
   watchdog('media_theplatform_mpx', 'Successfully created new video @id - "@title" - associated with file @fid for @account.',
     array(
       '@id' => basename($video['id']),
@@ -1107,6 +1109,8 @@ function media_theplatform_mpx_update_video($video, $fid = NULL, MpxAccount $acc
 
   // Delete thumbnail from files_*/media-mpx directory.
   _media_theplatform_mpx_delete_video_images($video);
+
+  module_invoke_all('media_theplatform_mpx_update_video', $fid, $video, $account);
 
   watchdog('media_theplatform_mpx', 'Updated video @id - "@title" - associated with file @fid for @account.',
     array(

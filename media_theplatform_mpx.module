@@ -30,6 +30,8 @@ function media_theplatform_mpx_hook_info() {
     'media_theplatform_mpx_import_media',
     'media_theplatform_mpx_media_import_item_alter',
     'media_theplatform_mpx_player_iframe_alter',
+    'media_theplatform_mpx_insert_video',
+    'media_theplatform_mpx_update_video',
     'media_theplatform_mpx_set_video_inactive',
   ), array('group' => 'mpx'));
 }

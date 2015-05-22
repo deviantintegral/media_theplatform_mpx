@@ -145,11 +145,51 @@ function hook_media_theplatform_mpx_player_iframe_alter(array &$element, array $
 }
 
 /**
+ * Respond to creation of a new mpx video.
+ *
+ * @param int $fid
+ *   The file ID of the mpx video file entity.
+ * @param array $video
+ *   Imported metadata array from mpx.
+ * @param MpxAccount $account
+ *   The mpx account associated with the video.
+ *
+ * @see media_theplatform_mpx_insert_video()
+ */
+function hook_media_theplatform_mpx_insert_video($fid, array $video, MpxAccount $account) {
+  if ($fid && $file = file_load($fid)) {
+    $file->field_guid[LANGUAGE_NONE][0]['value'] = $video['guid'];
+    file_save($file);
+  }
+}
+
+/**
+ * Respond to updates to an mpx video.
+ *
+ * @param int $fid
+ *   The file ID of the mpx video file entity.
+ * @param array $video
+ *   Imported metadata array from mpx.
+ * @param MpxAccount $account
+ *   The mpx account associated with the video.
+ *
+ * @see media_theplatform_mpx_update_video()
+ */
+function hook_media_theplatform_mpx_update_video($fid, array $video, MpxAccount $account) {
+  if ($fid && $file = file_load($fid)) {
+    $file->field_guid[LANGUAGE_NONE][0]['value'] = $video['guid'];
+    file_save($file);
+  }
+}
+
+/**
  * @todo Document this hook.
  * @todo Deprecate this hook.
  *
  * @param $id
  * @param $op
+ *
+ * @see media_theplatform_mpx_set_mpx_video_inactive()
  */
 function hook_media_theplatform_mpx_set_video_inactive($id, $op) {
   // @todo Add example implementation.
