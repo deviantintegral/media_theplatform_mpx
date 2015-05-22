@@ -86,7 +86,9 @@ class MpxApi {
       $options['data'] = http_build_query($options['data']);
     }
 
+    $time = microtime(TRUE);
     $response = drupal_http_request($url, $options);
+    $response->time_elapsed = microtime(TRUE) - $time;
     $response->url = $url;
     $response->params = $params;
 
