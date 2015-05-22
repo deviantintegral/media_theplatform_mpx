@@ -329,13 +329,13 @@ function _media_theplatform_mpx_process_batch_video_import(MpxAccount $account, 
   // Get the parts for the batch url and construct it.
   $batch_url = $account->getDataValue('proprocessing_batch_url');
   $batch_item_count = $account->getDataValue('proprocessing_batch_item_count');
-  $current_batch_item = (int) $account->getDataValue('proprocessing_batch_current_item');
+  $current_batch_item = $account->getDataValue('proprocessing_batch_current_item');
 
   $result_data = MpxApi::authenticatedRequest(
     $account,
     $batch_url,
     array(
-      'range' => $current_batch_item . '-' . ($current_batch_item + ($options['limit'] - 1)),
+      'range' => $current_batch_item . '-' . ($current_batch_item + $options['limit'] - 1),
     ),
     array(
       'timeout' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
@@ -515,7 +515,7 @@ function _media_theplatform_mpx_process_video_update(MpxAccount $account, $optio
     // Set starter batch system variables.
     $account->setDataValue('proprocessing_batch_url', $batch_url);
     $account->setDataValue('proprocessing_batch_item_count', $total_result_count);
-    $account->setDataValue('proprocessing_batch_current_item', 0);
+    $account->setDataValue('proprocessing_batch_current_item', 1);
     // Perform the first batch operation, not the update.
     return _media_theplatform_mpx_process_batch_video_import($account, $options);
   }
@@ -579,7 +579,7 @@ function _media_theplatform_mpx_process_video_import(MpxAccount $account, array 
     // Set starter batch system variables.
     $account->setDataValue('proprocessing_batch_url', $batch_url);
     $account->setDataValue('proprocessing_batch_item_count', $total_result_count);
-    $account->setDataValue('proprocessing_batch_current_item', 0);
+    $account->setDataValue('proprocessing_batch_current_item', 1);
 
     // Perform the first batch operation, not the update.
     return _media_theplatform_mpx_process_batch_video_import($account, $options);
