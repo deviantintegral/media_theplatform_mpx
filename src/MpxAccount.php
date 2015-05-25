@@ -34,11 +34,16 @@ class MpxAccount {
    *
    * @return MpxAccount
    *   An mpx account object.
+   *
+   * @throws InvalidArgumentException
    */
   public static function load($id) {
     $accounts = static::loadMultiple(array($id));
     if (!empty($accounts[$id])) {
       return $accounts[$id];
+    }
+    else {
+      throw new InvalidArgumentException("Cannot load mpx account $id.");
     }
   }
 
