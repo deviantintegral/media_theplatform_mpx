@@ -96,8 +96,17 @@ class MpxToken {
   public function delete() {
     $tokens = &drupal_static('media_theplatform_mpx_tokens', array());
     $cid = 'token:' . $this->username;
-    $tokens[$cid] = FALSE;
-    cache_clear_all($cid, 'cache_mpx');
+    if ($tokens[$cid] && $tokens[$cid]->value == $this->value) {
+      $tokens[$cid] = FALSE;
+    }
+
+    // Only clear from the cache if this is the same token currently stored.
+    /** @var object $cache */
+    if ($cache = cache_get($cid, 'cache_mpx')) {
+      if ($cache->data == $this->value) {
+        cache_clear_all($cid, 'cache_mpx');
+      }
+    }
 
     // If the token is still valid, expire it using the API.
     if ($this->isValid()) {

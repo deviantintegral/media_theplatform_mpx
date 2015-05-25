@@ -15,21 +15,34 @@
  *   Array of mpxMedia id's that have changed since $since.
  */
 function media_theplatform_mpx_get_changed_ids(MpxAccount $account) {
-  $result_data = MpxApi::authenticatedRequest(
-    $account,
-    'https://read.data.media.theplatform.com/media/notify',
-    array(
-      'account' => $account->import_account,
-      'block' => 'false',
-      'filter' => 'Media',
-      'clientId' => 'drupal_media_theplatform_mpx_' . $account->account_pid,
-      'since' => $account->getDataValue('last_notification'),
-      'size' => variable_get('media_theplatform_mpx__cron_videos_per_run', 250),
-    ),
-    array(
-      'timeout' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
-    )
-  );
+  $last_notification = $account->getDataValue('last_notification');
+
+  try {
+    $result_data = MpxApi::authenticatedRequest(
+      $account,
+      'https://read.data.media.theplatform.com/media/notify',
+      array(
+        'account' => $account->import_account,
+        'block' => 'false',
+        'filter' => 'Media',
+        'clientId' => 'drupal_media_theplatform_mpx_' . $account->account_pid,
+        'since' => $account->getDataValue('last_notification'),
+        'size' => variable_get('media_theplatform_mpx__cron_videos_per_run', 250),
+      ),
+      array(
+        'timeout' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
+      )
+    );
+  }
+  catch (MpxApiException $exception) {
+    // A 404 response means the notification ID that we have is now older than
+    // 7 days, and now we have to start ingesting from the beginning again.
+    if ($exception->getException()->responseCode == 404) {
+      $exception->setMessage("The last notification ID {$last_notification} for {$account} is older than 7 days and is too old to fetch notifications. The last notification ID has been reset to re-start ingestion of all videos.");
+      drupal_register_shutdown_function(array($account, 'setDataValue'), 'last_notification', NULL);
+    }
+    throw $exception;
+  }
 
   if (empty($result_data)) {
     watchdog('media_theplatform_mpx', 'Request for update notifications returned no data for @account.',
