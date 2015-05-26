@@ -39,12 +39,10 @@ class MpxAccount {
    */
   public static function load($id) {
     $accounts = static::loadMultiple(array($id));
-    if (!empty($accounts[$id])) {
-      return $accounts[$id];
-    }
-    else {
+    if (!isset($accounts[$id])) {
       throw new InvalidArgumentException("Cannot load mpx account $id.");
     }
+    return $accounts[$id];
   }
 
   /**
