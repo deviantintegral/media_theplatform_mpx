@@ -1106,7 +1106,7 @@ function media_theplatform_mpx_update_video($video, $fid = NULL, MpxAccount $acc
   }
 
   if (!$update_result) {
-    watchdog('media_theplatform_mpx', 'Failed to update video  @id - "@title" associated with file fid - @fid - for @account in the mpx_video table.',
+    watchdog('media_theplatform_mpx', 'Failed to update video  @id - "@title" associated with - @association - for @account in the mpx_video table.',
       array(
         '@id' => basename($video['id']),
         '@title' => $video['title'],
