@@ -557,7 +557,7 @@ function _media_theplatform_mpx_process_video_update(MpxAccount $account, $optio
   }
 
   // Set last notification for the next update.
-  $account->setDataVAlue('last_notification', $media_to_update['last_notification']);
+  $account->setDataValue('last_notification', $media_to_update['last_notification']);
 
   return TRUE;
 }
