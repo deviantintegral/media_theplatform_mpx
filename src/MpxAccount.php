@@ -378,6 +378,8 @@ class MpxAccount {
    *     variable, which defaults to 250 itself.
    *   - method: A string containing how this method was invoked. Used for
    *     watchdog statements. Defaults to 'manually'.
+   *   - force: A boolean if TRUE will skip some validation that normally
+   *     protects against duplicate runs.
    *
    * @return array
    *   A summary of the ingestion run including the following elements:
@@ -409,7 +411,7 @@ class MpxAccount {
     // Attempt to acquire a lock for ingestion for this account.
     $lock_id = 'media_theplatform_mpx_ingest_videos_' . $this->id;
     $lock_timeout = (float) variable_get('media_theplatform_mpx__cron_videos_timeout', 180);
-    if (!lock_acquire($lock_id, $lock_timeout)) {
+    if (!lock_acquire($lock_id, $lock_timeout) && empty($options['force'])) {
       throw new Exception("Unable to acquire lock for video ingestion for $this. Ingestion may currently be running in another process.");
     }
 

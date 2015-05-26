@@ -28,17 +28,20 @@ function media_theplatform_mpx_drush_command() {
     'aliases' => array('mpxal'),
   );
 
+  $ingest_options = array(
+    'limit' => dt('The number of new or updated items to process from the feed at once. The default is 250.'),
+    'queue-run' => dt('Will run the process queue after ingestion.'),
+    'queue-concurrency' => dt('The number of concurrent processes to use when running the process queue. The default is 1 so that the queue will be run in order.'),
+    'force' => dt('If provided will break any process locks.'),
+  );
+
   $commands['mpx-ingest'] = array(
     'description' => dt('Ingest videos for a specific mpx account'),
     'aliases' => array('mpxi'),
     'arguments '=> array(
       'account_id' => dt('The ID of the account to import. If not provided, all accounts will be used.'),
     ),
-    'options' => array(
-      'limit' => dt('The number of new or updated items to process from the feed at once. The default is 250.'),
-      'queue-run' => dt('Will run the process queue after ingestion.'),
-      'queue-concurrency' => dt('The number of concurrent processes to use when running the process queue. The default is 1 so that the queue will be run in order.'),
-    ),
+    'options' => $ingest_options,
     'examples' => array(
       'drush mpx-ingest 1' => dt('Ingest videos for mpx account 1.'),
       'drush mpxi 1 --limit=100' => dt('Ingest up to 100 new and 100 updated videos for mpx account 1.'),
@@ -47,11 +50,7 @@ function media_theplatform_mpx_drush_command() {
   $commands['mpx-ingest-all'] = array(
     'description' => dt('Ingest videos for all mpx accounts'),
     'aliases' => array('mpxia'),
-    'options' => array(
-      'limit' => dt('The number of new or updated items to process from the feed at once. The default is 250.'),
-      'queue-run' => dt('Will run the process queue after ingestion.'),
-      'queue-concurrency' => dt('The number of concurrent processes to use when running the process queue. The default is 1 so that the queue will be run in order.'),
-    ),
+    'options' => $ingest_options,
     'examples' => array(
       'drush mpx-ingest-all' => dt('Ingest videos for each mpx account.'),
       'drush mpxia --limit=100' => dt('Ingest up to 100 new and 100 updated videos for each mpx accounts.'),
@@ -177,7 +176,7 @@ function drush_media_theplatform_mpx_mpx_ingest_validate($account_id) {
   }
 
   // Check for locks used by drush ingest-mpx-videos.
-  if (!lock_may_be_available(MEDIA_THEPLATFORM_MPX_VIDEO_INGESTION_LOCK_BASENAME . '_parent_' . $account_id)) {
+  if (!drush_get_option('force') && !lock_may_be_available(MEDIA_THEPLATFORM_MPX_VIDEO_INGESTION_LOCK_BASENAME . '_parent_' . $account_id)) {
     return drush_set_error('MPX_INGEST_LOCK_ERROR', dt("Drush video ingestion is currently running for mpx account @id.", array('@id' => $account_id)));
   }
 }
@@ -195,6 +194,7 @@ function drush_media_theplatform_mpx_mpx_ingest($account_id) {
     if ($limit = drush_get_option('limit')) {
       $options['limit'] = (int) $limit;
     }
+    $options['force'] = (bool) drush_get_option('force');
     $summary = $account->ingestVideos($options);
     drush_log(dt(str_replace('<br>', "\n", $summary['message']), $summary['args']), 'success');
     _drush_media_theplatform_mpx_run_queue();
@@ -214,7 +214,7 @@ function drush_media_theplatform_mpx_mpx_ingest_all_validate() {
   }
 
   // Check for locks used by drush ingest-mpx-videos.
-  if (!lock_may_be_available('media_theplatform_mpx_ingest_videos_all')) {
+  if (!drush_get_option('force') && !lock_may_be_available('media_theplatform_mpx_ingest_videos_all')) {
     return drush_set_error('MPX_INGEST_LOCK_ERROR', dt("Drush video ingestion is currently running for all accounts."));
   }
 }
@@ -235,7 +235,7 @@ function drush_media_theplatform_mpx_mpx_ingest_all() {
   $common_options = array(
     'queue-run' => FALSE,
   );
-  foreach (array('limit') as $option) {
+  foreach (array('limit', 'force') as $option) {
     $value = drush_get_option($option);
     if (isset($value)) {
       $common_options[$option] = $value;
