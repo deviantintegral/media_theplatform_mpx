@@ -88,7 +88,7 @@ function media_theplatform_mpx_get_changed_ids(MpxAccount $account) {
   }
 
   if ($last_notification) {
-    media_theplatform_mpx_set_last_notification($account, $last_notification);
+    $account->setDataValue('last_notification', $last_notification);
   }
 
   // Remove any deletes from actives, because it causes errors when updating.
@@ -391,7 +391,7 @@ function _media_theplatform_mpx_process_batch_video_import(MpxAccount $account, 
     // notification id.
     // HERE
     if (!$account->getDataValue('last_notification')) {
-      media_theplatform_mpx_set_last_notification($account);
+      $account->setDataValue('last_notification', media_theplatform_mpx_get_last_notification($account));
     }
   }
 }
@@ -504,7 +504,7 @@ function _media_theplatform_mpx_process_video_update(MpxAccount $account, $optio
       return FALSE;
     }
     // Set last notification for the next update.
-    media_theplatform_mpx_set_last_notification($account, $media_to_update['last_notification']);
+    $account->setDataValue('last_notification', $media_to_update['last_notification']);
 
     return TRUE;
   }
@@ -524,7 +524,7 @@ function _media_theplatform_mpx_process_video_update(MpxAccount $account, $optio
 
   if ($total_result_count && $total_result_count > $options['limit']) {
     // Set last notification for the next update.
-    media_theplatform_mpx_set_last_notification($account, $media_to_update['last_notification']);
+    $account->setDataValue('last_notification', $media_to_update['last_notification']);
     // Set starter batch system variables.
     $account->setDataValue('proprocessing_batch_url', $batch_url);
     $account->setDataValue('proprocessing_batch_item_count', $total_result_count);
@@ -553,7 +553,7 @@ function _media_theplatform_mpx_process_video_update(MpxAccount $account, $optio
   }
 
   // Set last notification for the next update.
-  media_theplatform_mpx_set_last_notification($account, $media_to_update['last_notification']);
+  $account->setDataVAlue('last_notification', $media_to_update['last_notification']);
 
   return TRUE;
 }
@@ -579,7 +579,7 @@ function _media_theplatform_mpx_process_video_import(MpxAccount $account, array 
   // Set the first last notification value for subsequent updates.  Setting it
   // now ensures that any updates that happen during the import are processed
   // in subsequent updates.
-  media_theplatform_mpx_set_last_notification($account);
+  $account->setDataValue('last_notification', media_theplatform_mpx_get_last_notification($account));
 
   // Get the feed url.
   $batch_url = _media_theplatform_mpx_get_video_feed_url('all', $account);
@@ -1251,46 +1251,55 @@ function media_theplatform_mpx_get_thumbnail_url($guid) {
 }
 
 /**
+ * Retrieves the latest notification sequence ID for an account from the API.
+ *
+ * @param MpxAccount $account
+ *   The mpx account.
+ *
+ * @return string
+ *   The last notification sequence ID.
+ *
+ * @throws UnexpectedValueException
+ * @throws MpxException
+ */
+function media_theplatform_mpx_get_last_notification(MpxAccount $account) {
+  $data = MpxApi::authenticatedRequest(
+    $account,
+    'https://read.data.media.theplatform.com/media/notify',
+    array(
+      'account' => $account->import_account,
+      'filter' => 'Media',
+      'clientId' => 'drupal_media_theplatform_mpx_' . $account->account_pid,
+    )
+  );
+
+  if (!isset($data[0]['id'])) {
+    throw new MpxException("Unable to fetch the last notification sequence ID for {$account}.");
+  }
+  elseif (!is_numeric($data[0]['id'])) {
+    throw new UnexpectedValueException("The lsat notification sequence ID {$data[0]['id']} for {$account} was not a numeric value.");
+  }
+  else {
+    watchdog('media_theplatform_mpx', 'Retrieved last notification sequence ID @id for @account.', array(
+      '@id' => $data[0]['id'],
+      '@account' => (string) $account,
+    ), WATCHDOG_INFO);
+    return $data[0]['id'];
+  }
+}
+
+/**
  * Returns most recent notification sequence number from thePlatform.
+ *
+ * @deprecated
  */
 function media_theplatform_mpx_set_last_notification(MpxAccount $account, $last_notification = NULL) {
-
-  if (empty($last_notification)) {
-    $result_data = MpxApi::authenticatedRequest(
-      $account,
-      'https://read.data.media.theplatform.com/media/notify',
-      array(
-        'account' => $account->import_account,
-        'filter' => 'Media',
-        'clientId' => 'drupal_media_theplatform_mpx_' . $account->account_pid,
-      )
-    );
-
-    if (empty($result_data[0]['id'])) {
-      watchdog('media_theplatform_mpx', 'Failed to reset mpx last notification sequence ID for @account.  "id" field value not set.',
-        array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_ERROR);
-    }
-    else {
-      $last_notification = $result_data[0]['id'];
-      watchdog('media_theplatform_mpx', 'Successfully retrieved mpx last notification sequence ID for @account: @id.',
-        array(
-          '@id' => $last_notification,
-          '@account' => _media_theplatform_mpx_account_log_string($account),
-        ),
-        WATCHDOG_NOTICE);
-    }
+  if (!isset($last_notification)) {
+    $last_notification = media_theplatform_mpx_get_last_notification($account);
   }
 
-  // If we have a value, save it.
-  if ($last_notification) {
-    $account->setDataValue('last_notification', $last_notification);
-    return TRUE;
-  }
-
-  watchdog('media_theplatform_mpx', 'An attempt was made (but was not permitted) to set last_notification to an empty PHP value for @account.',
-    array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_ERROR);
-
-  return FALSE;
+  $account->setDataValue('last_notification', $last_notification);
+  return TRUE;
 }
 
 /**
