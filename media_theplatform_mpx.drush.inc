@@ -31,7 +31,6 @@ function media_theplatform_mpx_drush_command() {
   $ingest_options = array(
     'limit' => dt('The number of new or updated items to process from the feed at once. The default is 100.'),
     'queue-run' => dt('Will run the process queue after ingestion.'),
-    'queue-concurrency' => dt('The number of concurrent processes to use when running the process queue. The default is 1 so that the queue will be run in order.'),
     'force' => dt('If provided will break any process locks.'),
   );
 
@@ -258,29 +257,21 @@ function _drush_media_theplatform_mpx_run_queue() {
   }
 
   // The process the items from the queue.
-  $concurrency = (int) drush_get_option('queue-concurrency', 1);
   if (module_exists('concurrent_queue')) {
     drush_invoke_process(
       '@self',
       'queue-run-concurrent',
       array('media_theplatform_mpx_video_cron_queue'),
       array(
-        'concurrency' => $concurrency,
+        'concurrency' => 1,
       )
     );
   }
   else {
-    $invocations = array_fill(0, $concurrency, array(
-      'site' => '@self',
-      'command' => 'queue-run',
-      'args' => array('media_theplatform_mpx_video_cron_queue'),
-    ));
-    drush_backend_invoke_concurrent(
-      $invocations,
-      array(),
-      array(
-        'concurrency' => $concurrency,
-      )
+    drush_invoke_process(
+      '@self',
+      'queue-run',
+      'media_theplatform_mpx_video_cron_queue'
     );
   }
 }
