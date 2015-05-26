@@ -18,17 +18,21 @@ function media_theplatform_mpx_get_changed_ids(MpxAccount $account) {
   $last_notification = $account->getDataValue('last_notification');
 
   try {
+    $params = array(
+      'account' => $account->import_account,
+      'block' => 'false',
+      'filter' => 'Media',
+      'clientId' => 'drupal_media_theplatform_mpx_' . $account->account_pid,
+      'since' => $last_notification,
+    );
+    if ($size = variable_get('media_theplatform_mpx_notification_size')) {
+      $params['size'] = $size;
+    }
+
     $result_data = MpxApi::authenticatedRequest(
       $account,
       'https://read.data.media.theplatform.com/media/notify',
-      array(
-        'account' => $account->import_account,
-        'block' => 'false',
-        'filter' => 'Media',
-        'clientId' => 'drupal_media_theplatform_mpx_' . $account->account_pid,
-        'since' => $account->getDataValue('last_notification'),
-        'size' => variable_get('media_theplatform_mpx__cron_videos_per_run', 100),
-      ),
+      $params,
       array(
         'timeout' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
       )

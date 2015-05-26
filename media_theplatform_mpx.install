@@ -453,6 +453,7 @@ function media_theplatform_mpx_uninstall() {
   variable_del('media_theplatform_mpx__output_message_watchdog_severity');
   variable_del('media_theplatform_mpx__watchdog_severity');
   variable_del('media_theplatform_mpx__token_ttl');
+  variable_del('media_theplatform_mpx_notification_size');
 
   variable_del('media_theplatform_mpx__cron_next_to_last');
   variable_del('media_theplatform_mpx__running_total_videos_processed');
