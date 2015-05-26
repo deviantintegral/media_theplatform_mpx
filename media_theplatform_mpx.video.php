@@ -27,7 +27,7 @@ function media_theplatform_mpx_get_changed_ids(MpxAccount $account) {
         'filter' => 'Media',
         'clientId' => 'drupal_media_theplatform_mpx_' . $account->account_pid,
         'since' => $account->getDataValue('last_notification'),
-        'size' => variable_get('media_theplatform_mpx__cron_videos_per_run', 250),
+        'size' => variable_get('media_theplatform_mpx__cron_videos_per_run', 100),
       ),
       array(
         'timeout' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
@@ -336,7 +336,7 @@ function _media_theplatform_mpx_process_video_import_feed_data($result_data, $me
 function _media_theplatform_mpx_process_batch_video_import(MpxAccount $account, array $options = array()) {
   $options += array(
     'method' => 'manually',
-    'limit' => variable_get('media_theplatform_mpx__cron_videos_per_run', 250),
+    'limit' => variable_get('media_theplatform_mpx__cron_videos_per_run', 100),
   );
 
   // Get the parts for the batch url and construct it.
@@ -458,7 +458,7 @@ function _media_theplatform_mpx_get_feed_item_count($url, MpxAccount $account) {
 function _media_theplatform_mpx_process_video_update(MpxAccount $account, $options = array()) {
   $options += array(
     'method' => 'manually',
-    'limit' => variable_get('media_theplatform_mpx__cron_videos_per_run', 250),
+    'limit' => variable_get('media_theplatform_mpx__cron_videos_per_run', 100),
   );
 
   // This log message may seem redundant, but it's important for detecting if an
@@ -564,7 +564,7 @@ function _media_theplatform_mpx_process_video_update(MpxAccount $account, $optio
 function _media_theplatform_mpx_process_video_import(MpxAccount $account, array $options = array()) {
   $options += array(
     'method' => 'manually',
-    'limit' => variable_get('media_theplatform_mpx__cron_videos_per_run', 250),
+    'limit' => variable_get('media_theplatform_mpx__cron_videos_per_run', 100),
   );
 
   // This log message may seem redundant, but it's important for detecting if an

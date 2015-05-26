@@ -204,7 +204,7 @@ function media_theplatform_mpx_reports_page_status() {
 
   drupal_add_library('system', 'drupal.collapse');
 
-  $feed_request_item_limit = variable_get('media_theplatform_mpx__cron_videos_per_run', 250);
+  $feed_request_item_limit = variable_get('media_theplatform_mpx__cron_videos_per_run', 100);
 
   $build = array();
   $build['#cache'] = FALSE;

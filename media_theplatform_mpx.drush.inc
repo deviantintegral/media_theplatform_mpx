@@ -29,7 +29,7 @@ function media_theplatform_mpx_drush_command() {
   );
 
   $ingest_options = array(
-    'limit' => dt('The number of new or updated items to process from the feed at once. The default is 250.'),
+    'limit' => dt('The number of new or updated items to process from the feed at once. The default is 100.'),
     'queue-run' => dt('Will run the process queue after ingestion.'),
     'queue-concurrency' => dt('The number of concurrent processes to use when running the process queue. The default is 1 so that the queue will be run in order.'),
     'force' => dt('If provided will break any process locks.'),

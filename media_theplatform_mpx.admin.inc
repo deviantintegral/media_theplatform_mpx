@@ -361,7 +361,7 @@ function media_theplatform_mpx_settings_form($form, &$form_state) {
     '#type' => 'numberfield',
     '#title' => t('Media Processing Limit'),
     '#description' => t('The number of videos to pull from the media feed per cron run. Maximum of 500.'),
-    '#default_value' => variable_get('media_theplatform_mpx__cron_videos_per_run', 250),
+    '#default_value' => variable_get('media_theplatform_mpx__cron_videos_per_run', 100),
     '#min' => 0,
     '#max' => 500,
   );

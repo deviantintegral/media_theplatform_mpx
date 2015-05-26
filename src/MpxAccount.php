@@ -375,7 +375,7 @@ class MpxAccount {
    *   the following elements:
    *   - limit: An integer with the maximum number of items to ingest. Defaults
    *     to the value of the media_theplatform_mpx__cron_videos_per_run
-   *     variable, which defaults to 250 itself.
+   *     variable, which defaults to 100 itself.
    *   - method: A string containing how this method was invoked. Used for
    *     watchdog statements. Defaults to 'manually'.
    *   - force: A boolean if TRUE will skip some validation that normally
