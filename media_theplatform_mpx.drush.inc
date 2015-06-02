@@ -189,11 +189,11 @@ function drush_media_theplatform_mpx_mpx_ingest_validate($account_id) {
 function drush_media_theplatform_mpx_mpx_ingest($account_id) {
   try {
     $account = MpxAccount::load($account_id);
-    $options = array('method' => 'via Drush');
-    if ($limit = drush_get_option('limit')) {
-      $options['limit'] = (int) $limit;
-    }
-    $options['force'] = (bool) drush_get_option('force');
+    $options = array(
+      'method' => 'via Drush',
+      'limit' => (int) drush_get_option('limit', variable_get('media_theplatform_mpx__cron_videos_per_run', 100)),
+      'force' => (bool) drush_get_option('force'),
+    );
     $summary = $account->ingestVideos($options);
     drush_log(dt(str_replace('<br>', "\n", $summary['message']), $summary['args']), 'success');
     _drush_media_theplatform_mpx_run_queue();
