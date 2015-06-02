@@ -368,6 +368,29 @@ class MpxAccount {
   }
 
   /**
+   * Deletes an item from the key/value store.
+   *
+   * @param string $key
+   *   The item name to delete.
+   */
+  public function deleteDataValue($key) {
+    return $this->deleteMultipleDataValues(array($key));
+  }
+
+  /**
+   * Deletes multiple items from the key/value store.
+   *
+   * @param array $keys
+   *   A list of item names to delete.
+   */
+  public function deleteMultipleDataValues(array $keys) {
+    db_delete('mpx_account_data')
+      ->condition('name', $keys, 'IN')
+      ->condition('account_id', $this->id)
+      ->execute();
+  }
+
+  /**
    * Run video ingestion for the account.
    *
    * @param array $options
