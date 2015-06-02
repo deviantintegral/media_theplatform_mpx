@@ -311,8 +311,9 @@ function _media_theplatform_mpx_process_video_import_feed_data($result_data, $me
     }
   }
 
-  // Add the queue items to the cron queueu.
-  $queue = DrupalQueue::get('media_theplatform_mpx_video_cron_queue');
+  // Add the queue items to the cron queue.
+  /** @var DrupalReliableQueueInterface $queue */
+  $queue = DrupalQueue::get('media_theplatform_mpx_video_cron_queue', TRUE);
   foreach ($queue_items as $queue_item) {
     $queue->createItem($queue_item);
   }
