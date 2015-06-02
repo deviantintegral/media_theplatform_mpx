@@ -864,7 +864,7 @@ function _media_theplatform_mpx_delete_account_data($account_id) {
     $account = MpxAccount::load($account_id);
   }
 
-  // Delete the request queue for the account.
+  // Delete the deprecated Drush request queue for the account.
   /** @var DrupalReliableQueueInterface $queue */
   $queue = DrupalQueue::get('media_theplatform_mpx_video_request_queue_' . $account_id, TRUE);
   $queue->deleteQueue();
@@ -880,6 +880,9 @@ function _media_theplatform_mpx_delete_account_data($account_id) {
     if (!db_query("SELECT 1 FROM {mpx_accounts} WHERE username = :username AND id <> :id", array(':username' => $account->username, ':id' => $account_id))->fetchField()) {
       $account->releaseToken();
     }
+
+    // Delete the account's queues.
+    MpxRequestQueue::get($account)->deleteQueue();
   }
 
   // Remove variables disabling video and player sync for this account.

@@ -444,7 +444,6 @@ class MpxAccount {
       watchdog('media_theplatform_mpx', 'Starting video ingestion for @account.', array('@account' => (string) $this), WATCHDOG_INFO);
 
       $summary = array('args' => array());
-      $summary['queue_count_before'] = DrupalQueue::get('media_theplatform_mpx_video_cron_queue', TRUE)->numberOfItems();
       $summary['args']['@previous_notification_id'] = $this->getDataValue('last_notification', 'NULL');
       timer_start($lock_id);
 
@@ -464,15 +463,13 @@ class MpxAccount {
       // Ensure the lock is released.
       lock_release($lock_id);
 
+      // @todo Move the summary and message generation out of this function.
       $summary['timer'] = timer_read($lock_id);
       $summary['args']['@notification_id'] = $this->getDataValue('last_notification', 'NULL');
-      $summary['queue_count_after'] = DrupalQueue::get('media_theplatform_mpx_video_cron_queue', TRUE)->numberOfItems();
-      $summary['message'] = "Processed video ingestion for @account.<br>Current batch: @batch<br>Previous Notification ID: @previous_notification_id<br>Current notification ID: @notification_id<br>Peak memory usage: @memory in @elapsed sec<br>media_theplatform_mpx_video_cron_queue: @tasks new tasks, @task-count total tasks.";
+      $summary['message'] = "Processed video ingestion for @account.<br>Previous Notification ID: @previous_notification_id<br>Current notification ID: @notification_id<br>Current batch: @batch<br>Peak memory usage: @memory in @elapsed sec";
       $summary['args'] += array(
         '@account' => (string) $this,
         '@elapsed' => round($summary['timer'] / 1000.0, 2),
-        '@tasks' => $summary['queue_count_after'] - $summary['queue_count_before'],
-        '@task-count' => $summary['queue_count_after'],
         '@memory' => format_size(memory_get_peak_usage(TRUE)),
         '@batch' => $this->getDataValue('proprocessing_batch_url') ? ($this->getDataValue('proprocessing_batch_item_count') - $this->getDataValue('proprocessing_batch_current_item') + 1) . ' items remaining' : 'None',
       );
@@ -486,6 +483,20 @@ class MpxAccount {
       lock_release($lock_id);
       throw $exception;
     }
+  }
+
+  /**
+   * Resets video ingestion for the account.
+   */
+  public function resetIngestion() {
+    $this->deleteMultipleDataValues(array(
+      'last_notification',
+      'proprocessing_batch_url',
+      'proprocessing_batch_item_count',
+      'proprocessing_batch_current_item',
+    ));
+    MpxRequestQueue::get($this)->deleteQueue();
+    watchdog('media_theplatform_mpx', 'Video ingestion for @account has been reset.', array('@account' => (string) $this), WATCHDOG_WARNING);
   }
 
   /**

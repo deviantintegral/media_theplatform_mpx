@@ -43,7 +43,7 @@ function media_theplatform_mpx_get_changed_ids(MpxAccount $account) {
     // 7 days, and now we have to start ingesting from the beginning again.
     if ($exception->getException()->responseCode == 404) {
       $exception->setMessage("The last notification ID {$last_notification} for {$account} is older than 7 days and is too old to fetch notifications. The last notification ID has been reset to re-start ingestion of all videos.");
-      drupal_register_shutdown_function(array($account, 'setDataValue'), 'last_notification', NULL);
+      drupal_register_shutdown_function(array($account, 'resetIngestion'));
     }
     throw $exception;
   }
@@ -127,6 +127,14 @@ function media_theplatform_mpx_cron_queue_info() {
     'worker callback' => 'process_media_theplatform_mpx_video_cron_queue_item',
     'time' => variable_get('media_theplatform_mpx__cron_queue_processing_time', 10),
   );
+
+  $ids = db_query("SELECT id FROM {mpx_accounts}")->fetchCol();
+  foreach ($ids as $id) {
+    $queues['media_theplatform_mpx_request_' . $id] = array(
+      'worker callback' => '_media_theplatform_mpx_request_queue_process',
+      'time' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
+    );
+  }
 
   return $queues;
 }
@@ -240,6 +248,17 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
   $processing_time = microtime(TRUE) - $start_microtime;
   variable_set('media_theplatform_mpx__running_total_videos_processed', 1 + $current_total_videos_processed);
   variable_set('media_theplatform_mpx__running_total_video_processing_time', $current_total_video_processing_time + $processing_time);
+}
+
+/**
+ * Wrapper for MpxRequestQueue::processItem() since queue workers cannot
+ * be a callable in Drupal 7.
+ *
+ * @param $data
+ * @return bool
+ */
+function _media_theplatform_mpx_request_queue_process($data) {
+  return MpxRequestQueue::processItem($data);
 }
 
 /**
@@ -534,8 +553,15 @@ function _media_theplatform_mpx_process_video_update(MpxAccount $account, $optio
     $account->setDataValue('proprocessing_batch_url', $batch_url);
     $account->setDataValue('proprocessing_batch_item_count', $total_result_count);
     $account->setDataValue('proprocessing_batch_current_item', 1);
-    // Perform the first batch operation, not the update.
-    return _media_theplatform_mpx_process_batch_video_import($account, $options);
+
+    if (!empty($options['request queue'])) {
+      // Put the batch into a queue if requested.
+      return MpxRequestQueue::populateItems($account, $options['limit']);
+    }
+    else {
+      // Perform the first batch operation, not the update.
+      return _media_theplatform_mpx_process_batch_video_import($account, $options);
+    }
   }
 
   $result_data = MpxApi::authenticatedRequest(
@@ -599,8 +625,14 @@ function _media_theplatform_mpx_process_video_import(MpxAccount $account, array 
     $account->setDataValue('proprocessing_batch_item_count', $total_result_count);
     $account->setDataValue('proprocessing_batch_current_item', 1);
 
-    // Perform the first batch operation, not the update.
-    return _media_theplatform_mpx_process_batch_video_import($account, $options);
+    if (!empty($options['request queue'])) {
+      // Put the batch into a queue if requested.
+      return MpxRequestQueue::populateItems($account, $options['limit']);
+    }
+    else {
+      // Perform the first batch operation, not the update.
+      return _media_theplatform_mpx_process_batch_video_import($account, $options);
+    }
   }
 
   watchdog('media_theplatform_mpx', 'Retrieving all media data from thePlatform for @account.',

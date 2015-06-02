@@ -32,6 +32,8 @@ function media_theplatform_mpx_drush_command() {
     'limit' => dt('The number of new or updated items to process from the feed at once. The default is 100.'),
     'queue-run' => dt('Will run the process queue after ingestion.'),
     'force' => dt('If provided will break any process locks.'),
+    'reset' => dt('If provided will start ingestion from the beginning again.'),
+    'request-concurrency' => dt('The number of concurrent request workers. Default is 10.'),
   );
 
   $commands['mpx-ingest'] = array(
@@ -189,14 +191,37 @@ function drush_media_theplatform_mpx_mpx_ingest_validate($account_id) {
 function drush_media_theplatform_mpx_mpx_ingest($account_id) {
   try {
     $account = MpxAccount::load($account_id);
+
+    if (drush_get_option('reset')) {
+      if (drush_confirm(dt('Are you sure you want to reset video ingestion for @account?', array('@account' => (string) $account)))) {
+        $account->resetIngestion();
+        drush_log(dt('Reset video ingestion for @account', array('@account' => (string) $account)), 'ok');
+      }
+    }
+
     $options = array(
       'method' => 'via Drush',
       'limit' => (int) drush_get_option('limit', variable_get('media_theplatform_mpx__cron_videos_per_run', 100)),
       'force' => (bool) drush_get_option('force'),
+      'request queue' => (bool) drush_get_option('queue-run', TRUE),
     );
     $summary = $account->ingestVideos($options);
-    drush_log(dt(str_replace('<br>', "\n", $summary['message']), $summary['args']), 'success');
-    _drush_media_theplatform_mpx_run_queue();
+    $lines = explode('<br>', format_string($summary['message'], $summary['args']));
+    foreach ($lines as $line) {
+      drush_log($line, 'ok');
+    }
+
+    // Convert the current ingestion to the request queue.
+    if (drush_get_option('queue-run', TRUE)) {
+      MpxRequestQueue::populateItems($account, $options['limit']);
+    }
+
+    // Process the request queue for the account.
+    $request_concurrency = (int) drush_get_option('request-concurrency', 10);
+    _drush_media_theplatform_mpx_invoke_queue('media_theplatform_mpx_request_' . $account->id, $request_concurrency);
+
+    // Process the video queue for the account.
+    _drush_media_theplatform_mpx_invoke_queue('media_theplatform_mpx_video_cron_queue', 1);
   }
   catch (Exception $e) {
     watchdog_exception('media_theplatform_mpx', $e);
@@ -231,42 +256,28 @@ function drush_media_theplatform_mpx_mpx_ingest_all() {
       'args' => array($account->id),
     );
   }
-  $common_options = array(
-    'queue-run' => FALSE,
-  );
-  foreach (array('limit', 'force') as $option) {
-    $value = drush_get_option($option);
-    if (isset($value)) {
-      $common_options[$option] = $value;
-    }
-  }
+  $common_options = drush_redispatch_get_options();
   $common_backend_options = array(
     'concurrency' => count($invocations),
   );
   drush_backend_invoke_concurrent($invocations, $common_options, $common_backend_options);
-  _drush_media_theplatform_mpx_run_queue();
-}
-
-/**
- * Run the media_theplatform_mpx_video_cron_queue queue.
- */
-function _drush_media_theplatform_mpx_run_queue() {
-  if (!drush_get_option('queue-run') || drush_get_error()) {
-    return;
-  }
-
-  // The process the items from the queue.
-  _drush_media_theplatform_mpx_invoke_queue('media_theplatform_mpx_video_cron_queue', 1);
 }
 
 function _drush_media_theplatform_mpx_invoke_queue($queue_name, $concurrency = 1) {
-  if (!DrupalQueue::get($queue_name)->numberOfItems()) {
+  $count = DrupalQueue::get($queue_name)->numberOfItems();
+  // Report a summary of the queue.
+  drush_log(dt('Queue @queue: @count total items', array('@queue' => $queue_name, '@count' => $count)), 'ok');
+
+  if (!$count || !drush_get_option('queue-run', TRUE)) {
     return;
   }
 
+  // Ensure concurrency is not higher than the number of items in the queue.
+  $concurrency = min($concurrency, $count);
+
   // The process the items from the queue.
   if (module_exists('concurrent_queue')) {
-    return drush_invoke_process(
+    drush_invoke_process(
       '@self',
       'queue-run-concurrent',
       array($queue_name),
@@ -281,7 +292,7 @@ function _drush_media_theplatform_mpx_invoke_queue($queue_name, $concurrency = 1
       'command' => 'queue-run',
       'args' => array($queue_name),
     ));
-    return drush_backend_invoke_concurrent(
+    drush_backend_invoke_concurrent(
       $invocations,
       array(),
       array(
@@ -289,6 +300,10 @@ function _drush_media_theplatform_mpx_invoke_queue($queue_name, $concurrency = 1
       )
     );
   }
+
+  // Force the database connection to be reconnected since the queue may
+  // have run for an extended amount of time.
+  Database::closeConnection();
 }
 
 /**

@@ -8,6 +8,7 @@ files[] = includes/MediaInternetThePlatformMpxHandler.inc
 files[] = src/MpxAccount.php
 files[] = src/MpxApi.php
 files[] = src/MpxException.php
+files[] = src/MpxRequestQueue.php
 files[] = src/MpxToken.php
 dependencies[] = media (2.x)
 dependencies[] = media_internet (2.x)
