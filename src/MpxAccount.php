@@ -467,15 +467,14 @@ class MpxAccount {
       $summary['timer'] = timer_read($lock_id);
       $summary['args']['@notification_id'] = $this->getDataValue('last_notification', 'NULL');
       $summary['queue_count_after'] = DrupalQueue::get('media_theplatform_mpx_video_cron_queue', TRUE)->numberOfItems();
-      $summary['message'] = "Processed video ingestion for mpx account @id (@import_account).<br>Current batch: @batch<br>Previous Notification ID: @previous_notification_id<br>Current notification ID: @notification_id<br>Peak memory usage: @memory in @elapsed sec<br>media_theplatform_mpx_video_cron_queue: @tasks new tasks, @task-count total tasks.";
+      $summary['message'] = "Processed video ingestion for @account.<br>Current batch: @batch<br>Previous Notification ID: @previous_notification_id<br>Current notification ID: @notification_id<br>Peak memory usage: @memory in @elapsed sec<br>media_theplatform_mpx_video_cron_queue: @tasks new tasks, @task-count total tasks.";
       $summary['args'] += array(
-        '@id' => $this->id,
-        '@import_account' => $this->import_account,
+        '@account' => (string) $this,
         '@elapsed' => round($summary['timer'] / 1000.0, 2),
         '@tasks' => $summary['queue_count_after'] - $summary['queue_count_before'],
         '@task-count' => $summary['queue_count_after'],
         '@memory' => format_size(memory_get_peak_usage(TRUE)),
-        '@batch' => $this->getDataValue('proprocessing_batch_url') ? ($this->getDataValue('proprocessing_batch_item_count') - $this->getDataValue('proprocessing_batch_current_item')) . ' items remaining' : 'None',
+        '@batch' => $this->getDataValue('proprocessing_batch_url') ? ($this->getDataValue('proprocessing_batch_item_count') - $this->getDataValue('proprocessing_batch_current_item') + 1) . ' items remaining' : 'None',
       );
 
       watchdog('media_theplatform_mpx', $summary['message'], $summary['args'], WATCHDOG_INFO);
