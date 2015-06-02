@@ -251,27 +251,42 @@ function drush_media_theplatform_mpx_mpx_ingest_all() {
  * Run the media_theplatform_mpx_video_cron_queue queue.
  */
 function _drush_media_theplatform_mpx_run_queue() {
-  $count = DrupalQueue::get('media_theplatform_mpx_video_cron_queue', TRUE)->numberOfItems();
-  if (!$count || !drush_get_option('queue-run') || drush_get_error()) {
+  if (!drush_get_option('queue-run') || drush_get_error()) {
+    return;
+  }
+
+  // The process the items from the queue.
+  _drush_media_theplatform_mpx_invoke_queue('media_theplatform_mpx_video_cron_queue', 1);
+}
+
+function _drush_media_theplatform_mpx_invoke_queue($queue_name, $concurrency = 1) {
+  if (!DrupalQueue::get($queue_name)->numberOfItems()) {
     return;
   }
 
   // The process the items from the queue.
   if (module_exists('concurrent_queue')) {
-    drush_invoke_process(
+    return drush_invoke_process(
       '@self',
       'queue-run-concurrent',
-      array('media_theplatform_mpx_video_cron_queue'),
+      array($queue_name),
       array(
-        'concurrency' => 1,
+        'concurrency' => $concurrency,
       )
     );
   }
   else {
-    drush_invoke_process(
-      '@self',
-      'queue-run',
-      'media_theplatform_mpx_video_cron_queue'
+    $invocations = array_fill(0, $concurrency, array(
+      'site' => '@self',
+      'command' => 'queue-run',
+      'args' => array($queue_name),
+    ));
+    return drush_backend_invoke_concurrent(
+      $invocations,
+      array(),
+      array(
+        'concurrency' => $concurrency,
+      )
     );
   }
 }
