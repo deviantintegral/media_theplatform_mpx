@@ -177,7 +177,7 @@ class MpxToken {
       $data['signInResponse']['token'],
       REQUEST_TIME + $lifetime
     );
-    watchdog('media_theplatform_mpx', 'Fetched new mpx token @token for account @username that expires on @date (in @duration).', array('@token' => $token->value, '@username' => $username, '@date' => format_date($token->expire), '@duration' => format_interval($lifetime)), WATCHDOG_INFO);
+    watchdog('media_theplatform_mpx', 'Fetched new mpx token @token for account @username that expires on @date (in @duration).', array('@token' => $token->value, '@username' => $username, '@date' => format_date($token->expire, 'custom', DATE_ISO8601), '@duration' => format_interval($lifetime)), WATCHDOG_INFO);
     return $token;
   }
 
