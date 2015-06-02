@@ -38,7 +38,7 @@ function media_theplatform_mpx_drush_command() {
     'description' => dt('Ingest videos for a specific mpx account'),
     'aliases' => array('mpxi'),
     'arguments '=> array(
-      'account_id' => dt('The ID of the account to import. If not provided, all accounts will be used.'),
+      'account_id' => dt('The ID of the account to import.'),
     ),
     'options' => $ingest_options,
     'examples' => array(
