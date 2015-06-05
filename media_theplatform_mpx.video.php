@@ -119,27 +119,6 @@ function media_theplatform_mpx_get_changed_ids(MpxAccount $account) {
 }
 
 /**
- * Implements hook_cron_queue_info().
- */
-function media_theplatform_mpx_cron_queue_info() {
-
-  $queues['media_theplatform_mpx_video_cron_queue'] = array(
-    'worker callback' => 'process_media_theplatform_mpx_video_cron_queue_item',
-    'time' => variable_get('media_theplatform_mpx__cron_queue_processing_time', 10),
-  );
-
-  $ids = db_query("SELECT id FROM {mpx_accounts}")->fetchCol();
-  foreach ($ids as $id) {
-    $queues['media_theplatform_mpx_request_' . $id] = array(
-      'worker callback' => '_media_theplatform_mpx_request_queue_process',
-      'time' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
-    );
-  }
-
-  return $queues;
-}
-
-/**
  * Video queue item worker callback.
  */
 function process_media_theplatform_mpx_video_cron_queue_item($item) {
@@ -248,17 +227,6 @@ function process_media_theplatform_mpx_video_cron_queue_item($item) {
   $processing_time = microtime(TRUE) - $start_microtime;
   variable_set('media_theplatform_mpx__running_total_videos_processed', 1 + $current_total_videos_processed);
   variable_set('media_theplatform_mpx__running_total_video_processing_time', $current_total_video_processing_time + $processing_time);
-}
-
-/**
- * Wrapper for MpxRequestQueue::processItem() since queue workers cannot
- * be a callable in Drupal 7.
- *
- * @param $data
- * @return bool
- */
-function _media_theplatform_mpx_request_queue_process($data) {
-  return MpxRequestQueue::processItem($data);
 }
 
 /**

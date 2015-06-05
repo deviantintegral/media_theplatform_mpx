@@ -211,6 +211,26 @@ function media_theplatform_mpx_cron() {
 }
 
 /**
+ * Implements hook_cron_queue_info().
+ */
+function media_theplatform_mpx_cron_queue_info() {
+  $queues['media_theplatform_mpx_video_cron_queue'] = array(
+    'worker callback' => 'process_media_theplatform_mpx_video_cron_queue_item',
+    'time' => variable_get('media_theplatform_mpx__cron_queue_processing_time', 10),
+  );
+
+  $ids = db_query("SELECT id FROM {mpx_accounts}")->fetchCol();
+  foreach ($ids as $id) {
+    $queues['media_theplatform_mpx_request_' . $id] = array(
+      'worker callback' => '_media_theplatform_mpx_request_queue_process',
+      'time' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
+    );
+  }
+
+  return $queues;
+}
+
+/**
  * Implements hook_permission().
  */
 function media_theplatform_mpx_permission() {
@@ -1188,69 +1208,6 @@ function media_theplatform_mpx_get_player_iframe_url(array $variables) {
 }
 
 /**
- * Implements hook_file_formatter_info().
- */
-function media_theplatform_mpx_file_formatter_info() {
-  $formatters['media_theplatform_mpx_image'] = array(
-    'label' => t('mpx Preview Image'),
-    'file types' => array('video'),
-    'default settings' => array(
-      'image_style' => '',
-    ),
-    'view callback' => 'media_theplatform_mpx_file_formatter_image_view',
-    'settings callback' => 'media_theplatform_mpx_file_formatter_image_settings',
-    'mime types' => array('video/mpx', 'player/mpx'),
-  );
-  return $formatters;
-}
-
-/**
- * Implements hook_file_formatter_FORMATTER_view().
- */
-function media_theplatform_mpx_file_formatter_image_view($file, $display, $langcode) {
-  if ($file->filemime === 'video/mpx' || $file->filemime === 'player/mpx') {
-    /** @var MediaThePlatformMpxStreamWrapper $wrapper */
-    $wrapper = file_stream_wrapper_get_instance_by_uri($file->uri);
-
-    $image_style = $display['settings']['image_style'];
-    $valid_image_styles = image_style_options(FALSE);
-
-    if (empty($image_style) || !isset($valid_image_styles[$image_style])) {
-      if ($uri = $wrapper->getOriginalThumbnailPath()) {
-        return array(
-          '#theme' => 'image',
-          '#path' => $uri,
-        );
-      }
-    }
-    else {
-      if ($uri = $wrapper->getLocalThumbnailPath()) {
-        return array(
-          '#theme' => 'image_style',
-          '#style_name' => $image_style,
-          '#path' => $uri,
-        );
-      }
-    }
-  }
-}
-
-/**
- * Implements hook_file_formatter_FORMATTER_settings().
- */
-function media_theplatform_mpx_file_formatter_image_settings($form, &$form_state, $settings) {
-  $element = array();
-  $element['image_style'] = array(
-    '#title' => t('Image style'),
-    '#type' => 'select',
-    '#options' => image_style_options(FALSE),
-    '#default_value' => $settings['image_style'],
-    '#empty_option' => t('None (original image)'),
-  );
-  return $element;
-}
-
-/**
  * @deprecated
  *
  * Returns array of all accounts specified thePlatform account.
@@ -1351,4 +1308,15 @@ function media_theplatform_mpx_is_file_active($file) {
   elseif ($file->filemime === 'player/mpx') {
     return (bool) db_query("SELECT status FROM {mpx_player} WHERE fid = :fid", array(':fid' => $file->fid))->fetchField();
   }
+}
+
+/**
+ * Wrapper for MpxRequestQueue::processItem() since queue workers cannot
+ * be a callable in Drupal 7.
+ *
+ * @param $data
+ * @return bool
+ */
+function _media_theplatform_mpx_request_queue_process($data) {
+  return MpxRequestQueue::processItem($data);
 }
