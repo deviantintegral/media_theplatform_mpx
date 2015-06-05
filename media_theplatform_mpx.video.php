@@ -1088,34 +1088,7 @@ function media_theplatform_mpx_update_video($video, $fid = NULL, MpxAccount $acc
   if (is_object($account) && !empty($account->id)) {
     $update_query->condition('parent_account', $account->id, '=');
   }
-
-  $update_result = $update_query->execute();
-
-  if ($update_result) {
-    if (strpos($association, 'guid') !== FALSE) {
-      $update_result = db_update('file_managed')
-        ->fields(array('filename' => $video['title']))
-        ->condition('uri', 'mpx://%' . $video['guid'] . '%', 'LIKE')
-        ->execute();
-    }
-  }
-  else {
-    $update_result = db_update('file_managed')
-      ->fields(array('filename' => $video['title']))
-      ->condition('fid', $fid, '=')
-      ->execute();
-  }
-
-  if (!$update_result) {
-    watchdog('media_theplatform_mpx', 'Failed to update video  @id - "@title" associated with - @association - for @account in the mpx_video table.',
-      array(
-        '@id' => basename($video['id']),
-        '@title' => $video['title'],
-        '@association' => $association,
-        '@account' => _media_theplatform_mpx_account_log_string($account),
-      ),
-      WATCHDOG_ERROR);
-  }
+  $update_query->execute();
 
   // Update the file entity filename with the newly ingested video title.
   if ($fid) {
