@@ -213,19 +213,19 @@ function media_theplatform_mpx_cron() {
 /**
  * Implements hook_cron_queue_info().
  */
-function media_theplatform_mpx_cron_queue_info() {
-  $queues['media_theplatform_mpx_video_cron_queue'] = array(
-    'worker callback' => 'process_media_theplatform_mpx_video_cron_queue_item',
-    'time' => variable_get('media_theplatform_mpx__cron_queue_processing_time', 10),
-  );
-
-  $ids = db_query("SELECT id FROM {mpx_accounts}")->fetchCol();
+function media_theplatform_mpx_cron_queue_info($account_id = NULL) {
+  $ids = $account_id ? array($account_id) : db_query("SELECT id FROM {mpx_accounts}")->fetchCol();
   foreach ($ids as $id) {
     $queues['media_theplatform_mpx_request_' . $id] = array(
       'worker callback' => '_media_theplatform_mpx_request_queue_process',
       'time' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
     );
   }
+
+  $queues['media_theplatform_mpx_video_cron_queue'] = array(
+    'worker callback' => 'process_media_theplatform_mpx_video_cron_queue_item',
+    'time' => variable_get('media_theplatform_mpx__cron_queue_processing_time', 30),
+  );
 
   return $queues;
 }
