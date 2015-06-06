@@ -422,7 +422,7 @@ function media_theplatform_mpx_settings_form($form, &$form_state) {
     '#type' => 'numberfield',
     '#title' => t('Override maximum number of notifications in a request'),
     '#description' => t('Leave blank to use the default limit, which is 500. Maximum: 500. Only change this if requests to data.media.theplatform.com/media/notify are encountering timeouts.'),
-    '#default_value' => variable_get('media_theplatform_mpx_notification_size'),
+    '#default_value' => variable_get('media_theplatform_mpx_notification_size', 500),
     '#min' => 1,
     '#max' => 500,
   );

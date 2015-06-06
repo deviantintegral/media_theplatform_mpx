@@ -24,10 +24,8 @@ function media_theplatform_mpx_get_changed_ids(MpxAccount $account) {
       'filter' => 'Media',
       'clientId' => 'drupal_media_theplatform_mpx_' . $account->account_pid,
       'since' => $last_notification,
+      'size' => variable_get('media_theplatform_mpx_notification_size', 500),
     );
-    if ($size = variable_get('media_theplatform_mpx_notification_size')) {
-      $params['size'] = $size;
-    }
 
     $result_data = MpxApi::authenticatedRequest(
       $account,
@@ -54,7 +52,7 @@ function media_theplatform_mpx_get_changed_ids(MpxAccount $account) {
     return array();
   }
 
-  // Initalize arrays to store active and deleted ID's.
+  // Initialize arrays to store active and deleted ID's.
   $actives = array();
   $deletes = array();
   $last_notification = NULL;
