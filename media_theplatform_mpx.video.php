@@ -300,9 +300,11 @@ function _media_theplatform_mpx_process_video_import_feed_data($result_data, $me
 
   // Add the queue items to the cron queue.
   /** @var DrupalReliableQueueInterface $queue */
+  $count = 0;
   $queue = DrupalQueue::get('media_theplatform_mpx_video_cron_queue', TRUE);
   foreach ($queue_items as $queue_item) {
     $queue->createItem($queue_item);
+    $count++;
   }
 
   watchdog('media_theplatform_mpx', 'Video IDs queued to be processed on cron:'
@@ -319,7 +321,7 @@ function _media_theplatform_mpx_process_video_import_feed_data($result_data, $me
     ),
     WATCHDOG_INFO);
 
-  return TRUE;
+  return $count;
 }
 
 /**
