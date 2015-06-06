@@ -16,23 +16,36 @@ class MpxRequestQueue {
   /**
    * Queue worker callback for a request queue item.
    *
-   * @param array $data
-   *   The queue item data as added in MpxRequestQueue::populateItems().
+   * @param array $queue_data
+   *   The queue item data.
+   *
+   * @return mixed
+   *   The result of $data['callback'].
+   */
+  public static function processItem(array $queue_data) {
+    return call_user_func($queue_data['callback'], $queue_data);
+  }
+
+  /**
+   * Callback for processing batch requests.
+   *
+   * @param array $queue_data
+   *   The queue item data as added in MpxRequestQueue::populateBatchItems().
    *
    * @return int
    *   The number of additional video queue tasks created from the request.
    */
-  public static function processItem($data) {
-    $account = MpxAccount::load($data['account_id']);
-    $url = $data['url'];
-    $data += array('params' => array(), 'options' => array());
+  public static function processBatchItem(array $queue_data) {
+    $account = MpxAccount::load($queue_data['account_id']);
+    $url = $queue_data['url'];
+    $queue_data += array('params' => array(), 'options' => array());
 
-    $data['options'] += array(
+    $queue_data['options'] += array(
       'timeout' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
     );
 
-    $data = MpxApi::authenticatedRequest($account, $url, $data['params'], $data['options']);
-    return _media_theplatform_mpx_process_video_import_feed_data($data, NULL, $account);
+    $request_data = MpxApi::authenticatedRequest($account, $url, $queue_data['params'], $queue_data['options']);
+    return _media_theplatform_mpx_process_video_import_feed_data($request_data, NULL, $account);
   }
 
   /**
@@ -48,7 +61,7 @@ class MpxRequestQueue {
    *
    * @todo Add specific $url $start $count parameters instead of using proprocesing data.
    */
-  public static function populateItems(MpxAccount $account, $limit = NULL) {
+  public static function populateBatchItems(MpxAccount $account, $limit = NULL) {
     $batch_url = $account->getDataValue('proprocessing_batch_url');
 
     if (!$batch_url) {
@@ -66,6 +79,7 @@ class MpxRequestQueue {
     $count = 0;
     while ($current_batch_item <= $batch_item_count) {
       $data = array();
+      $data['callback'] = get_called_class() . '::' . 'processBatchItem';
       $data['account_id'] = $account->id;
       $data['url'] = $batch_url;
       $data['params'] = array(

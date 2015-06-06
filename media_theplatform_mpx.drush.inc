@@ -381,7 +381,7 @@ function drush_media_theplatform_mpx_mpx_queue_run($account_id) {
         drush_log("Processing request queue item $item->item_id.", 'info');
         drush_log("Starting request to {$url}", 'info');
         // @todo This queue callback is hardcoded.
-        $enqueued_video_task_count = MpxRequestQueue::processItem($item->data);
+        $enqueued_video_task_count = (int) MpxRequestQueue::processItem($item->data);
 
         $request_queue->deleteItem($item);
         drush_log("Finished request queue item $item->item_id which added {$enqueued_video_task_count} tasks to the video queue.", 'ok');

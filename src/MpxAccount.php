@@ -448,7 +448,7 @@ class MpxAccount {
       if ($this->getDataValue('proprocessing_batch_url')) {
         if (!empty($options['request queue'])) {
           // Put the batch into a queue if requested.
-          return MpxRequestQueue::populateItems($this, $options['limit']);
+          return MpxRequestQueue::populateBatchItems($this, $options['limit']);
         }
         else {
           // Perform the first batch operation, not the update.

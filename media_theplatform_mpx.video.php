@@ -526,7 +526,7 @@ function _media_theplatform_mpx_process_video_update(MpxAccount $account, $optio
 
     if (!empty($options['request queue'])) {
       // Put the batch into a queue if requested.
-      return MpxRequestQueue::populateItems($account, $options['limit']);
+      return MpxRequestQueue::populateBatchItems($account, $options['limit']);
     }
     else {
       // Perform the first batch operation, not the update.
@@ -597,7 +597,7 @@ function _media_theplatform_mpx_process_video_import(MpxAccount $account, array 
 
     if (!empty($options['request queue'])) {
       // Put the batch into a queue if requested.
-      return MpxRequestQueue::populateItems($account, $options['limit']);
+      return MpxRequestQueue::populateBatchItems($account, $options['limit']);
     }
     else {
       // Perform the first batch operation, not the update.
