@@ -19,8 +19,8 @@ class MpxRequestQueue {
    * @param array $data
    *   The queue item data as added in MpxRequestQueue::populateItems().
    *
-   * @return bool
-   *   TRUE on success, otherwise FALSE.
+   * @return int
+   *   The number of additional video queue tasks created from the request.
    */
   public static function processItem($data) {
     $account = MpxAccount::load($data['account_id']);

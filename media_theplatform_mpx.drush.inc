@@ -33,7 +33,7 @@ function media_theplatform_mpx_drush_command() {
     'queue-run' => dt('Will run the process queue after ingestion.'),
     'force' => dt('If provided will break any process locks.'),
     'reset' => dt('If provided will start ingestion from the beginning again.'),
-    'request-concurrency' => dt('The number of concurrent request workers. Default is 10.'),
+    'queue-concurrency' => dt('The number of concurrent queue workers. Default is 10.'),
   );
 
   $commands['mpx-ingest'] = array(
@@ -55,6 +55,37 @@ function media_theplatform_mpx_drush_command() {
     'examples' => array(
       'drush mpx-ingest-all' => dt('Ingest videos for each mpx account.'),
       'drush mpxia --limit=100' => dt('Ingest up to 100 new and 100 updated videos for each mpx accounts.'),
+    ),
+  );
+  $commands['mpx-queue-list'] = array(
+    'description' => 'List queues for an mpx account.',
+    'aliases' => array('mpxql'),
+    'arguments' => array(
+      'account_id' => 'The ID of the mpx account.',
+    ),
+    'outputformat' => array(
+      'default' => 'table',
+      'pipe-format' => 'csv',
+      'field-labels' => array(
+        'queue' => 'Queue',
+        'items' => 'Items',
+      ),
+      'ini-item' => 'items',
+      'table-metadata' => array(
+        'key-value-item' => 'items',
+      ),
+      'output-data-type' => 'format-table',
+    ),
+  );
+  $commands['mpx-queue-run'] = array(
+    'description' => 'Run queues for an mpx account.',
+    'aliases' => array('mpxqr'),
+    'arguments '=> array(
+      'account_id' => 'The ID of the mpx account.',
+    ),
+    'required-arguments' => TRUE,
+    'options' => array(
+      'limit' => 'The number of video queue items to process before running the other queues again.'
     ),
   );
 
@@ -173,7 +204,7 @@ function drush_media_theplatform_mpx_mpx_account_list() {
  */
 function drush_media_theplatform_mpx_mpx_ingest_validate($account_id) {
   if (!MpxAccount::load($account_id)) {
-    return drush_set_error('MPX_INGEST_ACCOUNT_NOT_FOUND', dt("Unable to load mpx account @id.", array('@id' => $account_id)));
+    return drush_set_error('MPX_ACCOUNT_NOT_FOUND', dt("Unable to load mpx account @id.", array('@id' => $account_id)));
   }
 
   // Check for locks used by drush ingest-mpx-videos.
@@ -214,14 +245,40 @@ function drush_media_theplatform_mpx_mpx_ingest($account_id) {
     // Convert the current ingestion to the request queue.
     if (drush_get_option('queue-run', TRUE)) {
       MpxRequestQueue::populateItems($account, $options['limit']);
+
+      // Ensure that the concurrency is not higher than the maximum number of
+      // items in the queues for the account.
+      $queues = drush_media_theplatform_mpx_mpx_queue_list($account_id);
+      $max_items = 0;
+      foreach ($queues as $queue) {
+        $max_items = max($max_items, $queue['items']);
+      }
+      $concurrency = (int) drush_get_option('queue-concurrency', 10);
+      $concurrency = min($concurrency, $max_items);
+
+      if ($concurrency) {
+        $invocations = array_fill(0, $concurrency, array(
+          'site' => '@self',
+          'command' => 'mpx-queue-run',
+          'args' => array($account_id),
+          'options' => array('limit' => $options['limit']),
+        ));
+        drush_backend_invoke_concurrent(
+          $invocations,
+          array(),
+          array(
+            'concurrency' => $concurrency,
+          )
+        );
+
+        // Force the database connection to be reconnected since the queues mau
+        // have run for an extended amount of time.
+        Database::closeConnection();
+      }
     }
 
-    // Process the request queue for the account.
-    $request_concurrency = (int) drush_get_option('request-concurrency', 10);
-    _drush_media_theplatform_mpx_invoke_queue('media_theplatform_mpx_request_' . $account->id, $request_concurrency);
-
-    // Process the video queue for the account.
-    _drush_media_theplatform_mpx_invoke_queue('media_theplatform_mpx_video_cron_queue', 1);
+    // Show the summary of the account's queues.
+    drush_invoke_process('@self', 'mpx-queue-list', array($account_id));
   }
   catch (Exception $e) {
     watchdog_exception('media_theplatform_mpx', $e);
@@ -234,7 +291,7 @@ function drush_media_theplatform_mpx_mpx_ingest($account_id) {
  */
 function drush_media_theplatform_mpx_mpx_ingest_all_validate() {
   if (!MpxAccount::loadAll()) {
-    return drush_set_error('MPX_INGEST_NO_ACCOUNTS', "No mpx accounts available.");
+    return drush_set_error('MPX_NO_ACCOUNTS', "No mpx accounts available.");
   }
 
   // Check for locks used by drush ingest-mpx-videos.
@@ -263,47 +320,121 @@ function drush_media_theplatform_mpx_mpx_ingest_all() {
   drush_backend_invoke_concurrent($invocations, $common_options, $common_backend_options);
 }
 
-function _drush_media_theplatform_mpx_invoke_queue($queue_name, $concurrency = 1) {
-  $count = DrupalQueue::get($queue_name)->numberOfItems();
-  // Report a summary of the queue.
-  drush_log(dt('Queue @queue: @count total items', array('@queue' => $queue_name, '@count' => $count)), 'ok');
-
-  if (!$count || !drush_get_option('queue-run', TRUE)) {
-    return;
+/**
+ * Validation callback for drush mpx-queue-list.
+ */
+function drush_media_theplatform_mpx_mpx_queue_list_validate($account_id = NULL) {
+  if (isset($account_id) && !MpxAccount::load($account_id)) {
+    return drush_set_error('MPX_ACCOUNT_NOT_FOUND', dt("Unable to load mpx account @id.", array('@id' => $account_id)));
   }
+}
 
-  // Ensure concurrency is not higher than the number of items in the queue.
-  $concurrency = min($concurrency, $count);
-
-  // The process the items from the queue.
-  if (module_exists('concurrent_queue')) {
-    drush_invoke_process(
-      '@self',
-      'queue-run-concurrent',
-      array($queue_name),
-      array(
-        'concurrency' => $concurrency,
-      )
+/**
+ * Command callback for drush mpx-queue-list.
+ */
+function drush_media_theplatform_mpx_mpx_queue_list($account_id = NULL) {
+  $queues = media_theplatform_mpx_cron_queue_info($account_id);
+  $result = array();
+  foreach (array_keys($queues) as $queue_name) {
+    $queue = DrupalQueue::get($queue_name, TRUE);
+    $result[$queue_name] = array(
+      'queue' => $queue_name,
+      'items' => $queue->numberOfItems(),
     );
   }
-  else {
-    $invocations = array_fill(0, $concurrency, array(
-      'site' => '@self',
-      'command' => 'queue-run',
-      'args' => array($queue_name),
-    ));
-    drush_backend_invoke_concurrent(
-      $invocations,
-      array(),
-      array(
-        'concurrency' => $concurrency,
-      )
-    );
+  return $result;
+}
+
+/**
+ * Validation callback for drush mpx-queue-run.
+ */
+function drush_media_theplatform_mpx_mpx_queue_run_validate($account_id) {
+  if (!MpxAccount::load($account_id)) {
+    return drush_set_error('MPX_ACCOUNT_NOT_FOUND', dt("Unable to load mpx account @id.", array('@id' => $account_id)));
+  }
+}
+
+/**
+ * Command callback for drush mpx-queue-run.
+ */
+function drush_media_theplatform_mpx_mpx_queue_run($account_id) {
+  $account = MpxAccount::load($account_id);
+
+  $queues = media_theplatform_mpx_cron_queue_info($account_id);
+  $request_queue = MpxRequestQueue::get($account);
+  /** @var DrupalReliableQueueInterface $video_queue */
+  $video_queue = DrupalQueue::get('media_theplatform_mpx_video_cron_queue', TRUE);
+  $video_queue_run_limit = (int) drush_get_option('limit', variable_get('media_theplatform_mpx__cron_videos_per_run', 100));
+
+  // Increase the execution time limit to one hour.
+  if (function_exists('set_time_limit')) {
+    $current = ini_get('max_execution_time');
+    // Do not set time limit if it is currently unlimited.
+    if ($current != 0) {
+      @set_time_limit(3600);
+    }
   }
 
-  // Force the database connection to be reconnected since the queue may
-  // have run for an extended amount of time.
-  Database::closeConnection();
+  do {
+    // Run one item from the request queue if there is one.
+    if ($item = $request_queue->claimItem()) {
+      try {
+        $url = url($item->data['url'], array('query' => $item->data['params']));
+        drush_log("Processing request queue item $item->item_id.", 'info');
+        drush_log("Starting request to {$url}", 'info');
+        // @todo This queue callback is hardcoded.
+        $enqueued_video_task_count = MpxRequestQueue::processItem($item->data);
+
+        $request_queue->deleteItem($item);
+        drush_log("Finished request queue item $item->item_id which added {$enqueued_video_task_count} tasks to the video queue.", 'ok');
+      }
+      catch (Exception $e) {
+        watchdog_exception('media_theplatform_mpx', $e);
+        drush_set_error('MPX_QUEUE_EXCEPTION', $e->getMessage());
+      }
+    }
+
+    // Force the database connection to be reconnected since each request queue
+    // item generally may take a long time.
+    Database::closeConnection();
+
+    // Process up to $video_queue_limit items before looping back and working
+    // on the next request queue item. If the request queue no longer contains
+    // any items, keep processing video queue items until the queue is empty.
+    $video_count = 0;
+    while ($item = $video_queue->claimItem()) {
+      try {
+        drush_log(dt("Processing video queue item $item->item_id"), 'info');
+        $video_count++;
+        // @todo This queue callback is hardcoded.
+        process_media_theplatform_mpx_video_cron_queue_item($item->data);
+        $video_queue->deleteItem($item);
+        if ($video_count >= $video_queue_run_limit && $request_queue->numberOfItems()) {
+          break;
+        }
+      }
+      catch (Exception $e) {
+        watchdog_exception('media_theplatform_mpx', $e);
+        drush_set_error('MPX_QUEUE_EXCEPTION', $e->getMessage());
+      }
+    }
+    if ($video_count) {
+      drush_log("Processed $video_count video queue items.", 'ok');
+    }
+
+    // @todo This assumes that the queues use the SystemQueue class.
+    $claimable_items = db_query('SELECT COUNT(item_id) FROM {queue} WHERE name IN (:names) AND expire = 0', array(':names' => array_keys($queues)))->fetchField();
+  } while ($claimable_items);
+
+  /*foreach (array_keys($queues) as $queue_name) {
+    if (DrupalQueue::get($queue_name)->numberOfItems()) {
+      //drush_invoke_process('@self', 'queue-run', array($queue_name));
+      drush_invoke('queue-run', array($queue_name));
+      // Force the database connection to be reconnected since the queue may
+      // have run for an extended amount of time.
+      Database::closeConnection();
+    }
+  }*/
 }
 
 /**
