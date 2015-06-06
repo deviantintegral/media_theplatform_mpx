@@ -373,18 +373,17 @@ function drush_media_theplatform_mpx_mpx_queue_run($account_id) {
     }
   }
 
+  // @todo Should attempt to reclaim stalled queue items at some point.
+
   do {
     // Run one item from the request queue if there is one.
     if ($item = $request_queue->claimItem()) {
       try {
-        $url = url($item->data['url'], array('query' => $item->data['params']));
-        drush_log("Processing request queue item $item->item_id.", 'info');
-        drush_log("Starting request to {$url}", 'info');
+        drush_log("Starting request queue item $item->item_id.", 'info');
         // @todo This queue callback is hardcoded.
-        $enqueued_video_task_count = (int) MpxRequestQueue::processItem($item->data);
-
+        MpxRequestQueue::processItem($item->data);
         $request_queue->deleteItem($item);
-        drush_log("Finished request queue item $item->item_id which added {$enqueued_video_task_count} tasks to the video queue.", 'ok');
+        drush_log("Finished request queue item $item->item_id.", 'info');
       }
       catch (Exception $e) {
         watchdog_exception('media_theplatform_mpx', $e);
