@@ -244,8 +244,6 @@ function drush_media_theplatform_mpx_mpx_ingest($account_id) {
 
     // Convert the current ingestion to the request queue.
     if (drush_get_option('queue-run', TRUE)) {
-      MpxRequestQueue::populateItems($account, $options['limit']);
-
       // Ensure that the concurrency is not higher than the maximum number of
       // items in the queues for the account.
       $queues = drush_media_theplatform_mpx_mpx_queue_list($account_id);

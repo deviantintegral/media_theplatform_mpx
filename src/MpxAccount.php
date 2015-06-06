@@ -403,16 +403,15 @@ class MpxAccount {
    *     watchdog statements. Defaults to 'manually'.
    *   - force: A boolean if TRUE will skip some validation that normally
    *     protects against duplicate runs.
+   *   - request queue: A boolean if TRUE will put the current batch and all of
+   *     the remaining batches into a queue instead of processing the batch
+   *     directly.
    *
    * @return array
    *   A summary of the ingestion run including the following elements:
    *   - message: The summary message.
    *   - args: The summary message arguments for use with t().
    *   - timer: The elapsed ingestion time in milliseconds.
-   *   - queue_count_before: The number of items in the cron queue before
-   *     ingestion started.
-   *   - queue_count_after: The number of items in the cron queue after
-   *     ingestion started.
    *
    * @throws Exception
    * @throws InvalidArgumentException
@@ -438,18 +437,33 @@ class MpxAccount {
       throw new Exception("Unable to acquire lock for video ingestion for $this. Ingestion may currently be running in another process.");
     }
 
+    watchdog('media_theplatform_mpx', 'Starting video ingestion for @account.', array('@account' => (string) $this), WATCHDOG_INFO);
     $transaction = db_transaction();
 
     try {
-      watchdog('media_theplatform_mpx', 'Starting video ingestion for @account.', array('@account' => (string) $this), WATCHDOG_INFO);
-
       $summary = array('args' => array());
       $summary['args']['@previous_notification_id'] = $this->getDataValue('last_notification', 'NULL');
       timer_start($lock_id);
 
       if ($this->getDataValue('proprocessing_batch_url')) {
-        // Check if we're running a feed request batch.  If so, construct the batch URL.
-        _media_theplatform_mpx_process_batch_video_import($this, $options);
+        if (!empty($options['request queue'])) {
+          // Put the batch into a queue if requested.
+          return MpxRequestQueue::populateItems($this, $options['limit']);
+        }
+        else {
+          // Perform the first batch operation, not the update.
+          return _media_theplatform_mpx_process_batch_video_import($this, $options);
+        }
+      }
+      elseif (MpxRequestQueue::get($this)->numberOfItems()) {
+        watchdog(
+          'media_theplatform_mpx',
+          'Video notification ingestion is paused while the request queue for @account still has items to process.',
+          array(
+            '@account' => (string) $this,
+          ),
+          WATCHDOG_WARNING
+        );
       }
       elseif ($this->getDataValue('last_notification')) {
         // Check if we have a notification stored.  If so, run an update.
