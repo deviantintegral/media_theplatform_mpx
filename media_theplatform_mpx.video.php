@@ -428,6 +428,9 @@ function _media_theplatform_mpx_get_feed_item_count($url, MpxAccount $account) {
       'count' => 'true',
       'fields' => 'guid',
       'range' => '1-1',
+    ),
+    array(
+      'timeout' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
     )
   );
 
