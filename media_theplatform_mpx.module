@@ -1320,3 +1320,12 @@ function media_theplatform_mpx_is_file_active($file) {
 function _media_theplatform_mpx_request_queue_process($data) {
   return MpxRequestQueue::processItem($data);
 }
+
+/**
+ * Implements hook_views_api().
+ */
+function media_theplatform_mpx_views_api() {
+  return array(
+    'api' => 3,
+  );
+}
