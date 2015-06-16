@@ -1,6 +1,11 @@
 <?php
 
 /**
+ * @file
+ * Views integration for the media_theplatform_mpx module.
+ */
+
+/**
  * Implements hook_views_data().
  */
 function media_theplatform_mpx_views_data() {
