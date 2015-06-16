@@ -14,6 +14,20 @@ function media_theplatform_mpx_file_mimetype_mapping_alter(&$mapping) {
 }
 
 /**
+ * Implements hook_file_entity_access().
+ */
+function media_theplatform_mpx_file_entity_access($op, $file, $account) {
+  if ($file->filemime == 'player/mpx' && $op == 'download') {
+    // Mpx players are not downloadable.
+    return FILE_ENTITY_ACCESS_DENY;
+  }
+  if ($file->filemime == 'video/mpx' && $op == 'download') {
+    // Mpx videos are not downloadable.
+    return FILE_ENTITY_ACCESS_DENY;
+  }
+}
+
+/**
  * Implements hook_file_delete().
  */
 function media_theplatform_mpx_file_delete($file) {
