@@ -1378,3 +1378,19 @@ function media_theplatform_mpx_get_video_availability($available_date, $expirati
 function media_theplatform_mpx_get_account_options() {
   return drupal_map_assoc(db_query("SELECT import_account FROM {mpx_accounts}")->fetchCol());
 }
+
+/**
+ * Implements hook_modules_installed().
+ */
+function media_theplatform_mpx_modules_installed($modules) {
+  if (in_array('file_admin', $modules)) {
+    // When file_admin is installed, ensure that file_managed.published values
+    // match the mpx_video.status values. Here we only set values of 0 since
+    // the default value for file_managed.published is 1.
+    $unpublish_fids = db_query("SELECT fid FROM {mpx_video} WHERE status = 0")->fetchCol();
+    db_update('file_managed')
+      ->fields(array('published' => 0))
+      ->condition('fid', $unpublish_fids)
+      ->execute();
+  }
+}
