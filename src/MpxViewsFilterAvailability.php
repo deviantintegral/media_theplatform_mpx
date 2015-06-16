@@ -16,9 +16,9 @@ class MpxViewsFilterAvailability extends views_handler_filter_in_operator {
   function get_value_options() {
     if (!isset($this->value_options)) {
       $this->value_options = array(
-        'unavailable' => t('Unavailable'),
-        'available' => t('Available'),
-        'expired' => t('Expired'),
+        MPX_VIDEO_UNAVAILABLE => t('Unavailable'),
+        MPX_VIDEO_AVAILABLE => t('Available'),
+        MPX_VIDEO_EXPIRED => t('Expired'),
       );
     }
   }
@@ -41,19 +41,13 @@ class MpxViewsFilterAvailability extends views_handler_filter_in_operator {
     $sub_query_condition = db_or();
 
     foreach ($this->value as $value) {
-      if ($value == 'unavailable') {
+      if ($value == MPX_VIDEO_UNAVAILABLE) {
         $and = db_and();
         $and->condition("mpxv.available_date", 0, '<>');
         $and->condition("mpxv.available_date", REQUEST_TIME, '>');
         $sub_query_condition->condition($and);
       }
-      elseif ($value == 'expired') {
-        $and = db_and();
-        $and->condition("mpxv.expiration_date", 0, '<>');
-        $and->condition("mpxv.expiration_date", REQUEST_TIME, '<=');
-        $sub_query_condition->condition($and);
-      }
-      elseif ($value == 'available') {
+      elseif ($value == MPX_VIDEO_AVAILABLE) {
         $and = db_and();
         $and->condition("mpxv.available_date", 0);
         $and->condition("mpxv.expiration_date", 0);
@@ -61,6 +55,12 @@ class MpxViewsFilterAvailability extends views_handler_filter_in_operator {
         $and = db_and();
         $and->condition("mpxv.available_date", REQUEST_TIME, '<=');
         $and->condition("mpxv.expiration_date", REQUEST_TIME, '>');
+        $sub_query_condition->condition($and);
+      }
+      elseif ($value == MPX_VIDEO_EXPIRED) {
+        $and = db_and();
+        $and->condition("mpxv.expiration_date", 0, '<>');
+        $and->condition("mpxv.expiration_date", REQUEST_TIME, '<=');
         $sub_query_condition->condition($and);
       }
     }

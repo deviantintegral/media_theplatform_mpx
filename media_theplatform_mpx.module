@@ -4,6 +4,21 @@
  * Functions for media_theplatform_mpx.module.
  */
 
+/**
+ * Video is not available (but will be soon).
+ */
+define('MPX_VIDEO_UNAVAILABLE', 'unavailable');
+
+/**
+ * Video is available.
+ */
+define('MPX_VIDEO_AVAILABLE', 'available');
+
+/**
+ * Video is expired.
+ */
+define('MPX_VIDEO_EXPIRED', 'expired');
+
 // Field API integration
 include_once __DIR__ . '/media_theplatform_mpx.field.inc';
 
@@ -1328,4 +1343,29 @@ function media_theplatform_mpx_views_api() {
   return array(
     'api' => 3,
   );
+}
+
+/**
+ * Checks if a video is available.
+ *
+ * @param int $available_date
+ *   The UNIX timestamp of when the video will be available, or 0 if the video
+ *   is available immediately.
+ * @param int $expiration_date
+ *   The UNIX timestamp of when the video will expire, or 0 if the video will
+ *   not expire.
+ *
+ * @return string
+ *   Either MPX_VIDEO_UNAVAILABLE, MPX_VIDEO_AVAILABLE, or MPX_VIDEO_EXPIRED.
+ */
+function media_theplatform_mpx_get_video_availability($available_date, $expiration_date) {
+  if ($available_date && $available_date > REQUEST_TIME) {
+    return MPX_VIDEO_UNAVAILABLE;
+  }
+  elseif ($expiration_date && $expiration_date <= REQUEST_TIME) {
+    return MPX_VIDEO_EXPIRED;
+  }
+  else {
+    return MPX_VIDEO_AVAILABLE;
+  }
 }
