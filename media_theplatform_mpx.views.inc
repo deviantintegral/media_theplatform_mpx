@@ -79,6 +79,25 @@ function media_theplatform_mpx_views_data() {
     ),
   );
 
+  $data['mpx_video']['account'] = array(
+    'title' => t('Account'),
+    'help' => t('The mpx account associated with the video.'),
+    'field' => array(
+      'handler' => 'views_handler_field',
+      'click sortable' => TRUE,
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort',
+    ),
+    'filter' => array(
+      'handler' => 'views_handler_filter_in_operator',
+      'options callback' => 'media_theplatform_mpx_get_account_options',
+    ),
+    'argument' => array(
+      'handler' => 'views_handler_argument_string',
+    ),
+  );
+
   $data['mpx_video']['created'] = array(
     'title' => t('Created date'),
     'help' => t('The date when the mpx video was initially ingested.'),

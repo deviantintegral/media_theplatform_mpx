@@ -1369,3 +1369,12 @@ function media_theplatform_mpx_get_video_availability($available_date, $expirati
     return MPX_VIDEO_AVAILABLE;
   }
 }
+
+/**
+ * Return an array of current mpx import accounts, for use in a select element.
+ *
+ * @return array
+ */
+function media_theplatform_mpx_get_account_options() {
+  return drupal_map_assoc(db_query("SELECT import_account FROM {mpx_accounts}")->fetchCol());
+}
