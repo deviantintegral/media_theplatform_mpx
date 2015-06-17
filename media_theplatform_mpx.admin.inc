@@ -125,7 +125,7 @@ function media_theplatform_mpx_account_list() {
  * @return array
  *   A render array.
  */
-function media_theplatform_mpx_account_status_report(MpxAccount $account) {
+function media_theplatform_mpx_account_status_report_page(MpxAccount $account) {
   $status = module_invoke_all('media_theplatform_mpx_account_status', $account);
   drupal_alter('media_theplatform_mpx_account_status', $status, $account);
 
@@ -499,6 +499,28 @@ function media_theplatform_mpx_settings_form($form, &$form_state) {
   );
 
   return system_settings_form($form);
+}
+
+/**
+ *
+ * Page callback: Display a status report for all mpx accounts.
+ *
+ * @return array
+ *   A render array.
+ */
+function media_theplatform_mpx_status_report_page() {
+  $output = array();
+  $accounts = MpxAccount::loadAll();
+  foreach ($accounts as $account) {
+    $output[$account->id] = array(
+      '#type' => 'fieldset',
+      '#title' => (string) $account,
+    );
+    $output[$account->id] += media_theplatform_mpx_account_status_report_page($account);
+    $output[$account->id]['ingest']['#access'] = FALSE;
+  }
+
+  return $output;
 }
 
 /**

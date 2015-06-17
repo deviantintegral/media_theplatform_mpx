@@ -82,7 +82,7 @@ function media_theplatform_mpx_menu() {
   $items['admin/config/media/theplatform/accounts/%media_theplatform_mpx_account'] = array(
     'title callback' => 'media_theplatform_mpx_account_title',
     'title arguments' => array(5),
-    'page callback' => 'media_theplatform_mpx_account_status_report',
+    'page callback' => 'media_theplatform_mpx_account_status_report_page',
     'page arguments' => array(5),
     'access arguments' => array('administer mpx account'),
     'file' => 'media_theplatform_mpx.admin.inc',
@@ -96,8 +96,7 @@ function media_theplatform_mpx_menu() {
     'title' => 'Ingest',
     'page callback' => 'media_theplatform_mpx_account_ingest',
     'page arguments' => array(5),
-    'access callback' => 'media_theplatform_mpx_account_ingest_access',
-    'access arguments' => array(5),
+    'access arguments' => array('administer mpx account'),
     'file' => 'media_theplatform_mpx.admin.inc',
     'type' => MENU_CALLBACK,
   );
@@ -127,6 +126,16 @@ function media_theplatform_mpx_menu() {
     'file' => 'media_theplatform_mpx.admin.inc',
     'type' => MENU_LOCAL_TASK,
   );
+  if (!module_exists('media_theplatform_mpx_reports')) {
+    $items['admin/config/media/theplatform/settings'] = array(
+      'title' => 'Status',
+      'page callback' => 'media_theplatform_mpx_status_report_page',
+      'access arguments' => array('administer mpx account'),
+      'file' => 'media_theplatform_mpx.admin.inc',
+      'type' => MENU_LOCAL_TASK,
+      'weight' => 10,
+    );
+  }
 
   // @todo Replace these two menu items with Views
   $items['admin/content/file/mpxplayer'] = array(
@@ -158,18 +167,6 @@ function media_theplatform_mpx_menu() {
  */
 function media_theplatform_mpx_account_title(MpxAccount $account) {
   return (string) $account;
-}
-
-/**
- * Access callback: for the mpx account ingestion callback.
- *
- * @param MpxAccount $account
- *   The mpx account.
- *
- * @return bool
- */
-function media_theplatform_mpx_account_ingest_access(MpxAccount $account) {
-  return user_access('administer mpx account') || user_access('sync mpx_video');
 }
 
 /**
