@@ -164,60 +164,9 @@ function media_theplatform_mpx_account_ingest(MpxAccount $account) {
     return MENU_ACCESS_DENIED;
   }
 
-  try {
-    $end = time() + 240;
-
-    // Allow to run for four minutes.
-    drupal_set_time_limit(240);
-
-    $summary = $account->ingestVideos();
-    drupal_set_message(format_string($summary['message'], $summary['args']));
-
-    // Run the queues.
-    $queues = media_theplatform_mpx_cron_queue_info($account->id);
-    foreach ($queues as $queue_name => $queue_info) {
-      $processed = 0;
-
-      /** @var DrupalReliableQueueInterface $queue */
-      $queue = DrupalQueue::get($queue_name, TRUE);
-
-      // Attempt to release items from the queue.
-      if (method_exists($queue, 'resetItems')) {
-        $queue->resetItems();
-      }
-      else {
-        db_update('queue')
-          ->fields(array(
-            'expire' => 0,
-          ))
-          ->condition('expire', 0, '<>')
-          ->condition('expire', time(), '<')
-          ->condition('name', $queue_name)
-          ->execute();
-      }
-
-      while (time() < $end && $item = $queue->claimItem()) {
-        try {
-          call_user_func($queue_info['worker callback'], $item->data);
-          $queue->deleteItem($item);
-          $processed++;
-        }
-        catch (Exception $exception) {
-          watchdog_exception('media_theplatform_mpx', $exception);
-          drupal_set_message($exception->getMessage(), 'error');
-        }
-      }
-      if ($processed || $queue->numberOfItems()) {
-        drupal_set_message(t('Processed @count tasks from the %queue queue. There are @remaining remaining tasks in the %queue queue.', array('@count' => $processed, '%queue' => $queue_name, '@remaining' => $queue->numberOfItems())));
-      }
-    }
-
-    drupal_goto('admin/config/media/theplatform/accounts/' . $account->id . '/status');
-  }
-  catch (Exception $exception) {
-    watchdog_exception('media_theplatform_mpx', $exception);
-    drupal_set_message($exception->getMessage(), 'error');
-  }
+  module_load_include('inc', 'media_theplatform_mpx', 'media_theplatform_mpx.batch');
+  batch_set(media_theplatform_mpx_account_ingest_batch_info(array($account)));
+  batch_process('admin/config/media/theplatform/accounts/' . $account->id . '/status');
 }
 
 /**

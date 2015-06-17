@@ -448,11 +448,11 @@ class MpxAccount {
       if ($this->getDataValue('proprocessing_batch_url')) {
         if (!empty($options['request queue'])) {
           // Put the batch into a queue if requested.
-          return MpxRequestQueue::populateBatchItems($this, $options['limit']);
+          MpxRequestQueue::populateBatchItems($this, $options['limit']);
         }
         else {
           // Perform the first batch operation, not the update.
-          return _media_theplatform_mpx_process_batch_video_import($this, $options);
+          _media_theplatform_mpx_process_batch_video_import($this, $options);
         }
       }
       elseif (MpxRequestQueue::get($this)->numberOfItems()) {

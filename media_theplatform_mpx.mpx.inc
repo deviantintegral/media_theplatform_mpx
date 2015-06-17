@@ -129,10 +129,10 @@ function media_theplatform_mpx_media_theplatform_mpx_account_status(MpxAccount $
         // we can process in one run.
         if (count($data) >= variable_get('media_theplatform_mpx_notification_size', 500)) {
           $status['current_notification_id']['severity'] = REQUIREMENT_WARNING;
-          $status['current_notification_id']['description'] = t('There are 500 or more notification sequence IDs that have not been processed yet.');
+          $status['current_notification_id']['description'] = t('There are 500 or more notification sequence IDs that have yet to be processed.');
         }
         else {
-          $status['current_notification_id']['description'] = t('There are @count notification sequence IDs that have not been processed yet.', array('@count' => count($data)));
+          $status['current_notification_id']['description'] = t('There are @count notification sequence IDs that have yet to be processed.', array('@count' => count($data)));
         }
       }
 
