@@ -165,7 +165,7 @@ function media_theplatform_mpx_account_ingest(MpxAccount $account) {
   }
 
   module_load_include('inc', 'media_theplatform_mpx', 'media_theplatform_mpx.batch');
-  batch_set(media_theplatform_mpx_account_ingest_batch_info(array($account)));
+  batch_set(media_theplatform_mpx_batch_ingest_info(array($account)));
   batch_process('admin/config/media/theplatform/accounts/' . $account->id . '/status');
 }
 

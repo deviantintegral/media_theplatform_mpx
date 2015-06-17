@@ -1,6 +1,11 @@
 <?php
 
-function media_theplatform_mpx_account_ingest_batch_info(array $accounts) {
+/**
+ * @file
+ * Batch callbacks for the media_theplatform_mpx module.
+ */
+
+function media_theplatform_mpx_batch_ingest_info(array $accounts) {
   $batch = array(
     'title' => t('Running ingestion'),
     'operations' => array(),
