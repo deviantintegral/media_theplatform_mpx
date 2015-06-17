@@ -150,7 +150,6 @@ abstract class MpxNotificationService {
           ),
           $options + $this->options
         );
-        dpm($data);
       }
       catch (MpxApiException $exception) {
         // A 404 response means the notification ID that we have is now older than
