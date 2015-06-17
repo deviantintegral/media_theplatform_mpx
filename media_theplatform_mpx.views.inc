@@ -21,6 +21,7 @@ function media_theplatform_mpx_views_data() {
     ),
   );
 
+  // @todo Do we even need this? Why not use file_managed.title?
   $data['mpx_video']['title'] = array(
     'title' => t('Title'),
     'help' => t('The title of the video.'),
@@ -133,6 +134,7 @@ function media_theplatform_mpx_views_data() {
     ),
   );
 
+  // @todo If file_admin is enabled, should this read from file_managed.published instead?
   $data['mpx_video']['status'] = array(
     'title' => t('Published'),
     'help' => t('Whether or not the mpx video is published.'),
