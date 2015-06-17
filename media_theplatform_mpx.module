@@ -69,43 +69,54 @@ function media_theplatform_mpx_menu() {
   $items['admin/config/media/theplatform/accounts'] = array(
     'title' => 'Accounts',
     'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
   );
   $items['admin/config/media/theplatform/accounts/add'] = array(
     'title' => 'Add mpx account',
-    'type' => MENU_LOCAL_ACTION,
     'page callback' => 'drupal_get_form',
     'page arguments' => array('media_theplatform_mpx_account_add_form'),
     'access arguments' => array('administer mpx account'),
     'file' => 'media_theplatform_mpx.admin.inc',
+    'type' => MENU_LOCAL_ACTION,
   );
-  $items['admin/config/media/theplatform/accounts/%media_theplatform_mpx_account/edit'] = array(
-    'title' => 'Edit mpx account',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('media_theplatform_mpx_account_edit_form', 5),
-    'access arguments' => array('administer mpx account'),
-    'file' => 'media_theplatform_mpx.admin.inc',
-  );
-  $items['admin/config/media/theplatform/accounts/%media_theplatform_mpx_account/delete'] = array(
-    'title' => 'Delete mpx account',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('media_theplatform_mpx_account_delete_form', 5),
-    'access arguments' => array('administer mpx account'),
-    'file' => 'media_theplatform_mpx.admin.inc',
-  );
-  $items['admin/config/media/theplatform/accounts/%media_theplatform_mpx_account/status'] = array(
-    'title' => 'Status report',
+  $items['admin/config/media/theplatform/accounts/%media_theplatform_mpx_account'] = array(
+    'title callback' => 'media_theplatform_mpx_account_title',
+    'title arguments' => array(5),
     'page callback' => 'media_theplatform_mpx_account_status_report',
     'page arguments' => array(5),
     'access arguments' => array('administer mpx account'),
     'file' => 'media_theplatform_mpx.admin.inc',
   );
+  $items['admin/config/media/theplatform/accounts/%media_theplatform_mpx_account/status'] = array(
+    'title' => 'Status',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+  $items['admin/config/media/theplatform/accounts/%media_theplatform_mpx_account/edit'] = array(
+    'title' => 'Edit',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('media_theplatform_mpx_account_edit_form', 5),
+    'access arguments' => array('administer mpx account'),
+    'file' => 'media_theplatform_mpx.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 10,
+  );
+  $items['admin/config/media/theplatform/accounts/%media_theplatform_mpx_account/delete'] = array(
+    'title' => 'Delete',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('media_theplatform_mpx_account_delete_form', 5),
+    'access arguments' => array('administer mpx account'),
+    'file' => 'media_theplatform_mpx.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 20,
+  );
   $items['admin/config/media/theplatform/settings'] = array(
     'title' => 'Settings',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('media_theplatform_mpx_settings_form'),
-    'type' => MENU_LOCAL_TASK,
     'access arguments' => array('administer mpx account'),
     'file' => 'media_theplatform_mpx.admin.inc',
+    'type' => MENU_LOCAL_TASK,
   );
 
   // @todo Replace these two menu items with Views
@@ -126,6 +137,10 @@ function media_theplatform_mpx_menu() {
     'file' => 'media_theplatform_mpx.admin.inc',
   );
   return $items;
+}
+
+function media_theplatform_mpx_account_title(MpxAccount $account) {
+  return (string) $account;
 }
 
 /**

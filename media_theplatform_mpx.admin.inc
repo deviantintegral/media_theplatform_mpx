@@ -69,6 +69,10 @@ function media_theplatform_mpx_account_list() {
     $row['data'][] = $result->video_count;
 
     $operations = array();
+    $operations['status'] = array(
+      'title' => t('Status'),
+      'href' => 'admin/config/media/theplatform/accounts/' . $id,
+    );
     $operations['edit'] = array(
       'title' => t('Edit'),
       'href' => 'admin/config/media/theplatform/accounts/' . $id . '/edit',
@@ -76,10 +80,6 @@ function media_theplatform_mpx_account_list() {
     $operations['delete'] = array(
       'title' => t('Delete'),
       'href' => 'admin/config/media/theplatform/accounts/' . $id . '/delete',
-    );
-    $operations['status'] = array(
-      'title' => t('Status report'),
-      'href' => 'admin/config/media/theplatform/accounts/' . $id . '/status',
     );
     $row['data'][] = array('data' => array(
       '#theme' => 'links',
@@ -100,6 +100,25 @@ function media_theplatform_mpx_account_list() {
   );
   $output['pager'] = array(
     '#theme' => 'pager',
+  );
+  return $output;
+}
+
+/**
+ * Page callback: Display a status report for an mpx account.
+ *
+ * @param MpxAccount $account
+ *   The mpx account.
+ *
+ * @return array
+ *   A render array.
+ */
+function media_theplatform_mpx_account_status_report(MpxAccount $account) {
+  $status = module_invoke_all('media_theplatform_mpx_account_status', $account);
+  drupal_alter('media_theplatform_mpx_account_status', $status, $account);
+
+  $output['report'] = array(
+    '#markup' => theme('status_report', array('requirements' => $status)),
   );
   return $output;
 }
@@ -206,6 +225,8 @@ function media_theplatform_mpx_account_add_form_submit($form, &$form_state) {
  * @ingroup forms
  */
 function media_theplatform_mpx_account_edit_form($form, &$form_state, MpxAccount $account) {
+  drupal_set_title(t('Edit @account', array('@account' => (string) $account)));
+
   $form['username_display'] = array(
     '#type' => 'item',
     '#title' => t('Username'),
@@ -432,27 +453,6 @@ function media_theplatform_mpx_settings_form($form, &$form_state) {
   );
 
   return system_settings_form($form);
-}
-
-/**
- * Page callback: Display a status report for an mpx account.
- *
- * @param MpxAccount $account
- *   The mpx account.
- *
- * @return array
- *   A render array.
- */
-function media_theplatform_mpx_account_status_report(MpxAccount $account) {
-  drupal_set_title(t('Status report for @account', array('@account' => (string) $account)));
-
-  $status = module_invoke_all('media_theplatform_mpx_account_status', $account);
-  drupal_alter('media_theplatform_mpx_account_status', $status, $account);
-
-  $output['report'] = array(
-    '#markup' => theme('status_report', array('requirements' => $status)),
-  );
-  return $output;
 }
 
 /**
