@@ -166,10 +166,23 @@ abstract class MpxNotificationService {
 
     } while ($run_until_empty && count($data) == $params['size']);
 
+    watchdog(
+      'media_theplatform_mpx',
+      'Fetched @count notifications from @url for @account.',
+      array(
+        '@count' => count($notifications),
+        '@url' => $this->url,
+        '@account' => (string) $this->account,
+      ),
+      WATCHDOG_INFO
+    );
+
     return $notifications;
   }
 
-  public static function processNotifications(array $notifications, $results = array(), &$notification_id = NULL, &$count = NULL) {
+  public static function processNotifications(array $notifications, &$notification_id = NULL) {
+    $results = array();
+
     foreach ($notifications as $notification) {
       // Update the most recently seen notification ID.
       $notification_id = $notification['id'];
@@ -189,8 +202,6 @@ abstract class MpxNotificationService {
         }
       }
     }
-
-    $count += count($notifications);
 
     return $results;
   }
