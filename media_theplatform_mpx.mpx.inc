@@ -38,18 +38,28 @@ function media_theplatform_mpx_media_theplatform_mpx_account_status(MpxAccount $
     );
   }
 
+  $request_queue = MpxRequestQueue::get($account);
+  $status['request_queue'] = array(
+    'title' => t('Queued requests to process'),
+    'value' => $request_queue->numberOfItems(),
+  );
+  if (user_access('administer site configuration') && $status['request_queue']['value']) {
+    $cron_url = url('admin/reports/status/run-cron', array('query' => drupal_get_destination()));
+    $status['request_queue']['description'] = t('<a href="@cron">Run cron now</a> to process items from the queue.', array('@cron' => $cron_url));
+  }
+
   // Report if there are any videos to be processed in the queue.
   $cron_queue_count = db_select('queue', 'q')
     ->condition('name', 'media_theplatform_mpx_video_cron_queue')
     ->condition('data', '%' . db_like('s:10:"account_id";s:' . strlen($account->id) . ':"' . $account->id . '";') . '%', 'LIKE')
     ->countQuery()->execute()->fetchField();
-  $status['cron_queue_count'] = array(
+  $status['video_queue'] = array(
     'title' => t('Queued videos to process'),
     'value' => $cron_queue_count,
   );
-  if (user_access('administer site configuration') && $cron_queue_count) {
+  if (user_access('administer site configuration') && $status['video_queue']['value']) {
     $cron_url = url('admin/reports/status/run-cron', array('query' => drupal_get_destination()));
-    $status['cron_queue_count']['description'] = t('<a href="@cron">Run cron now</a> to process the videos from the <em>media_theplatform_mpx_video_cron_queue</em> queue.', array('@cron' => $cron_url));
+    $status['video_queue']['description'] = t('<a href="@cron">Run cron now</a> to process items from queue.', array('@cron' => $cron_url));
   }
 
   // Report if the account has a current and valid API token.
