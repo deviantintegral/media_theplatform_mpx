@@ -79,85 +79,67 @@ function media_theplatform_mpx_media_theplatform_mpx_account_status(MpxAccount $
   }
 
   // Report on the last notification sequence ID that has been processed.
-  $status['last_notification_id'] = array(
-    'title' => t('Last notification sequence ID processed'),
-    'description' => t('Sequence IDs are only stored by thePlatform for 7 days, after which they are invalid and a complete re-ingestion of all videos will be automatically performed.')
+  $service = MpxMediaNotificationService::getInstance($account);
+  $status['current_notification_id'] = array(
+    'title' => t('Last notification ID processed'),
+    'description' => t('Notification sequence IDs are only stored by thePlatform for 7 days, after which they are invalid and a complete re-ingestion of all videos will be automatically performed.')
   );
-  if ($last_notification = $account->getDataValue('last_notification')) {
+  if ($last_notification_id = $service->getCurrentNotificationId()) {
     try {
+      $status['current_notification_id']['value'] = $last_notification_id;
       // Verify that the current sequence ID will return data without error.
-      MpxApi::authenticatedRequest(
-        $account,
-        'https://read.data.media.theplatform.com/media/notify',
-        array(
-          'account' => $account->import_account,
-          'block' => 'false',
-          'filter' => 'Media',
-          'clientId' => 'drupal_media_theplatform_mpx_' . $account->account_pid,
-          'since' => $last_notification,
-          'size' => 1,
-        )
-      );
-      $status['last_notification_id']['value'] = $last_notification;
-    }
-    catch (MpxApiException $exception) {
-      // A 404 response means the notification ID that we have is now older than
-      // 7 days, and now we have to start ingesting from the beginning again.
-      if ($exception->getException()->responseCode == 404) {
-        $exception->setMessage("The last notification ID {$last_notification} for {$account} is older than 7 days and is too old to fetch notifications. The last notification ID has been reset to re-start ingestion of all videos.");
-      }
-      $status['last_notification_id']['value'] = $exception->getMessage();
-      $status['last_notification_id']['severity'] = REQUIREMENT_ERROR;
-    }
-    catch (Exception $exception) {
-      $status['last_notification_id']['value'] = $exception->getMessage();
-      $status['last_notification_id']['severity'] = REQUIREMENT_ERROR;
-    }
-  }
-  else {
-    $status['last_notification_id']['value'] = t('Not available');
-    $status['last_notification_id']['severity'] = REQUIREMENT_WARNING;
-  }
-
-  // Report on the current notification sequence ID from the API.
-  if ($last_notification) {
-    $status['current_notification_id'] = array(
-      'title' => t('Current notification sequence ID from thePlatform'),
-    );
-    try {
-      $current_notification = media_theplatform_mpx_get_last_notification($account);
-      $status['current_notification_id']['value'] = $current_notification;
-      if ($last_notification != $current_notification) {
-        // Check to see how far behind in notifications we are.
-        $data = MpxApi::authenticatedRequest(
-          $account,
-          'https://read.data.media.theplatform.com/media/notify',
-          array(
-            'account' => $account->import_account,
-            'filter' => 'Media',
-            'clientId' => 'drupal_media_theplatform_mpx_' . $account->account_pid,
-            'history' => $last_notification . '-' . $current_notification,
-          ),
-          array(
-            'timeout' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
-          )
-        );
-
-        // Only warn if the number of notifications is greater than the amount
-        // we can process in one run.
-        if (count($data) >= variable_get('media_theplatform_mpx_notification_size', 500)) {
-          $status['current_notification_id']['severity'] = REQUIREMENT_WARNING;
-          $status['current_notification_id']['description'] = t('There are 500 or more notification sequence IDs that have yet to be processed.');
-        }
-        else {
-          $status['current_notification_id']['description'] = t('There are @count notification sequence IDs that have yet to be processed.', array('@count' => count($data)));
-        }
-      }
-
+      $service->request($last_notification_id, FALSE, array('size' => 1));
     }
     catch (Exception $exception) {
       $status['current_notification_id']['value'] = $exception->getMessage();
       $status['current_notification_id']['severity'] = REQUIREMENT_ERROR;
+      // Skip the remaining notifications status check.
+      $last_notification_id = FALSE;
+    }
+  }
+  else {
+    $status['current_notification_id']['value'] = t('Not available');
+    $status['current_notification_id']['severity'] = REQUIREMENT_WARNING;
+  }
+
+  // Report on the remaining notifications from the API.
+  if ($last_notification_id) {
+    $status['remaining_notifications'] = array(
+      'title' => t('Notifications yet to be processed from thePlatform'),
+    );
+    try {
+      // Check to see how far behind in notifications we are.
+      $data = MpxApi::authenticatedRequest(
+        $account,
+        'https://read.data.media.theplatform.com/media/notify',
+        array(
+          'account' => $account->import_account,
+          'filter' => 'Media',
+          'clientId' => 'drupal_media_theplatform_mpx_' . $account->account_pid,
+          'history' => $last_notification_id . '-',
+        ),
+        array(
+          'timeout' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
+        )
+      );
+
+      // Only warn if the number of notifications is greater than the amount
+      // we can process in one run.
+      $remaining_count = count($data);
+      $limit = variable_get('media_theplatform_mpx_notification_size', 500);
+      $status['remaining_notifications']['description'] = t('Each ingestion run can only process up to @count notifications.', array('@count' => $limit));
+      if ($remaining_count >= $limit) {
+        $status['remaining_notifications']['severity'] = REQUIREMENT_WARNING;
+        $status['remaining_notifications']['value'] = t('At least @count', array('@count' => $remaining_count));
+      }
+      else {
+        $status['remaining_notifications']['value'] = $remaining_count;
+      }
+
+    }
+    catch (Exception $exception) {
+      $status['remaining_notifications']['value'] = $exception->getMessage();
+      $status['remaining_notifications']['severity'] = REQUIREMENT_ERROR;
     }
   }
 

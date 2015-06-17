@@ -146,7 +146,7 @@ abstract class MpxNotificationService {
           drupal_array_merge_deep(
             $this->params,
             $params,
-            array('size' => $notification_id)
+            array('since' => $notification_id)
           ),
           $options + $this->options
         );
@@ -155,8 +155,6 @@ abstract class MpxNotificationService {
         // A 404 response means the notification ID that we have is now older than
         // 7 days, and now we have to start ingesting from the beginning again.
         if ($exception->getException()->responseCode == 404) {
-          // @todo Should we just watchdog() and return here instead?
-          $notification_id = NULL;
           throw new MpxNotificationInvalidException("The notification sequence ID {$notification_id} for {$this->account} is older than 7 days and is too old to fetch notifications.", $exception->getCode(), $exception);
         }
         else {
