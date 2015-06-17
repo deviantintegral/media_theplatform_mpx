@@ -48,6 +48,8 @@ function media_theplatform_mpx_hook_info() {
     'media_theplatform_mpx_insert_video',
     'media_theplatform_mpx_update_video',
     'media_theplatform_mpx_set_video_inactive',
+    'media_theplatform_mpx_account_status',
+    'media_theplatform_mpx_account_status_alter',
   ), array('group' => 'mpx'));
 }
 
@@ -87,6 +89,13 @@ function media_theplatform_mpx_menu() {
     'title' => 'Delete mpx account',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('media_theplatform_mpx_account_delete_form', 5),
+    'access arguments' => array('administer mpx account'),
+    'file' => 'media_theplatform_mpx.admin.inc',
+  );
+  $items['admin/config/media/theplatform/accounts/%media_theplatform_mpx_account/status'] = array(
+    'title' => 'Status report',
+    'page callback' => 'media_theplatform_mpx_account_status_report',
+    'page arguments' => array(5),
     'access arguments' => array('administer mpx account'),
     'file' => 'media_theplatform_mpx.admin.inc',
   );

@@ -18,7 +18,6 @@ function media_theplatform_mpx_account_list() {
     array('data' => t('Import account'), 'field' => 'import_account'),
     array('data' => t('Default player')),
     array('data' => t('Imported videos'), 'field' => 'video_count'),
-    array('data' => t('API token')),
     array('data' => t('Operations')),
   );
   $query = db_select('mpx_accounts', 'mpxa')
@@ -69,14 +68,6 @@ function media_theplatform_mpx_account_list() {
     // Imported video count.
     $row['data'][] = $result->video_count;
 
-    if ($token = $account->acquireToken()) {
-      $row['data'][] = t('Expires in !interval', array('!interval' => format_interval($token->expire - REQUEST_TIME)));
-    }
-    else {
-      $row['data'][] = t('Not available');
-      $row['class'][] = 'warning';
-    }
-
     $operations = array();
     $operations['edit'] = array(
       'title' => t('Edit'),
@@ -85,6 +76,10 @@ function media_theplatform_mpx_account_list() {
     $operations['delete'] = array(
       'title' => t('Delete'),
       'href' => 'admin/config/media/theplatform/accounts/' . $id . '/delete',
+    );
+    $operations['status'] = array(
+      'title' => t('Status report'),
+      'href' => 'admin/config/media/theplatform/accounts/' . $id . '/status',
     );
     $row['data'][] = array('data' => array(
       '#theme' => 'links',
@@ -437,6 +432,27 @@ function media_theplatform_mpx_settings_form($form, &$form_state) {
   );
 
   return system_settings_form($form);
+}
+
+/**
+ * Page callback: Display a status report for an mpx account.
+ *
+ * @param MpxAccount $account
+ *   The mpx account.
+ *
+ * @return array
+ *   A render array.
+ */
+function media_theplatform_mpx_account_status_report(MpxAccount $account) {
+  drupal_set_title(t('Status report for @account', array('@account' => (string) $account)));
+
+  $status = module_invoke_all('media_theplatform_mpx_account_status', $account);
+  drupal_alter('media_theplatform_mpx_account_status', $status, $account);
+
+  $output['report'] = array(
+    '#markup' => theme('status_report', array('requirements' => $status)),
+  );
+  return $output;
 }
 
 /**
