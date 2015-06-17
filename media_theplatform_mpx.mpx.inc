@@ -30,6 +30,14 @@ function media_theplatform_mpx_media_theplatform_mpx_account_status(MpxAccount $
     'severity' => $player_count ? REQUIREMENT_OK : REQUIREMENT_WARNING,
   );
 
+  // Report if there is a batch still being processed.
+  if ($account->getDataValue('proprocessing_batch_url')) {
+    $status['current_batch'] = array(
+      'title' => t('Current batch'),
+      'value' => ($account->getDataValue('proprocessing_batch_item_count') - $account->getDataValue('proprocessing_batch_current_item') + 1) . ' items remaining',
+    );
+  }
+
   // Report if there are any videos to be processed in the queue.
   $cron_queue_count = db_select('queue', 'q')
     ->condition('name', 'media_theplatform_mpx_video_cron_queue')

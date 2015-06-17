@@ -8,7 +8,7 @@ function media_theplatform_mpx_account_ingest_batch_info(array $accounts) {
     'file' => drupal_get_path('module', 'media_theplatform_mpx') . '/media_theplatform_mpx.batch.inc',
   );
   foreach ($accounts as $account) {
-    $batch['operations'][] = array('media_theplatform_mpx_batch_ingest', array($account));
+    $batch['operations'][] = array('media_theplatform_mpx_batch_ingest', array($account, array('method' => 'batch')));
     $queues = media_theplatform_mpx_cron_queue_info($account->id);
     foreach ($queues as $queue_name => $queue_info) {
       $batch['operations'][] = array('media_thplatform_mpx_batch_queue_run', array($queue_name, $queue_info));
@@ -17,16 +17,12 @@ function media_theplatform_mpx_account_ingest_batch_info(array $accounts) {
   return $batch;
 }
 
-function media_theplatform_mpx_batch_ingest(MpxAccount $account, array &$context) {
+function media_theplatform_mpx_batch_ingest(MpxAccount $account, array $options, array &$context) {
   try {
-    // Allow to run for four minutes.
     drupal_set_time_limit(240);
-    $summary = $account->ingestVideos(array(
-      'method' => 'batch',
-      //'request queue' => TRUE,
-    ));
+    $summary = $account->ingestVideos($options);
     $context['results'][] = array(format_string($summary['message'], $summary['args']));
-    $context['message'] = t('Completed ingestion for @account', array('@account' => (string) $account));
+    $context['message'] = t('Processed ingestion for @account.', array('@account' => (string) $account));
   }
   catch (Exception $exception) {
     watchdog_exception('media_theplatform_mpx', $exception);
@@ -76,7 +72,7 @@ function media_thplatform_mpx_batch_queue_run($queue_name, array $queue_info, ar
   }
   else {
     $context['finished'] = 1;
-    $context['results'][] = array(t('Processed @count tasks from the %queue queue. There are @remaining remaining tasks in the %queue queue.', array('@count' => $context['sandbox']['count'], '%queue' => $queue_name, '@remaining' => $queue->numberOfItems())));
+    $context['results'][] = array(t('Processed @count tasks from the %queue queue. There are @remaining tasks remaining.', array('@count' => $context['sandbox']['count'], '%queue' => $queue_name, '@remaining' => $queue->numberOfItems())));
   }
 }
 
