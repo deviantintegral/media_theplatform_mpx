@@ -92,6 +92,15 @@ function media_theplatform_mpx_menu() {
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'weight' => -10,
   );
+  $items['admin/config/media/theplatform/accounts/%media_theplatform_mpx_account/ingest'] = array(
+    'title' => 'Ingest',
+    'page callback' => 'media_theplatform_mpx_account_ingest',
+    'page arguments' => array(5),
+    'access callback' => 'media_theplatform_mpx_account_ingest_access',
+    'access arguments' => array(5),
+    'file' => 'media_theplatform_mpx.admin.inc',
+    'type' => MENU_CALLBACK,
+  );
   $items['admin/config/media/theplatform/accounts/%media_theplatform_mpx_account/edit'] = array(
     'title' => 'Edit',
     'page callback' => 'drupal_get_form',
@@ -139,8 +148,28 @@ function media_theplatform_mpx_menu() {
   return $items;
 }
 
+/**
+ * Title callback: mpx account page.
+ *
+ * @param MpxAccount $account
+ *   The mpx account.
+ *
+ * @return string
+ */
 function media_theplatform_mpx_account_title(MpxAccount $account) {
   return (string) $account;
+}
+
+/**
+ * Access callback: for the mpx account ingestion callback.
+ *
+ * @param MpxAccount $account
+ *   The mpx account.
+ *
+ * @return bool
+ */
+function media_theplatform_mpx_account_ingest_access(MpxAccount $account) {
+  return user_access('administer mpx account') || user_access('sync mpx_video');
 }
 
 /**

@@ -73,6 +73,13 @@ function media_theplatform_mpx_account_list() {
       'title' => t('Status'),
       'href' => 'admin/config/media/theplatform/accounts/' . $id,
     );
+    $operations['ingest'] = array(
+      'title' => t('Run ingestion'),
+      'href' => 'admin/config/media/theplatform/accounts/' . $id . '/ingest',
+      'query' => array(
+        'token' => drupal_get_token('admin/config/media/theplatform/accounts/' . $id . '/ingest'),
+      ) + drupal_get_destination(),
+    );
     $operations['edit'] = array(
       'title' => t('Edit'),
       'href' => 'admin/config/media/theplatform/accounts/' . $id . '/edit',
@@ -81,6 +88,11 @@ function media_theplatform_mpx_account_list() {
       'title' => t('Delete'),
       'href' => 'admin/config/media/theplatform/accounts/' . $id . '/delete',
     );
+    foreach ($operations as $id => $operation) {
+      if (!drupal_valid_path($operation['href'])) {
+        unset($operations[$id]);
+      }
+    }
     $row['data'][] = array('data' => array(
       '#theme' => 'links',
       '#links' => $operations,
@@ -120,7 +132,92 @@ function media_theplatform_mpx_account_status_report(MpxAccount $account) {
   $output['report'] = array(
     '#markup' => theme('status_report', array('requirements' => $status)),
   );
+
+  // Add a button link to run ingestion and return back here to the status
+  // page.
+  $output['ingest'] = array(
+    '#type' => 'link',
+    '#title' => t('Run ingestion'),
+    '#href' => 'admin/config/media/theplatform/accounts/' . $account->id . '/ingest',
+    '#options' => array(
+      'query' => array(
+        'token' => drupal_get_token('admin/config/media/theplatform/accounts/' . $account->id . '/ingest'),
+      ) + drupal_get_destination(),
+    ),
+    '#attributes' => array(
+      'class' => array('button'),
+    ),
+  );
+
   return $output;
+}
+
+/**
+ * Page callback: Run ingestion once for an mpx account.
+ *
+ * @param MpxAccount $account
+ *   The mpx account.
+ */
+function media_theplatform_mpx_account_ingest(MpxAccount $account) {
+  // Validate the security token.
+  if (!isset($_GET['token']) || $_GET['token'] !== drupal_get_token($_GET['q'])) {
+    return MENU_ACCESS_DENIED;
+  }
+
+  try {
+    $end = time() + 240;
+
+    // Allow to run for four minutes.
+    drupal_set_time_limit(240);
+
+    $summary = $account->ingestVideos();
+    drupal_set_message(format_string($summary['message'], $summary['args']));
+
+    // Run the queues.
+    $queues = media_theplatform_mpx_cron_queue_info($account->id);
+    foreach ($queues as $queue_name => $queue_info) {
+      $processed = 0;
+
+      /** @var DrupalReliableQueueInterface $queue */
+      $queue = DrupalQueue::get($queue_name, TRUE);
+
+      // Attempt to release items from the queue.
+      if (method_exists($queue, 'resetItems')) {
+        $queue->resetItems();
+      }
+      else {
+        db_update('queue')
+          ->fields(array(
+            'expire' => 0,
+          ))
+          ->condition('expire', 0, '<>')
+          ->condition('expire', time(), '<')
+          ->condition('name', $queue_name)
+          ->execute();
+      }
+
+      while (time() < $end && $item = $queue->claimItem()) {
+        try {
+          call_user_func($queue_info['worker callback'], $item->data);
+          $queue->deleteItem($item);
+          $processed++;
+        }
+        catch (Exception $exception) {
+          watchdog_exception('media_theplatform_mpx', $exception);
+          drupal_set_message($exception->getMessage(), 'error');
+        }
+      }
+      if ($processed || $queue->numberOfItems()) {
+        drupal_set_message(t('Processed @count tasks from the %queue queue. There are @remaining remaining tasks in the %queue queue.', array('@count' => $processed, '%queue' => $queue_name, '@remaining' => $queue->numberOfItems())));
+      }
+    }
+
+    drupal_goto('admin/config/media/theplatform/accounts/' . $account->id . '/status');
+  }
+  catch (Exception $exception) {
+    watchdog_exception('media_theplatform_mpx', $exception);
+    drupal_set_message($exception->getMessage(), 'error');
+  }
 }
 
 /**
