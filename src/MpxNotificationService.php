@@ -122,13 +122,12 @@ abstract class MpxNotificationService {
    * @throws MpxApiException
    * @throws MpxNotificationInvalidException
    */
-  public function request(&$notification_id, $run_until_empty = FALSE, array $params = array(), array $options = array()) {
+  public function request($notification_id, $run_until_empty = FALSE, array $params = array(), array $options = array()) {
     if (!$notification_id) {
       throw new Exception("Cannot call MpxNotificationService::request() with an empty notification sequence ID.");
     }
 
-    $results = array();
-    $count = 0;
+    $notifications = array();
 
     $params += array(
       'block' => 'false',
@@ -162,40 +161,36 @@ abstract class MpxNotificationService {
         }
       }
 
-      foreach ($data as $notification) {
-        // Update the most recently seen notification ID.
-        $notification_id = $notification['id'];
-
-        if (!empty($notification['entry'])) {
-          // The ID is always a fully qualified URI, and we only care about the
-          // actual ID value, which is at the end.
-          $id = basename($notification['entry']['id']);
-
-          // Group results by the 'method' value.
-          $method = $notification['method'];
-          if (!isset($results[$method])) {
-            $results[$method] = array($id);
-          }
-          elseif (!in_array($id, $results[$method])) {
-            $results[$method][] = $id;
-          }
-        }
-      }
-      $count += count($data);
+      // Merge the notification data.
+      $notifications = array_merge($notifications, $data);
 
     } while ($run_until_empty && count($data) == $params['size']);
 
-    watchdog(
-      'media_theplatform_mpx',
-      'Fetched @count notifications from @url for @account. @result',
-      array(
-        '@count' => $count,
-        '@url' => $this->url,
-        '@account' => (string) $this->account,
-        '@result' => $results ? '<br/>' . print_r($results, TRUE) : '',
-      ),
-      WATCHDOG_INFO
-    );
+    return $notifications;
+  }
+
+  public static function processNotifications(array $notifications, $results = array(), &$notification_id = NULL, &$count = NULL) {
+    foreach ($notifications as $notification) {
+      // Update the most recently seen notification ID.
+      $notification_id = $notification['id'];
+
+      if (!empty($notification['entry'])) {
+        // The ID is always a fully qualified URI, and we only care about the
+        // actual ID value, which is at the end.
+        $id = basename($notification['entry']['id']);
+
+        // Group results by the 'method' value.
+        $method = $notification['method'];
+        if (!isset($results[$method])) {
+          $results[$method] = array($id);
+        }
+        elseif (!in_array($id, $results[$method])) {
+          $results[$method][] = $id;
+        }
+      }
+    }
+
+    $count += count($notifications);
 
     return $results;
   }
