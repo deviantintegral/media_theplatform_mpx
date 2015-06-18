@@ -105,7 +105,8 @@ class MpxNotificationService {
    *   An additional array of options to pass through when calling
    *   MpxApi::authenticatedRequest().
    *
-   * @return array
+   * @return MpxNotification[]
+   *   An array of notification objects.
    *
    * @throws Exception
    * @throws MpxApiException
@@ -142,7 +143,7 @@ class MpxNotificationService {
         // Process the notifications.
         $notifications = array_merge(
           $notifications,
-          static::processNotifications($data, $notification_id)
+          $this->processNotifications($data, $notification_id)
         );
       }
       catch (MpxApiException $exception) {
@@ -171,7 +172,18 @@ class MpxNotificationService {
     return $notifications;
   }
 
-  public static function processNotifications(array $notifications, &$notification_id = NULL) {
+  /**
+   * Process the notifications from the API.
+   *
+   * @param array $notifications
+   *   The array of raw notification data.
+   * @param string &$notification_id
+   *   The notification ID to update.
+   *
+   * @return MpxNotification[]
+   *   An array of notification objects.
+   */
+  public function processNotifications(array $notifications, &$notification_id = NULL) {
     $return = array();
 
     // Process the notifications.
@@ -180,13 +192,13 @@ class MpxNotificationService {
       $notification_id = $notification['id'];
 
       if (!empty($notification['entry'])) {
-        $return[] = array(
-          'type' => $notification['type'],
+        $return[] = new MpxNotification(
+          $notification['type'],
           // The ID is always a fully qualified URI, and we only care about the
           // actual ID value, which is at the end.
-          'id' => basename($notification['entry']['id']),
-          'method' => $notification['method'],
-          'updated' => $notification['entry']['updated'],
+          basename($notification['entry']['id']),
+          $notification['method'],
+          $notification['entry']['updated']
         );
       }
     }
@@ -194,7 +206,7 @@ class MpxNotificationService {
     return $return;
   }
 
-    /**
+  /**
    * Retrieves the current notification service sequence ID for the account.
    *
    * @return string
@@ -306,6 +318,22 @@ class MpxMediaNotificationService extends MpxNotificationService {
    */
   public function resetCurrentNotificationId() {
     $this->account->resetIngestion();
+  }
+
+}
+
+class MpxNotification {
+
+  public $type;
+  public $id;
+  public $method;
+  public $updated;
+
+  public function __construct($type, $id, $method, $updated = NULL) {
+    $this->type = $type;
+    $this->id = $id;
+    $this->method = $method;
+    $this->updated = $updated;
   }
 
 }
