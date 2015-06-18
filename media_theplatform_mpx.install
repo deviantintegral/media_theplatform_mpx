@@ -1054,7 +1054,7 @@ function media_theplatform_mpx_update_7220() {
 /**
  * Ensure the default mpx icon is copied to the media icon directory.
  */
-function media_theplatform_mpx_udpate_7221() {
+function media_theplatform_mpx_update_7221() {
   _media_theplatform_mpx_copy_icons();
 }
 
