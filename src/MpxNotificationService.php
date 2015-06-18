@@ -149,6 +149,12 @@ abstract class MpxNotificationService {
           ),
           $options + $this->options
         );
+
+        // Process the notifications.
+        $notifications = array_merge(
+          $notifications,
+          static::processNotifications($data, $notification_id)
+        );
       }
       catch (MpxApiException $exception) {
         // A 404 response means the notification ID that we have is now older than
@@ -160,24 +166,6 @@ abstract class MpxNotificationService {
           throw $exception;
         }
       }
-
-      // Process the notifications.
-      foreach ($data as $notification) {
-        // Update the most recently seen notification ID.
-        $notification_id = $notification['id'];
-
-        if (!empty($notification['entry'])) {
-          $notifications[] = array(
-            'type' => $notification['type'],
-            // The ID is always a fully qualified URI, and we only care about the
-            // actual ID value, which is at the end.
-            'id' => basename($notification['entry']['id']),
-            'method' => $notification['method'],
-            'updated' => $notification['entry']['updated'],
-          );
-        }
-      }
-
     } while ($run_until_empty && count($data) == $params['size']);
 
     watchdog(
@@ -194,7 +182,30 @@ abstract class MpxNotificationService {
     return $notifications;
   }
 
-  /**
+  public static function processNotifications(array $notifications, &$notification_id = NULL) {
+    $return = array();
+
+    // Process the notifications.
+    foreach ($notifications as $notification) {
+      // Update the most recently seen notification ID.
+      $notification_id = $notification['id'];
+
+      if (!empty($notification['entry'])) {
+        $notifications[] = array(
+          'type' => $notification['type'],
+          // The ID is always a fully qualified URI, and we only care about the
+          // actual ID value, which is at the end.
+          'id' => basename($notification['entry']['id']),
+          'method' => $notification['method'],
+          'updated' => $notification['entry']['updated'],
+        );
+      }
+    }
+
+    return $return;
+  }
+
+    /**
    * Retrieves the current notification service sequence ID for the account.
    *
    * @return string
