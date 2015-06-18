@@ -497,6 +497,11 @@ function media_theplatform_mpx_settings_form($form, &$form_state) {
     '#min' => 3,
     '#max' => MpxToken::MAX_TTL,
   );
+  $form['advanced']['media_theplatform_mpx_debug'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable debugging mode'),
+    '#default_value' => variable_get('media_theplatform_mpx_debug', 0),
+  );
 
   return system_settings_form($form);
 }

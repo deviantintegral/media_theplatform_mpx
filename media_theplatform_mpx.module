@@ -1444,3 +1444,49 @@ function media_theplatform_mpx_modules_installed($modules) {
       ->execute();
   }
 }
+
+/**
+ * Outputs debug information.
+ *
+ * This is a copy of debug() that has nicer and more useful output.
+ *
+ * @param mixed $data
+ *   The data to be output.
+ * @param string $label
+ *   Label to prefix the data.
+ * @param bool $print_r
+ *   Flag to switch between print_r() and var_export() for data conversion to
+ *   string. Set $print_r to TRUE when dealing with a recursive data structure
+ *   as var_export() will generate an error.
+ */
+function media_theplatform_mpx_debug($data, $label = NULL, $print_r = FALSE) {
+  static $debugging;
+
+  if (!isset($debugging)) {
+    $debugging = variable_get('media_theplatform_mpx_debug', 0);
+  }
+
+  if ($debugging) {
+    $value = $print_r ? print_r($data, TRUE) : var_export($data, TRUE);
+
+    if (class_exists('Kint') || module_exists('kint')) {
+      if (function_exists('kint_require')) {
+        kint_require();
+      }
+      $message_string = trim($label ? "$label => !value" : "!value");
+      drupal_set_message(format_string($message_string, array('!value' => @Kint::dump($data))));
+    }
+    elseif (module_exists('devel')) {
+      $message_string = kprint_r($data, TRUE, $label);
+      $message_string .= kprint_r(ddebug_backtrace(TRUE, 1), TRUE, 'Backtrace');
+      drupal_set_message($message_string);
+    }
+    else {
+      $message_string = trim($label ? "$label => <pre>@value</pre>" : "<pre>@value</pre>");
+      drupal_set_message(format_string($message_string, array('@value' => $value)));
+    }
+
+    $watchdog_string = trim($label ? "$label => <pre>@value</pre>" : "<pre>@value</pre>");
+    watchdog('media_theplatform_mpx', $watchdog_string, array('@value' => $value), WATCHDOG_DEBUG);
+  }
+}

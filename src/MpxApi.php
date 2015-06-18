@@ -89,6 +89,8 @@ class MpxApi {
     $response->url = $url;
     $response->params = $params;
 
+    media_theplatform_mpx_debug($response, "MPX API request to " . preg_replace('/\?.*/', '', $url));
+
     if (!empty($response->error)) {
       throw new MpxHttpException($response);
     }
