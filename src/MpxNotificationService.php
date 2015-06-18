@@ -1,6 +1,6 @@
 <?php
 
-abstract class MpxNotificationService {
+class MpxNotificationService {
 
   /** @var \MpxAccount */
   protected $account;
