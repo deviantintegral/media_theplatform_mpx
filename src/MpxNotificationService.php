@@ -122,7 +122,7 @@ abstract class MpxNotificationService {
    * @throws MpxApiException
    * @throws MpxNotificationInvalidException
    */
-  public function request($notification_id, $run_until_empty = FALSE, array $params = array(), array $options = array()) {
+  public function request(&$notification_id, $run_until_empty = FALSE, array $params = array(), array $options = array()) {
     if (!$notification_id) {
       throw new Exception("Cannot call MpxNotificationService::request() with an empty notification sequence ID.");
     }
@@ -161,8 +161,22 @@ abstract class MpxNotificationService {
         }
       }
 
-      // Merge the notification data.
-      $notifications = array_merge($notifications, $data);
+      // Process the notifications.
+      foreach ($data as $notification) {
+        // Update the most recently seen notification ID.
+        $notification_id = $notification['id'];
+
+        if (!empty($notification['entry'])) {
+          $notifications[] = array(
+            'type' => $notification['type'],
+            // The ID is always a fully qualified URI, and we only care about the
+            // actual ID value, which is at the end.
+            'id' => basename($notification['entry']['id']),
+            'method' => $notification['method'],
+            'updated' => $notification['entry']['updated'],
+          );
+        }
+      }
 
     } while ($run_until_empty && count($data) == $params['size']);
 
@@ -178,32 +192,6 @@ abstract class MpxNotificationService {
     );
 
     return $notifications;
-  }
-
-  public static function processNotifications(array $notifications, &$notification_id = NULL) {
-    $results = array();
-
-    foreach ($notifications as $notification) {
-      // Update the most recently seen notification ID.
-      $notification_id = $notification['id'];
-
-      if (!empty($notification['entry'])) {
-        // The ID is always a fully qualified URI, and we only care about the
-        // actual ID value, which is at the end.
-        $id = basename($notification['entry']['id']);
-
-        // Group results by the 'method' value.
-        $method = $notification['method'];
-        if (!isset($results[$method])) {
-          $results[$method] = array($id);
-        }
-        elseif (!in_array($id, $results[$method])) {
-          $results[$method][] = $id;
-        }
-      }
-    }
-
-    return $results;
   }
 
   /**
