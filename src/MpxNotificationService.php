@@ -5,23 +5,28 @@ abstract class MpxNotificationService {
   /** @var \MpxAccount */
   protected $account;
 
+  /** @var string */
+  protected $url;
+
+  /** @var string */
+  protected $dataKey;
+
   /** @var array */
   protected $params;
 
   /** @var array */
   protected $options;
 
-  /** @var string */
-  protected $url;
-
-  /** @var string */
-  protected $notificationDataValueKey;
-
   /**
-   * Construct an mpx player service.
+   * Construct an mpx notification service.
    *
    * @param MpxAccount $account
    *   The mpx account.
+   * @param string $url
+   *   The notification URL.
+   * @param string $dataKey
+   *   The key to use when retrieving and storing the current notification ID
+   *   value using $account->getDataValue() and $account->setDataValue().
    * @param array $params
    *   An additional array of parameters to pass through when calling
    *   MpxApi::authenticatedRequest().
@@ -29,31 +34,15 @@ abstract class MpxNotificationService {
    *   An additional array of options to pass through when calling
    *   MpxApi::authenticatedRequest().
    */
-  public function __construct(MpxAccount $account, array $params = array(), array $options = array()) {
+  public function __construct(MpxAccount $account, $url, $dataKey = NULL, array $params = array(), array $options = array()) {
     $this->account = $account;
+    $this->url = $url;
+    $this->dataKey = $dataKey;
     $this->params = $params + array(
       'account' => $this->account->import_account,
       'clientId' => 'drupal_media_theplatform_mpx_' . $this->account->account_pid,
     );
     $this->options = $options;
-  }
-
-  /**
-   * Get an instance of an mpx player service.
-   *
-   * @param MpxAccount $account
-   *   The mpx account.
-   * @param array $params
-   *   An additional array of parameters to pass through when calling
-   *   MpxApi::authenticatedRequest().
-   * @param array $options
-   *   An additional array of options to pass through when calling
-   *   MpxApi::authenticatedRequest().
-   *
-   * @return static
-   */
-  public static function getInstance(MpxAccount $account, array $params = array(), array $options = array()) {
-    return new static($account, $params, $options);
   }
 
   /**
@@ -120,9 +109,9 @@ abstract class MpxNotificationService {
    *
    * @throws Exception
    * @throws MpxApiException
-   * @throws MpxNotificationInvalidException
+   * @throws MpxNotificationExpiredException
    */
-  public function request(&$notification_id, $run_until_empty = FALSE, array $params = array(), array $options = array()) {
+  public function requestNotifications(&$notification_id, $run_until_empty = FALSE, array $params = array(), array $options = array()) {
     if (!$notification_id) {
       throw new Exception("Cannot call MpxNotificationService::request() with an empty notification sequence ID.");
     }
@@ -160,7 +149,7 @@ abstract class MpxNotificationService {
         // A 404 response means the notification ID that we have is now older than
         // 7 days, and now we have to start ingesting from the beginning again.
         if ($exception->getException()->responseCode == 404) {
-          throw new MpxNotificationInvalidException("The notification sequence ID {$notification_id} for {$this->account} is older than 7 days and is too old to fetch notifications.", $exception->getCode(), $exception);
+          throw new MpxNotificationExpiredException("The notification sequence ID {$notification_id} for {$this->account} is older than 7 days and is too old to fetch notifications.", $exception->getCode(), $exception);
         }
         else {
           throw $exception;
@@ -212,7 +201,7 @@ abstract class MpxNotificationService {
    *   The notification sequence ID.
    */
   public function getCurrentNotificationId() {
-    return $this->account->getDataValue($this->notificationDataValueKey);
+    return $this->account->getDataValue($this->dataKey);
   }
 
   /**
@@ -222,14 +211,17 @@ abstract class MpxNotificationService {
    *   The notification sequence ID.
    */
   public function setCurrentNotificationId($value) {
-    if ($value != $this->getCurrentNotificationId()) {
-      $this->account->setDataValue($this->notificationDataValueKey, $value);
+    if (!$value) {
+      $this->resetCurrentNotificationId();
+    }
+    elseif ($value != $this->getCurrentNotificationId()) {
+      $this->account->setDataValue($this->dataKey, $value);
       watchdog(
         'media_theplatform_mpx',
         'Saved notification sequence ID @value to @key for @account.',
         array(
           '@value' => $value,
-          '@key' => $this->notificationDataValueKey,
+          '@key' => $this->dataKey,
           '@account' => (string) $this->account,
         ),
         WATCHDOG_INFO
@@ -240,13 +232,13 @@ abstract class MpxNotificationService {
   /**
    * Reset the current notification service sequence ID for the account.
    */
-  public function reset() {
-    $this->account->deleteDataValue($this->notificationDataValueKey);
+  public function resetCurrentNotificationId() {
+    $this->account->deleteDataValue($this->dataKey);
     watchdog(
       'media_theplatform_mpx',
       'The saved notification sequence ID @key for @account has been reset.',
       array(
-        '@key' => $this->notificationDataValueKey,
+        '@key' => $this->dataKey,
         '@account' => (string) $this->account,
       ),
       WATCHDOG_WARNING
@@ -257,29 +249,65 @@ abstract class MpxNotificationService {
 
 class MpxPlayerNotificationService extends MpxNotificationService {
 
-  /** @var string */
-  protected $url = 'https://read.data.player.theplatform.com/player/notify';
-
-  /** @var string */
-  protected $notificationDataValueKey = 'player_notification_id';
+  /**
+   * Get an instance of an mpx player notification service.
+   *
+   * @param MpxAccount $account
+   *   The mpx account.
+   * @param array $params
+   *   An additional array of parameters to pass through when calling
+   *   MpxApi::authenticatedRequest().
+   * @param array $options
+   *   An additional array of options to pass through when calling
+   *   MpxApi::authenticatedRequest().
+   *
+   * @return static
+   */
+  public static function getInstance(MpxAccount $account, array $params = array(), array $options = array()) {
+    return new static(
+      $account,
+      'https://read.data.player.theplatform.com/player/notify',
+      'player_notification_id',
+      $params,
+      $options
+    );
+  }
 
 }
 
 class MpxMediaNotificationService extends MpxNotificationService {
 
-  /** @var string */
-  protected $url = 'https://read.data.media.theplatform.com/media/notify';
-
-  /** @var string */
-  protected $notificationDataValueKey = 'last_notification';
+  /**
+   * Get an instance of an mpx media notification service.
+   *
+   * @param MpxAccount $account
+   *   The mpx account.
+   * @param array $params
+   *   An additional array of parameters to pass through when calling
+   *   MpxApi::authenticatedRequest().
+   * @param array $options
+   *   An additional array of options to pass through when calling
+   *   MpxApi::authenticatedRequest().
+   *
+   * @return static
+   */
+  public static function getInstance(MpxAccount $account, array $params = array(), array $options = array()) {
+    return new static(
+      $account,
+      'https://read.data.media.theplatform.com/media/notify',
+      'last_notification',
+      $params,
+      $options
+    );
+  }
 
   /**
    * {@inheritdoc}
    */
-  public function reset() {
+  public function resetCurrentNotificationId() {
     $this->account->resetIngestion();
   }
 
 }
 
-class MpxNotificationInvalidException extends MpxException {}
+class MpxNotificationExpiredException extends MpxException {}

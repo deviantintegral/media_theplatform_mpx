@@ -88,7 +88,7 @@ function media_theplatform_mpx_media_theplatform_mpx_account_status(MpxAccount $
     try {
       $status['current_notification_id']['value'] = $last_notification_id;
       // Verify that the current sequence ID will return data without error.
-      $service->request($last_notification_id, FALSE, array('size' => 1));
+      $service->requestNotifications($last_notification_id, FALSE, array('size' => 1));
     }
     catch (Exception $exception) {
       $status['current_notification_id']['value'] = $exception->getMessage();
