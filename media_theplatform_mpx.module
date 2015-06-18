@@ -127,7 +127,7 @@ function media_theplatform_mpx_menu() {
     'type' => MENU_LOCAL_TASK,
   );
   if (!module_exists('media_theplatform_mpx_reports')) {
-    $items['admin/config/media/theplatform/settings'] = array(
+    $items['admin/config/media/theplatform/status'] = array(
       'title' => 'Status',
       'page callback' => 'media_theplatform_mpx_status_report_page',
       'access arguments' => array('administer mpx account'),
