@@ -191,7 +191,7 @@ abstract class MpxNotificationService {
       $notification_id = $notification['id'];
 
       if (!empty($notification['entry'])) {
-        $notifications[] = array(
+        $return[] = array(
           'type' => $notification['type'],
           // The ID is always a fully qualified URI, and we only care about the
           // actual ID value, which is at the end.
