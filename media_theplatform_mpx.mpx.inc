@@ -79,16 +79,29 @@ function media_theplatform_mpx_media_theplatform_mpx_account_status(MpxAccount $
   }
 
   // Report on the last notification sequence ID that has been processed.
-  $service = MpxMediaNotificationService::getInstance($account);
   $status['current_notification_id'] = array(
     'title' => t('Last notification ID processed'),
     'description' => t('Notification sequence IDs are only stored by thePlatform for 7 days, after which they are invalid and a complete re-ingestion of all videos will be automatically performed.')
   );
-  if ($last_notification_id = $service->getCurrentNotificationId()) {
+  if ($last_notification_id = $account->getDataValue('last_notification')) {
     try {
       $status['current_notification_id']['value'] = $last_notification_id;
       // Verify that the current sequence ID will return data without error.
-      $service->requestNotifications($last_notification_id, FALSE, array('size' => 1));
+      MpxApi::authenticatedRequest(
+        $account,
+        'https://read.data.media.theplatform.com/media/notify',
+        array(
+          'account' => $account->import_account,
+          'filter' => 'Media',
+          'clientId' => 'drupal_media_theplatform_mpx_' . $account->account_pid,
+          'since' => $last_notification_id,
+          'size' => 1,
+          'block' => 'false',
+        ),
+        array(
+          'timeout' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
+        )
+      );
     }
     catch (Exception $exception) {
       $status['current_notification_id']['value'] = $exception->getMessage();
