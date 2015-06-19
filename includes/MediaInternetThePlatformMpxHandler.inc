@@ -48,10 +48,7 @@ class MediaInternetThePlatformMpxHandler extends MediaInternetBaseHandler {
       $file->filename = $title;
     }
 
-    watchdog('media_theplatform_mpx', 'Saving the following file object in MediaInternetThePlatformMpxHandler::save:
-      <br /> <pre>@file</pre>',
-      array('@file' => print_r($file, TRUE)), WATCHDOG_DEBUG);
-
+    media_theplatform_mpx_debug($file, "Saving file object in MediaInternetThePlatformMpxHandler::save()");
     file_save($file);
     return $file;
   }

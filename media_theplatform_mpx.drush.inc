@@ -2179,16 +2179,13 @@ function _drush_media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TR
   $memory_limit_in_bytes = _media_theplatform_mpx_convert_shorthand_to_bytes($memory_limit);
   $expensive_operation_min_memory = 536870912;
 
-  // Only output this message if the mpx logging level is set to extremely
-  // verbose.  Increase memory if necessary beforehand, as this message can
-  // be extremely large and use up available memory if set lower than 512M.
-  if (MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL == WATCHDOG_DEBUG || MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL == WATCHDOG_DEBUG) {
+  if (variable_get('media_theplatform_mpx_debug', 0)) {
+    // Increase memory if necessary beforehand, as this message can be
+    // extremely large and use up available memory if set lower than 512M.
     if ($memory_limit_in_bytes < $expensive_operation_min_memory) {
       ini_set('memory_limit', '512M');
     }
-    watchdog('media_theplatform_mpx', 'Request to retrieve mpx feed data returned the following response:
-      <br /> <pre>@response</pre>',
-      array('@response' => print_r($result, TRUE)), WATCHDOG_DEBUG);
+    media_theplatform_mpx_debug($result, "Request to retrieve mpx feed data");
     if ($memory_limit_in_bytes < $expensive_operation_min_memory) {
       ini_set('memory_limit', $memory_limit);
     }
@@ -2248,19 +2245,13 @@ function _drush_media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TR
     return $json_decode ? array() : '';
   }
 
-  // Only output this message if the mpx logging level is set to extremely
-  // verbose.  Increase memory if necessary beforehand, as this message can
-  // be extremely large and use up available memory if set lower than 512M.
-  if (MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL == WATCHDOG_DEBUG || MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL == WATCHDOG_DEBUG) {
+  if (variable_get('media_theplatform_mpx_debug', 0)) {
+    // Increase memory if necessary beforehand, as this message can be
+    // extremely large and use up available memory if set lower than 512M.
     if ($memory_limit_in_bytes < $expensive_operation_min_memory) {
       ini_set('memory_limit', '512M');
     }
-    watchdog('media_theplatform_mpx', 'Request to retrieve mpx feed data returned the following data:
-      <br /> <pre>@data</pre>',
-      array(
-        '@data' => print_r($result_data, TRUE),
-      ),
-      WATCHDOG_DEBUG);
+    media_theplatform_mpx_debug($result_data, "Request to retrieve mpx feed data");
     if ($memory_limit_in_bytes < $expensive_operation_min_memory) {
       ini_set('memory_limit', $memory_limit);
     }

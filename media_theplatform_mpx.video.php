@@ -707,18 +707,8 @@ function _media_theplatform_mpx_update_file_uri($fid, $new_file_uri, $table = 'f
  * @return String
  *   Returns output of media_theplatform_mpx_update_video() or media_theplatform_mpx_insert_video()
  */
-function media_theplatform_mpx_import_video($video, $account = NULL) {
-
-  if (MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL == WATCHDOG_DEBUG || MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL == WATCHDOG_DEBUG) {
-    watchdog('media_theplatform_mpx', 'Importing/Updating video @id for @account with the following data:
-      <br /> <pre>@data</pre>',
-      array(
-        '@id' => basename($video['id']),
-        '@account' => _media_theplatform_mpx_account_log_string($account),
-        '@data' => print_r($video, TRUE),
-      ),
-      WATCHDOG_DEBUG);
-  }
+function media_theplatform_mpx_import_video($video, MpxAccount $account) {
+  media_theplatform_mpx_debug($video, "Importing/Updating video " . basename($video['id']) . " for {$account}");
 
   $op = '';
 

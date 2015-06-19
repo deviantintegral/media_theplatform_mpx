@@ -52,13 +52,12 @@ function media_theplatform_mpx_get_players_from_theplatform(MpxAccount $account)
   }
 
   $players = array();
-  $player_ids = array();
   foreach ($result_data['entries'] as $player) {
-    $player_ids[] = basename($player['id']);
     // We only want mpxPlayers which are not disabled.
     if (!$player['plplayer$disabled']) {
-      $players[] = array(
-        'id' => basename($player['id']),
+      $player_id = basename($player['id']);
+      $players[$player_id] = array(
+        'id' => $player_id,
         'guid' => $player['guid'],
         'title' => $player['title'],
         'description' => $player['description'],
@@ -69,14 +68,7 @@ function media_theplatform_mpx_get_players_from_theplatform(MpxAccount $account)
     }
   }
 
-  watchdog('media_theplatform_mpx', '@count players returned for @account.  Player IDs: @ids',
-    array(
-      '@account' => _media_theplatform_mpx_account_log_string($account),
-      '@count' => $result_data['entryCount'],
-      '@ids' => implode(', ', $player_ids),
-    ),
-    WATCHDOG_DEBUG);
-
+  media_theplatform_mpx_debug($players, count($players) . " players returned for {$account}");
   return $players;
 }
 
@@ -357,16 +349,7 @@ function media_theplatform_mpx_insert_player($player, $fid = NULL, $account = NU
       'status' => 1,
     );
 
-    if (MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL == WATCHDOG_DEBUG || MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL == WATCHDOG_DEBUG) {
-      watchdog('media_theplatform_mpx', 'Inserting new player @pid - "@title" - associated with file @fid with the following data: @data',
-        array(
-          '@pid' => $player['pid'],
-          '@title' => $player['title'],
-          '@fid' => $fid,
-          '@data' => print_r($insert_fields, TRUE),
-        ),
-        WATCHDOG_DEBUG);
-    }
+    media_theplatform_mpx_debug($player, "Inserting new player {$player['title']} (pid: {$player['pid']}) associated with file $fid");
 
     // Insert record into mpx_player.
     $player_id = db_insert('mpx_player')

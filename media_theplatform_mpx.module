@@ -235,6 +235,8 @@ function media_theplatform_mpx_watchdog_alter(&$log_entry) {
 
 /**
  * Helper that returns a description log string for an account if passed.
+ *
+ * @deprecated
  */
 function _media_theplatform_mpx_account_log_string($account = NULL) {
 
@@ -408,36 +410,13 @@ function _media_theplatform_mpx_retrieve_feed_data($url, $json_decode = TRUE, $o
   $memory_limit_in_bytes = _media_theplatform_mpx_convert_shorthand_to_bytes($memory_limit);
   $expensive_operation_min_memory = 536870912;
 
-  // Only output this message if the mpx logging level is set to extremely
-  // verbose.  Increase memory if necessary beforehand, as this message can
-  // be extremely large and use up available memory if set lower than 512M.
-  if (MEDIA_THEPLATFORM_MPX_LOGGING_LEVEL == WATCHDOG_DEBUG || MEDIA_THEPLATFORM_MPX_MESSAGE_LEVEL == WATCHDOG_DEBUG) {
+  if (variable_get('media_theplatform_mpx_debug', 0)) {
+    // Increase memory if necessary beforehand, as this message can be
+    // be extremely large and use up available memory if set lower than 512M.
     if ($memory_limit_in_bytes < $expensive_operation_min_memory) {
       ini_set('memory_limit', '512M');
     }
-    $response_log_message = t('Request to retrieve mpx data with drupal_http_request() returned the following response data:
-      request: @request
-      code: @code
-      protocol: @protocol
-      status_message: @status_message
-      redirect_code: @redirect_code
-      redirect_url: @redirect_url
-      error: @error
-      headers: @headers
-      data: @data',
-    array(
-      '@request' => $result->request,
-      '@code' => $result->code,
-      '@protocol' => $result->protocol,
-      '@status_message' => $result->status_message,
-      '@redirect_code' => $result->redirect_code,
-      '@redirect_url' => $result->redirect_url,
-      '@error' => $result->error,
-      '@headers' => $result->headers,
-      '@data' => $result->data,
-    ));
-    $response_log_message = str_replace("\n", '\n', $response_log_message);
-    watchdog('media_theplatform_mpx', $response_log_message,  array(), WATCHDOG_DEBUG);
+    media_theplatform_mpx_debug($result, "Request to retrieve mpx data with drupal_http_request()");
     if ($memory_limit_in_bytes < $expensive_operation_min_memory) {
       ini_set('memory_limit', $memory_limit);
     }
