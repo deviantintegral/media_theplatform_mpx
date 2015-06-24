@@ -1469,3 +1469,16 @@ function media_theplatform_mpx_debug($data, $label = NULL, $print_r = FALSE) {
     watchdog('media_theplatform_mpx', $watchdog_string, array('@value' => $value), WATCHDOG_DEBUG);
   }
 }
+
+/**
+ * Finds and returns $media_data array key with a pl#$ namespace prefix.
+ *
+ * @param string $key
+ * @param array $media_data
+ *
+ * @return mixed
+ */
+function _media_theplatform_mpx_get_pl_key($key, array $media_data) {
+  $pl_key = preg_grep('/^pl\d+\$' . preg_quote($key, '/') . '$/', array_keys($media_data));
+  return reset($pl_key);
+}
