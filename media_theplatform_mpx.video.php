@@ -39,7 +39,7 @@ function media_theplatform_mpx_get_changed_ids(MpxAccount $account) {
   catch (MpxApiException $exception) {
     // A 404 response means the notification ID that we have is now older than
     // 7 days, and now we have to start ingesting from the beginning again.
-    if ($exception->getException()->responseCode == 404) {
+    if ($exception->getCode() == 404) {
       $exception->setMessage("The last notification ID {$last_notification} for {$account} is older than 7 days and is too old to fetch notifications. The last notification ID has been reset to re-start ingestion of all videos.");
       drupal_register_shutdown_function(array($account, 'resetIngestion'));
     }

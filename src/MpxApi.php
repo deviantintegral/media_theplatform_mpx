@@ -32,7 +32,7 @@ class MpxApi {
     catch (MpxApiException $exception) {
       // If the token is invalid, we should delete it from storage so that a
       // fresh token is fetched on the next request.
-      if ($exception->getException()->responseCode == 401) {
+      if ($exception->getCode() == 401) {
         // Flag the token as expired so it will not be reused.
         $params['token']->expire = NULL;
         // Ensure the token will be deleted.
@@ -92,10 +92,10 @@ class MpxApi {
     media_theplatform_mpx_debug($response, "MPX API request to " . preg_replace('/\?.*/', '', $url));
 
     if (!empty($response->error)) {
-      throw new MpxHttpException($response);
+      throw new MpxHttpException("Error $response->code on request to $url: $response->error", (int) $response->code);
     }
     elseif (empty($response->data)) {
-      throw new MpxHttpException($response, "Empty response from request to $url.");
+      throw new MpxApiException("Empty response from request to $url.");
     }
 
     if (isset($response->headers['content-type']) && preg_match('~^(application|text)/json~', $response->headers['content-type'])) {
@@ -121,19 +121,19 @@ class MpxApi {
     $data = json_decode($response->data, TRUE, 256);
     if ($data === NULL && json_last_error() !== JSON_ERROR_NONE) {
       if (function_exists('json_last_error_msg')) {
-        throw new MpxHttpException($response, "Unable to decode JSON response from request to {$response->url}: " . json_last_error_msg());
+        throw new MpxHttpException("Unable to decode JSON response from request to {$response->url}: " . json_last_error_msg());
       }
       else {
-        throw new MpxHttpException($response, "Unable to decode JSON response from request to {$response->url}");
+        throw new MpxHttpException("Unable to decode JSON response from request to {$response->url}");
       }
     }
 
     $response->data = $data;
     if (!empty($data['responseCode']) && !empty($data['isException'])) {
-      throw new MpxApiException($response, (object) $data);
+      throw new MpxApiException("Error {$data['title']} on request to {$response->url}: {$data['description']}", (int) $data['responseCode']);
     }
     elseif (!empty($data[0]['entry']['responseCode']) && !empty($data[0]['entry']['isException'])) {
-      throw new MpxApiException($response, (object) $data[0]['entry']);
+      throw new MpxApiException("Error {$data[0]['entry']['title']} on request to {$response->url}: {$data[0]['entry']['description']}", (int) $data[0]['entry']['responseCode']);
     }
     else {
       return $data;
@@ -142,52 +142,6 @@ class MpxApi {
 
 }
 
-class MpxHttpException extends MpxException {
+class MpxHttpException extends MpxException { }
 
-  /** @var object */
-  protected $response;
-
-  /**
-   * @param object $response
-   * @param string $message
-   */
-  public function __construct($response, $message = '') {
-    $this->response = $response;
-    if (empty($message) && !empty($response->error)) {
-      $this->message = "Error $response->code on request to $response->url: $response->error";
-    }
-  }
-
-  /**
-   * @return object
-   */
-  public function getResponse() {
-    return $this->response;
-  }
-}
-
-class MpxApiException extends MpxHttpException {
-
-  /** @var object */
-  protected $exception;
-
-  /**
-   * @param object $response
-   * @param object $exception
-   * @param string $message
-   */
-  public function __construct($response, $exception, $message = '') {
-    $this->response = $response;
-    $this->exception = $exception;
-    if (empty($message)) {
-      $this->message = "Error {$exception->responseCode} on request to {$response->url}: {$exception->description}";
-    }
-  }
-
-  /**
-   * @return object
-   */
-  public function getException() {
-    return $this->exception;
-  }
-}
+class MpxApiException extends MpxHttpException { }
