@@ -38,14 +38,23 @@ function media_theplatform_mpx_media_theplatform_mpx_account_status(MpxAccount $
     );
   }
 
+  $ingest_url = url('admin/config/media/theplatform/accounts/' . $account->id . '/ingest', array(
+    'query' => array(
+      'token' => drupal_get_token('admin/config/media/theplatform/accounts/' . $account->id . '/ingest'),
+    ) + drupal_get_destination())
+  );
+
   $request_queue = MpxRequestQueue::get($account);
   $status['request_queue'] = array(
     'title' => t('Queued requests to process'),
     'value' => $request_queue->numberOfItems(),
   );
-  if (user_access('administer site configuration') && $status['request_queue']['value']) {
-    $cron_url = url('admin/reports/status/run-cron', array('query' => drupal_get_destination()));
-    $status['request_queue']['description'] = t('<a href="@cron">Run cron now</a> to process items from the queue.', array('@cron' => $cron_url));
+  if ($status['request_queue']['value']) {
+    $status['request_queue']['description'] = t('<a href="@ingest-url">Run ingestion now</a> to process items from the queue.', array('@ingest-url' => $ingest_url));
+  }
+  else {
+    // Do not show the status of the request queue if it doesn't contain any items.
+    unset($status['request_queue']);
   }
 
   // Report if there are any videos to be processed in the queue.
@@ -57,9 +66,8 @@ function media_theplatform_mpx_media_theplatform_mpx_account_status(MpxAccount $
     'title' => t('Queued videos to process'),
     'value' => $cron_queue_count,
   );
-  if (user_access('administer site configuration') && $status['video_queue']['value']) {
-    $cron_url = url('admin/reports/status/run-cron', array('query' => drupal_get_destination()));
-    $status['video_queue']['description'] = t('<a href="@cron">Run cron now</a> to process items from queue.', array('@cron' => $cron_url));
+  if ($status['video_queue']['value']) {
+    $status['video_queue']['description'] = t('<a href="@ingest-url">Run ingestion now</a> to process items from the queue.', array('@ingest-url' => $ingest_url));
   }
 
   // Report if the account has a current and valid API token.
@@ -111,7 +119,7 @@ function media_theplatform_mpx_media_theplatform_mpx_account_status(MpxAccount $
     }
   }
   else {
-    $status['current_notification_id']['value'] = t('Not available');
+    $status['current_notification_id']['value'] = t('Not yet available');
     $status['current_notification_id']['severity'] = REQUIREMENT_WARNING;
   }
 
@@ -148,7 +156,6 @@ function media_theplatform_mpx_media_theplatform_mpx_account_status(MpxAccount $
       else {
         $status['remaining_notifications']['value'] = $remaining_count;
       }
-
     }
     catch (Exception $exception) {
       $status['remaining_notifications']['value'] = $exception->getMessage();
