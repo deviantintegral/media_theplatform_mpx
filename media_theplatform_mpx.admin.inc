@@ -126,6 +126,8 @@ function media_theplatform_mpx_account_list() {
  *   A render array.
  */
 function media_theplatform_mpx_account_status_report_page(MpxAccount $account) {
+  include_once DRUPAL_ROOT . '/includes/install.inc';
+
   $status = module_invoke_all('media_theplatform_mpx_account_status', $account);
   drupal_alter('media_theplatform_mpx_account_status', $status, $account);
 
