@@ -403,9 +403,9 @@ class MpxAccount {
    *     watchdog statements. Defaults to 'manually'.
    *   - force: A boolean if TRUE will skip some validation that normally
    *     protects against duplicate runs.
-   *   - request queue: A boolean if TRUE will put the current batch and all of
-   *     the remaining batches into a queue instead of processing the batch
-   *     directly.
+   *   - all: A boolean if TRUE will put the current batch and all of
+   *     the remaining batches into a queue. Will also fetch all possible
+   *     notifications.
    *
    * @return array
    *   A summary of the ingestion run including the following elements:
@@ -446,7 +446,7 @@ class MpxAccount {
       timer_start($lock_id);
 
       if ($this->getDataValue('proprocessing_batch_url')) {
-        if (!empty($options['request queue'])) {
+        if (!empty($options['all'])) {
           // Put the batch into a queue if requested.
           MpxRequestQueue::populateBatchItems($this, $options['limit']);
         }

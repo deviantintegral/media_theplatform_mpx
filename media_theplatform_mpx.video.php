@@ -463,7 +463,7 @@ function _media_theplatform_mpx_process_video_update(MpxAccount $account, $optio
     WATCHDOG_INFO);
 
   // Get all IDs of mpxMedia that have been updated since last notification.
-  $media_to_update = media_theplatform_mpx_get_changed_ids($account, !empty($options['request queue']));
+  $media_to_update = media_theplatform_mpx_get_changed_ids($account, !empty($options['all']));
 
   // Update the current last notification from the data.
   if (!empty($media_to_update['last_notification'])) {
@@ -504,7 +504,7 @@ function _media_theplatform_mpx_process_video_update(MpxAccount $account, $optio
     $account->setDataValue('proprocessing_batch_item_count', $total_result_count);
     $account->setDataValue('proprocessing_batch_current_item', 1);
 
-    if (!empty($options['request queue'])) {
+    if (!empty($options['all'])) {
       // Put the batch into a queue if requested.
       return MpxRequestQueue::populateBatchItems($account, $options['limit']);
     }
@@ -572,7 +572,7 @@ function _media_theplatform_mpx_process_video_import(MpxAccount $account, array 
     $account->setDataValue('proprocessing_batch_item_count', $total_result_count);
     $account->setDataValue('proprocessing_batch_current_item', 1);
 
-    if (!empty($options['request queue'])) {
+    if (!empty($options['all'])) {
       // Put the batch into a queue if requested.
       return MpxRequestQueue::populateBatchItems($account, $options['limit']);
     }

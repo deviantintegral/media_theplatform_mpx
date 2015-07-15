@@ -29,6 +29,7 @@ function media_theplatform_mpx_drush_command() {
   );
 
   $ingest_options = array(
+    'all' => dt('If provided will attempt to ingest all possible items. Useful for initial ingestion or catching up when behind on notifications. If provided will also set --queue-run.'),
     'limit' => dt('The number of new or updated items to process from the feed at once. The default is 100.'),
     'queue-run' => dt('Will run the process queue after ingestion.'),
     'force' => dt('If provided will break any process locks.'),
@@ -226,7 +227,7 @@ function drush_media_theplatform_mpx_mpx_ingest($account_id) {
       'method' => 'via Drush',
       'limit' => (int) drush_get_option('limit', variable_get('media_theplatform_mpx__cron_videos_per_run', 100)),
       'force' => (bool) drush_get_option('force'),
-      'request queue' => (bool) drush_get_option('queue-run', TRUE),
+      'all' => (bool) drush_get_option('all'),
     );
     $summary = $account->ingestVideos($options);
     $lines = explode('<br>', format_string($summary['message'], $summary['args']));
@@ -234,8 +235,15 @@ function drush_media_theplatform_mpx_mpx_ingest($account_id) {
       drush_log($line, 'ok');
     }
 
-    // Convert the current ingestion to the request queue.
-    if (drush_get_option('queue-run', TRUE)) {
+    if ($options['all']) {
+      // Convert the current batch to the request queue.
+      MpxRequestQueue::populateBatchItems($account, $options['limit']);
+    }
+
+    // Show the summary of the account's queues.
+    drush_invoke_process('@self', 'mpx-queue-list', array($account_id));
+
+    if (drush_get_option('queue-run', $options['all'])) {
       // Ensure that the concurrency is not higher than the maximum number of
       // items in the queues for the account.
       $queues = drush_media_theplatform_mpx_mpx_queue_list($account_id);
@@ -266,9 +274,6 @@ function drush_media_theplatform_mpx_mpx_ingest($account_id) {
         Database::closeConnection();
       }
     }
-
-    // Show the summary of the account's queues.
-    drush_invoke_process('@self', 'mpx-queue-list', array($account_id));
   }
   catch (Exception $e) {
     watchdog_exception('media_theplatform_mpx', $e);
