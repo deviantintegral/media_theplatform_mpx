@@ -8,112 +8,109 @@
 /**
  * Query thePlatform Media Notify service to get Media id's that have changed.
  *
- * @param String $since
- *   The last notfication ID from thePlatform used to Sync mpxMedia.
+ * @param MpxAccount $account
+ *   The mpx account.
+ * @param bool $all
+ *   If TRUE will keep making requests for changed IDs until no data is
+ *   returned. If FALSE will only make one request for changed IDs.
  *
- * @return Array
- *   Array of mpxMedia id's that have changed since $since.
+ * @return array
+ *
+ * @throws MpxApiException
  */
-function media_theplatform_mpx_get_changed_ids(MpxAccount $account) {
-  $last_notification = $account->getDataValue('last_notification');
+function media_theplatform_mpx_get_changed_ids(MpxAccount $account, $all = FALSE) {
+  $results = array(
+    'actives' => array(),
+    'deletes' => array(),
+    'last_notification' => NULL,
+    'count' => 0,
+  );
 
-  try {
-    $params = array(
-      'account' => $account->import_account,
-      'block' => 'false',
-      'filter' => 'Media',
-      'clientId' => 'drupal_media_theplatform_mpx_' . $account->account_pid,
-      'since' => $last_notification,
-      'size' => variable_get('media_theplatform_mpx_notification_size', 500),
-    );
+  $params = array(
+    'account' => $account->import_account,
+    'block' => 'false',
+    'filter' => 'Media',
+    'clientId' => 'drupal_media_theplatform_mpx_' . $account->account_pid,
+    'since' => $account->getDataValue('last_notification'),
+    'size' => variable_get('media_theplatform_mpx_notification_size', 500),
+  );
 
-    $result_data = MpxApi::authenticatedRequest(
-      $account,
-      'https://read.data.media.theplatform.com/media/notify',
-      $params,
-      array(
-        'timeout' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
-      )
-    );
-  }
-  catch (MpxApiException $exception) {
-    // A 404 response means the notification ID that we have is now older than
-    // 7 days, and now we have to start ingesting from the beginning again.
-    if ($exception->getCode() == 404) {
-      $exception->setMessage("The last notification ID {$last_notification} for {$account} is older than 7 days and is too old to fetch notifications. The last notification ID has been reset to re-start ingestion of all videos.");
-      drupal_register_shutdown_function(array($account, 'resetIngestion'));
+  do {
+    try {
+      $data = MpxApi::authenticatedRequest(
+        $account,
+        'https://read.data.media.theplatform.com/media/notify',
+        $params,
+        array(
+          'timeout' => variable_get('media_theplatform_mpx__cron_videos_timeout', 180),
+        )
+      );
     }
-    throw $exception;
-  }
-
-  if (empty($result_data)) {
-    watchdog('media_theplatform_mpx', 'Request for update notifications returned no data for @account.',
-      array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_INFO);
-    return array();
-  }
-
-  // Initialize arrays to store active and deleted ID's.
-  $actives = array();
-  $deletes = array();
-  $last_notification = NULL;
-
-  foreach ($result_data as $changed) {
-    // Store last notification.
-    if (!empty($changed['id'])) {
-      $last_notification = $changed['id'];
+    catch (MpxApiException $exception) {
+      // A 404 response means the notification ID that we have is now older than
+      // 7 days, and now we have to start ingesting from the beginning again.
+      if ($exception->getException()->responseCode == 404) {
+        $exception->setMessage("The last notification ID {$params['since']} for {$account} is older than 7 days and is too old to fetch notifications. The last notification ID has been reset to re-start ingestion of all videos.");
+        drupal_register_shutdown_function(array($account, 'resetIngestion'));
+      }
+      throw $exception;
     }
-    elseif (is_numeric($changed)) {
-      $last_notification = $changed;
-    }
-    // If no method has been returned, there are no changes.
-    if (!isset($changed['method'])) {
-      watchdog('media_theplatform_mpx', 'Fetching changed media IDs for @account returned no changes.  "method" field value not set.',
-        array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_INFO);
 
-      break;
-    }
-    // Grab the last component of the URL.
-    $media_id = basename($changed['entry']['id']);
-    if ($changed['method'] !== 'delete') {
-      // If this entry id isn't already in actives, add it.
-      if (!in_array($media_id, $actives)) {
-        $actives[] = $media_id;
+    foreach ($data as $changed) {
+      // Store last notification.
+      $results['last_notification'] = $changed['id'];
+
+      // If no method and entry ID present, skip to the next notification.
+      if (empty($changed['method']) || empty($changed['entry']['id'])) {
+        continue;
+      }
+
+      // Grab the last component of the URL.
+      $media_id = basename($changed['entry']['id']);
+      if ($changed['method'] !== 'delete') {
+        $results['actives'][] = $media_id;
+      }
+      else {
+        // Only add to deletes array if this mpxMedia already exists.
+        // @todo Could we not care if the local video exists yet? Why not just silently fail the queue task instead?
+        $video_exists = media_theplatform_mpx_get_mpx_video_by_field('id', $media_id);
+        if ($video_exists) {
+          $results['deletes'][] = $media_id;
+        }
       }
     }
-    else {
-      // Only add to deletes array if this mpxMedia already exists.
-      $video_exists = media_theplatform_mpx_get_mpx_video_by_field('id', $media_id);
-      if ($video_exists) {
-        $deletes[] = $media_id;
-      }
+
+    // Add the total number of notifications processed.
+    $results['count'] += count($data);
+
+    // If this loops back, ensure the next request for notifications uses the
+    // sequence ID we just retrieved.
+    if (!empty($results['last_notification'])) {
+      $params['since'] = $results['last_notification'];
     }
-  }
 
-  if ($last_notification) {
-    $account->setDataValue('last_notification', $last_notification);
-  }
+  } while ($all && count($data) == $params['size']);
 
-  // Remove any deletes from actives, because it causes errors when updating.
-  $actives = array_diff($actives, $deletes);
+  // Reduce duplicate results.
+  $results['actives'] = array_unique($results['actives']);
+  $results['deletes'] = array_unique($results['deletes']);
 
   watchdog('media_theplatform_mpx',
     "Results while fetching changed media IDs for @account: <br/>
 <br /> Changed Media IDs: @actives
 <br /> Deleted Media IDs: @deletes
-<br /> Last Notification: @last_notification",
+<br /> Last Notification: @last_notification
+<br /> Total notification count: @count",
     array(
-      '@account' => _media_theplatform_mpx_account_log_string($account),
-      '@actives' => implode(', ', $actives),
-      '@deletes' => implode(', ', $deletes),
-      '@last_notification' => $last_notification,
+      '@account' => (string) $account,
+      '@actives' => implode(', ', $results['actives']),
+      '@deletes' => implode(', ', $results['deletes']),
+      '@last_notification' => $results['last_notification'],
+      '@count' => $results['count'],
     ),
     WATCHDOG_NOTICE);
 
-  return array(
-    'actives' => $actives,
-    'deletes' => $deletes,
-    'last_notification' => $last_notification,
-  );
+  return $results;
 }
 
 /**
@@ -466,28 +463,15 @@ function _media_theplatform_mpx_process_video_update(MpxAccount $account, $optio
     WATCHDOG_INFO);
 
   // Get all IDs of mpxMedia that have been updated since last notification.
-  $media_to_update = media_theplatform_mpx_get_changed_ids($account);
+  $media_to_update = media_theplatform_mpx_get_changed_ids($account, !empty($options['request queue']));
 
-  if (!$media_to_update) {
-    $cron_queue = DrupalQueue::get('media_theplatform_mpx_video_cron_queue');
-    $num_cron_queue_items = $cron_queue->numberOfItems();
-    if ($num_cron_queue_items) {
-      $message = 'All mpxMedia is up to date for @account.  There are approximately @num_items videos waiting to be processed for all accounts.';
-      $message_variables = array(
-        '@account' => _media_theplatform_mpx_account_log_string($account),
-        '@num_items' => $num_cron_queue_items
-      );
-    }
-    else {
-      $message = 'All mpxMedia is up to date for @account.';
-      $message_variables = array(
-        '@account' => _media_theplatform_mpx_account_log_string($account),
-      );
-    }
-    watchdog('media_theplatform_mpx', $message, $message_variables, WATCHDOG_NOTICE);
-
-    return FALSE;
+  // Update the current last notification from the data.
+  if (!empty($media_to_update['last_notification'])) {
+    $account->setDataValue('last_notification', $media_to_update['last_notification']);
   }
+
+  // Remove any deletes from actives, because it causes errors when updating.
+  $media_to_update['actives'] = array_diff($media_to_update['actives'], $media_to_update['deletes']);
 
   if (count($media_to_update['actives']) > 0) {
     $ids = implode(',', $media_to_update['actives']);
@@ -498,9 +482,6 @@ function _media_theplatform_mpx_process_video_update(MpxAccount $account, $optio
     if (!$processesing_success) {
       return FALSE;
     }
-    // Set last notification for the next update.
-    $account->setDataValue('last_notification', $media_to_update['last_notification']);
-
     return TRUE;
   }
   else {
@@ -518,8 +499,6 @@ function _media_theplatform_mpx_process_video_update(MpxAccount $account, $optio
   $total_result_count = count(explode(',', $ids));
 
   if ($total_result_count && $total_result_count > $options['limit']) {
-    // Set last notification for the next update.
-    $account->setDataValue('last_notification', $media_to_update['last_notification']);
     // Set starter batch system variables.
     $account->setDataValue('proprocessing_batch_url', $batch_url);
     $account->setDataValue('proprocessing_batch_item_count', $total_result_count);
@@ -553,9 +532,6 @@ function _media_theplatform_mpx_process_video_update(MpxAccount $account, $optio
   if (!$processesing_success) {
     return FALSE;
   }
-
-  // Set last notification for the next update.
-  $account->setDataValue('last_notification', $media_to_update['last_notification']);
 
   return TRUE;
 }
