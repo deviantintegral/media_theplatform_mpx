@@ -202,7 +202,7 @@ function media_theplatform_mpx_account_add_form($form, &$form_state) {
   $form['actions'] = array('#type' => 'actions');
   $form['actions']['submit'] = array(
     '#type' => 'submit',
-    '#value' => t('Continue and edit'),
+    '#value' => t('Continue and set import account'),
   );
   $form['actions']['cancel'] = array(
     '#type' => 'link',
@@ -242,7 +242,7 @@ function media_theplatform_mpx_account_add_form_validate($form, &$form_state) {
     $account = MpxAccount::create($form_state['values']);
     // Check if an unused import account can be selected.
     if (!$account->getImportAccountOptions()) {
-      form_set_error('', t('The mpx account @account does not have any available or unused import accounts.', array('@account' => $account->username)));
+      form_set_error('', t('The @account does not have any available or unused import accounts.', array('@account' => (string) $account)));
     }
   }
 }
@@ -256,7 +256,7 @@ function media_theplatform_mpx_account_add_form_submit($form, &$form_state) {
   form_state_values_clean($form_state);
   $account = MpxAccount::create($form_state['values']);
   $account->save();
-  watchdog('media_theplatform_mpx', 'Created mpx account @account.', array('@account' => $account->username), WATCHDOG_INFO);
+  watchdog('media_theplatform_mpx', 'Created @account.', array('@account' => (string) $account), WATCHDOG_INFO);
   // Redirect to the edit form to select import account and default player.
   $form_state['redirect'] = 'admin/config/media/theplatform/accounts/' . $account->id . '/edit';
 }
@@ -312,7 +312,7 @@ function media_theplatform_mpx_account_edit_form($form, &$form_state, MpxAccount
     );
   }
 
-  $default_player_options = media_theplatform_mpx_get_players_select($account);
+  $default_player_options = !empty($account->import_account) ? media_theplatform_mpx_get_players_select($account) : array();
   $form['default_player'] = array(
     '#type' => 'select',
     '#title' => t('Default player'),
@@ -335,7 +335,7 @@ function media_theplatform_mpx_account_edit_form($form, &$form_state, MpxAccount
   $form['actions'] = array('#type' => 'actions');
   $form['actions']['submit'] = array(
     '#type' => 'submit',
-    '#value' => t('Save'),
+    '#value' => empty($default_player_options) ? t('Continue and set default player') : t('Save'),
   );
   $form['actions']['cancel'] = array(
     '#type' => 'link',
@@ -364,9 +364,36 @@ function media_theplatform_mpx_account_edit_form_submit($form, &$form_state) {
     $account->default_player = NULL;
   }
   $account->save();
-  drupal_set_message(t('The mpx account %account has been saved.', array('%account' => $account->username)));
-  watchdog('media_theplatform_mpx', 'Updated mpx account @account.', array('@account' => $account->username), WATCHDOG_INFO);
-  $form_state['redirect'] = 'admin/config/media/theplatform/accounts';
+
+  if (empty($account->default_player)) {
+    watchdog('media_theplatform_mpx', 'Updated @account.', array('@account' => (string) $account), WATCHDOG_INFO);
+    $players = media_theplatform_mpx_import_account_players($account);
+    if (empty($players)) {
+      drupal_set_message(t('Unable to import players for the account.'), 'error');
+    }
+    $form_state['redirect'] = 'admin/config/media/theplatform/accounts/' . $account->id . '/edit';
+  }
+  else {
+    watchdog('media_theplatform_mpx', 'Updated @account.', array('@account' => (string) $account), WATCHDOG_INFO);
+    if (!$account->getDataValue('last_notification')) {
+      $methods = array();
+      if (variable_get('media_theplatform_mpx__cron_videos', 1)) {
+        if (user_access('administer site configuration')) {
+          $methods[] = l(t('Running cron'), 'admin/reports/status/run-cron', array('query' => drupal_get_destination()));
+        }
+        else {
+          $methods[] = t('Running cron');
+        }
+      }
+      $methods[] = t('Using the drush mpxi or mpxia commands from the command line');
+      $methods[] = t('Manually using the <a href="@link"><em>Run ingestion</em></a> link', array('@link' => url('admin/config/media/theplatform/accounts/' . $account->id . '/ingest', array('query' => array('token' => drupal_get_token('admin/config/media/theplatform/accounts/' . $account->id . '/ingest')) + drupal_get_destination()))));
+      drupal_set_message(t('The @account is now ready for video ingestion using any of the following methods: !methods', array('@account' => $account, '!methods' => theme('item_list', array('items' => $methods)))));
+    }
+    else {
+      drupal_set_message(t('The @account has been saved.', array('@account' => $account)));
+    }
+    $form_state['redirect'] = 'admin/config/media/theplatform/accounts';
+  }
 }
 
 /**
@@ -395,7 +422,7 @@ function media_theplatform_mpx_account_delete_form_submit($form, &$form_state) {
   $account = $form_state['build_info']['args'][0];
   _media_theplatform_mpx_delete_account($account->id);
   //drupal_set_message(t('The mpx account %account has been deleted.', array('%account' => $account->username)));
-  watchdog('media_theplatform_mpx', 'Deleted mpx account @account.', array('@account' => $account->username), WATCHDOG_INFO);
+  watchdog('media_theplatform_mpx', 'Deleted @account.', array('@account' => (string) $account), WATCHDOG_INFO);
   $form_state['redirect'] = 'admin/config/media/theplatform/accounts';
 }
 

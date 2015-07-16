@@ -7,29 +7,13 @@
 /**
  * Requests all mpxPlayers for specified thePlatform account.
  *
- * - Returns array of mpxPlayers' data indexed by mpxPlayer id if there are mpxPlayers.
- * - Returns FALSE if no mpxPlayers exist in mpx account.
- * - Returns error msg if no mpx_token variable.
+ * @return array
  */
 function media_theplatform_mpx_get_players_from_theplatform(MpxAccount $account) {
-
-  global $user;
-
-  // Check for the signIn token and account.
-  $mpx_token = $account->acquireToken();
-  $mpx_sub_account = $account->import_account;
-
-  if (!$mpx_token) {
-    watchdog('media_theplatform_mpx', 'Failed to retrieve mpx players for @acccount. Authentication token not available.',
-      array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_ERROR);
-
-    return FALSE;
-  }
-  if (!$mpx_sub_account) {
+  if (empty($account->import_account)) {
     watchdog('media_theplatform_mpx', 'Failed to retrieve mpx players for @acccount. Import account not available.',
-      array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_ERROR);
-
-    return FALSE;
+      array('@account' => (string) $account), WATCHDOG_ERROR);
+    return array();
   }
 
   // @todo - do some kind of check to bring back a max # of records?
@@ -40,15 +24,14 @@ function media_theplatform_mpx_get_players_from_theplatform(MpxAccount $account)
     array(
       'schema' => '1.3.0',
       'form' => 'json',
-      'account' => $mpx_sub_account,
+      'account' => $account->import_account,
     )
   );
 
   if (!isset($result_data['entryCount'])) {
     watchdog('media_theplatform_mpx', 'Failed to retrieve mpx players for @acccount.  "entryCount" field value not set.',
-      array('@account' => _media_theplatform_mpx_account_log_string($account)), WATCHDOG_ERROR);
-
-    return FALSE;
+      array('@account' => (string) $account), WATCHDOG_ERROR);
+    return array();
   }
 
   $players = array();
@@ -63,7 +46,7 @@ function media_theplatform_mpx_get_players_from_theplatform(MpxAccount $account)
         'description' => $player['description'],
         'pid' => $player['plplayer$pid'],
         'parent_account' => $account->id,
-        'account' => $mpx_sub_account,
+        'account' => $account->import_account,
       );
     }
   }
@@ -125,6 +108,50 @@ function media_theplatform_mpx_is_valid_player_for_account($player_id, $account 
   }
 
   return FALSE;
+}
+
+function media_theplatform_mpx_import_account_players(MpxAccount $account) {
+  $players = media_theplatform_mpx_get_players_from_theplatform($account);
+  foreach ($players as $player) {
+    media_theplatform_mpx_import_player($player, $account);
+  }
+
+  // Find all players that exist locally but weren't returned from
+  // the recent API request, and mark them as inactive.
+  $inactive_query = db_select('mpx_player', 'p')
+    ->fields('p', array('pid', 'fid'))
+    ->condition('status', 1)
+    ->condition('parent_account', $account->id);
+  if (!empty($players)) {
+    $inactive_query->condition('id', array_keys($players), 'NOT IN');
+  }
+  $inactive_players = $inactive_query->execute()->fetchAllKeyed();
+
+  if (!empty($inactive_players)) {
+    $inactive_fids = array_values($inactive_players);
+    watchdog('media_theplatform_mpx', 'Disabling the following players with pid values of @pids and fid values of @fid.',
+      array(
+        '@pids' => implode(', ', array_keys($inactive_players)),
+        '@fids' => implode(', ', array_values($inactive_fids)),
+      ),
+      WATCHDOG_INFO);
+    db_update('mpx_player')
+      ->fields(array('status' => 0))
+      ->condition('fid', $inactive_fids)
+      ->execute();
+
+    if (module_exists('file_admin')) {
+      $player_files = file_load_multiple($inactive_fids);
+      foreach ($player_files as $player_file) {
+        if (!empty($player_file->published)) {
+          $player_file->published = 0;
+          file_save($player_file);
+        }
+      }
+    }
+  }
+
+  return $players;
 }
 
 /**

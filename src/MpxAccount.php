@@ -517,6 +517,16 @@ class MpxAccount {
    * @return string
    */
   public function __toString() {
-    return 'mpx account ' . $this->id . ' (' . $this->import_account . ')';
+    $string = 'mpx account';
+    if (!empty($this->id)) {
+      $string .= ' ' . $this->id;
+      if (!empty($this->import_account)) {
+        $string .= ' (' . $this->import_account . ')';
+      }
+    }
+    else {
+      $string .= ' ' . $this->username;
+    }
+    return $string;
   }
 }
