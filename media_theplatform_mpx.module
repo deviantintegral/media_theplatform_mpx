@@ -964,39 +964,64 @@ function _media_theplatform_mpx_delete_account_finished($account_id) {
 }
 
 /**
- * Implements hook_representative_image_views_handler_render().
+ * Get the URI of the image for an mpx video.
  *
- * Provides Views support for Representative Image.
+ * @param object $file
+ *   An mpx video file object.
+ *
+ * @return string|bool
+ *   The URI of the image, or FALSE if an image was not available.
+ */
+function media_theplatform_mpx_get_image_uri($file) {
+  $uri = FALSE;
+  if (file_uri_scheme($file->uri) === 'mpx') {
+    /** @var MediaThePlatformMpxStreamWrapper $wrapper */
+    $wrapper = file_stream_wrapper_get_instance_by_uri($file->uri);
+    $local_uri = $wrapper->getLocalThumbnailPath();
+    if (is_file($local_uri)) {
+      $uri = $local_uri;
+    }
+    else {
+      $uri = $wrapper->getOriginalThumbnailPath();
+    }
+    drupal_alter('media_theplatform_mpx_image_uri', $uri, $file);
+  }
+  return $uri;
+}
+
+/**
+ * Implements hook_representative_image_ENTITY_TYPE_image_alter().
+ */
+function media_theplatform_mpx_representative_image_file_image_alter(&$image, $entity, $bundle_name) {
+  if (!$image && $uri = media_theplatform_mpx_get_image_uri($entity)) {
+    $image = file_create_url($uri);
+  }
+}
+
+/**
+ * Implements hook_representative_image_views_handler_render().
  */
 function media_theplatform_mpx_representative_image_views_handler_render($type, $entity, $field, $bundle, $values, $options) {
-  $mpx_bundle = (strpos($bundle,'mpx_video') === 0);
-
-  if ($mpx_bundle && !empty($entity->mpx_video_data['thumbnail_url'])) {
-    $local_thumbnail = pub_mpx_cache_thumbnail($entity->mpx_video_data['thumbnail_url']);
-
-    // By default the Image Style is not set and uses original.
-    if (empty($options['image_style'])) {
+  if ($type === 'file' && !$field && $uri = media_theplatform_mpx_get_image_uri($entity)) {
+    if (!empty($options['image_style']) && (file_valid_uri($uri) || (url_is_external($uri) && module_exists('imagecache_external')))) {
       return array(
-        '#theme' => 'image',
-        '#path' => $local_thumbnail,
+        '#theme' => 'image_style',
+        '#style_name' => $options['image_style'],
+        '#path' => $uri,
         '#attributes' => array(
           'class' => 'mpx-video-thumbnail',
         ),
       );
     }
-
-    // If Image Style is set then use it.
-    return array(
-      '#theme' => 'image_style',
-      '#style_name' => $options['image_style'],
-      '#path' => $local_thumbnail,
-      '#attributes' => array(
-        'class' => 'mpx-video-thumbnail',
-      ),
-    );
-  }
-  else {
-    return NULL;
+    else {
+      return array(
+        '#theme' => 'image',
+        '#path' => $uri,
+        '#attributes' => array(
+          'class' => 'mpx-video-thumbnail',
+        ),
+      );
+    }
   }
 }
 

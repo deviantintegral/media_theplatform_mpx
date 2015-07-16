@@ -194,3 +194,18 @@ function hook_media_theplatform_mpx_update_video($fid, array $video, MpxAccount 
 function hook_media_theplatform_mpx_set_video_inactive($id, $op) {
   // @todo Add example implementation.
 }
+
+/**
+ * Alter the image of an mpx video.
+ *
+ * @param string $uri
+ *   The image URI.
+ * @param object $file
+ *   The mpx file object.
+ */
+function hook_media_theplatform_mpx_image_uri_alter(&$uri, $file) {
+  if ($file->filemime === 'player/mpx') {
+    // Use the default mpx player image in the curren theme.
+    $uri = $GLOBALS['theme_path'] . '/images/mpx-player.jpg';
+  }
+}
