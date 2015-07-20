@@ -69,7 +69,7 @@ function media_theplatform_mpx_account_list() {
     $row['data'][] = $result->video_count;
 
     $operations = array();
-    $operations['status'] = array(
+    $operations['account-status'] = array(
       'title' => t('Status'),
       'href' => 'admin/config/media/theplatform/accounts/' . $id,
     );
