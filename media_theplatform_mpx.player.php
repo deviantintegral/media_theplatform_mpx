@@ -514,7 +514,7 @@ function media_theplatform_mpx_update_player($player, $fid, $mpx_player = NULL, 
  */
 function media_theplatform_mpx_get_mpx_player_by_field($fid, $field_name, $field_value, $op = '=') {
 
-  return db_query('mpx_player', 'p')
+  return db_select('mpx_player', 'p')
     ->fields('p')
     ->condition($field_name, $field_value, $op)
     ->execute()
