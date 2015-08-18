@@ -12,6 +12,7 @@
  *   An associative array containing:
  *   - file: The mpx video file object.
  *   - guid: The mpx video guid string.
+ *   - account_id: The mpx account ID if multiple videos share the same guid.
  *   - attributes: (optional) An array of additional attributes to use.
  *
  * @return string
