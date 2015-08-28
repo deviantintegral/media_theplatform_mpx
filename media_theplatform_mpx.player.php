@@ -9,47 +9,59 @@
  *
  * @return array
  */
-function media_theplatform_mpx_get_players_from_theplatform(MpxAccount $account) {
+function media_theplatform_mpx_get_players_from_theplatform(MpxAccount $account, $all = TRUE) {
   if (empty($account->import_account)) {
     watchdog('media_theplatform_mpx', 'Failed to retrieve mpx players for @acccount. Import account not available.',
       array('@account' => (string) $account), WATCHDOG_ERROR);
     return array();
   }
 
-  // @todo - do some kind of check to bring back a max # of records?
-  // Get the list of players from thePlatform.
-  $result_data = MpxApi::authenticatedRequest(
-    $account,
-    'https://read.data.player.theplatform.com/player/data/Player',
-    array(
-      'schema' => '1.3.0',
-      'form' => 'json',
-      'account' => $account->import_account,
-    )
+  $current_item = 1;
+  $size = variable_get('media_theplatform_mpx__cron_videos_per_run', 100);
+
+  $params = array(
+    'schema' => '1.3.0',
+    'form' => 'cjson',
+    'account' => $account->import_account,
   );
 
-  if (!isset($result_data['entryCount'])) {
-    watchdog('media_theplatform_mpx', 'Failed to retrieve mpx players for @acccount.  "entryCount" field value not set.',
-      array('@account' => (string) $account), WATCHDOG_ERROR);
-    return array();
-  }
-
   $players = array();
-  foreach ($result_data['entries'] as $player) {
-    // We only want mpxPlayers which are not disabled.
-    if (!$player['plplayer$disabled']) {
-      $player_id = basename($player['id']);
-      $players[$player_id] = array(
-        'id' => $player_id,
-        'guid' => $player['guid'],
-        'title' => $player['title'],
-        'description' => $player['description'],
-        'pid' => $player['plplayer$pid'],
-        'parent_account' => $account->id,
-        'account' => $account->import_account,
-      );
+
+  do {
+    $params['range'] = $current_item . '-' . ($current_item + $size - 1);
+
+    // Get the list of players from thePlatform.
+    $data = MpxApi::authenticatedRequest(
+      $account,
+      'https://read.data.player.theplatform.com/player/data/Player',
+      $params
+    );
+
+    if (!isset($data['entryCount'])) {
+      watchdog('media_theplatform_mpx', 'Failed to retrieve mpx players for @acccount.  "entryCount" field value not set.',
+        array('@account' => (string) $account), WATCHDOG_ERROR);
+      return array();
     }
-  }
+
+    foreach ($data['entries'] as $player) {
+      // We only want mpxPlayers which are not disabled.
+      if (!$player['disabled']) {
+        $player_id = basename($player['id']);
+        $players[$player_id] = array(
+          'id' => $player_id,
+          'guid' => $player['guid'],
+          'title' => $player['title'],
+          'description' => $player['description'],
+          'pid' => $player['pid'],
+          'parent_account' => $account->id,
+          'account' => $account->import_account,
+        );
+      }
+    }
+
+    $current_item += count($data['entries']);
+
+  } while ($all && !empty($data['entryCount']) && count($data['entries']) == $size);
 
   media_theplatform_mpx_debug($players, count($players) . " players returned for {$account}");
   return $players;
